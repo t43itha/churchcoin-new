@@ -2,7 +2,6 @@ import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
-import { createHash } from "node:crypto";
 
 const MODEL_NAME = "gpt-4o-mini";
 const MODEL_UNIT_COST = 0.0005; // estimated cost per 1K tokens in GBP equivalent
@@ -24,9 +23,15 @@ const buildCacheKey = (
   description: string,
   amount: number
 ) => {
-  const hash = createHash("sha256");
-  hash.update(`${churchId}:${normaliseDescription(description)}:${amount.toFixed(2)}`);
-  return hash.digest("hex");
+  // Simple hash function using basic string operations for caching
+  const input = `${churchId}:${normaliseDescription(description)}:${amount.toFixed(2)}`;
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    const char = input.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(16);
 };
 
 type SuggestionPayload = {

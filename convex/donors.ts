@@ -44,7 +44,7 @@ export const searchDonors = query({
       return donors;
     }
 
-    return fuse.search(args.searchTerm).map((result) => result.item);
+    return fuse.search(args.searchTerm).map((result: any) => result.item);
   },
 });
 
