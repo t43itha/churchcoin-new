@@ -1,0 +1,56 @@
+---
+description: Project-wide agentic rules referencing CLAUDE.md guides and Convex rules for consistent frontend/backend development
+alwaysApply: true
+---
+
+# ChurchCoin Agentic Development Rules
+
+These rules summarize and enforce the conventions from your CLAUDE guides and Convex rules across the entire repo.
+
+Authoritative docs to consult while coding:
+- [CLAUDE.md](mdc:CLAUDE.md) — repository-wide guidance and workflow
+- [convex/CLAUDE.md](mdc:convex/CLAUDE.md) — backend-specific guidance
+- [src/CLAUDE.md](mdc:src/CLAUDE.md) — frontend-specific guidance
+- [convex_rules.mdc](mdc:.cursor/rules/convex_rules.mdc) — strict Convex function/schema rules
+
+## Architecture & Tech Stack
+- Next.js App Router (15.x), React 19, TypeScript strict.
+- Tailwind CSS v4 with shadcn/ui components under `src/components/ui/`.
+- Convex for database, server functions, and auth under `convex/`.
+- Import alias `@/*` for all `src` imports.
+
+## Development Workflow
+- Backend: run `npm run convex:dev` continuously.
+- Frontend: run `npm run dev` in a separate terminal.
+- Ensure `NEXT_PUBLIC_CONVEX_URL` is set in `.env.local` for the client.
+- For deployments, use `npm run convex:deploy`.
+
+## Convex Rules (must-follow)
+- Define schema only in `convex/schema.ts` using `defineSchema`/`defineTable`.
+- Register functions with new syntax from `convex/_generated/server`:
+  - Public: `query`, `mutation`, `action`
+  - Internal: `internalQuery`, `internalMutation`, `internalAction`
+- Always provide `args` validators and `returns` (use `v.null()` when needed).
+- Use file-based routing under `convex/` and call via `api.*`/`internal.*`.
+- Prefer indexes and `withIndex` over `.filter()`; avoid table scans.
+- See full details in [convex_rules.mdc](mdc:.cursor/rules/convex_rules.mdc).
+
+## Frontend Rules
+- Wrap the app with the Convex provider in `src/app/layout.tsx` via `src/app/providers/convex-provider.tsx`.
+- Consume Convex in client components with `convex/react` hooks and `api` references from `convex/_generated/api`.
+- Use shadcn/ui primitives from `src/components/ui/`; follow design tokens and typography (JetBrains Mono) in `src/app/globals.css`.
+
+## File Placement
+- Backend functions: `convex/<feature>.ts` with public/internal functions grouped by feature.
+- HTTP endpoints: `convex/http.ts` using `httpAction` and `httpRouter`.
+- Providers: `src/app/providers/`.
+- Utility modules: `src/lib/`.
+
+## Quality & Consistency
+- TypeScript strict; avoid `any` and unsafe casts.
+- Keep functions small, typed, and validated; return early and handle errors meaningfully.
+- Match existing formatting; do not reformat unrelated code.
+
+When in doubt, consult the linked guides:
+- [CLAUDE.md](mdc:CLAUDE.md) • [convex/CLAUDE.md](mdc:convex/CLAUDE.md) • [src/CLAUDE.md](mdc:src/CLAUDE.md) • [convex_rules.mdc](mdc:.cursor/rules/convex_rules.mdc)
+
