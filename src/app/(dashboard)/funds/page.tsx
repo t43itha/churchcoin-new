@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { Banknote, LineChart, PiggyBank, PlusCircle } from "lucide-react";
 
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { FundCard, type FundCardSummary } from "@/components/funds/fund-card";
 import { FundForm, type FundFormValues } from "@/components/funds/fund-form";
 import { FundLedger } from "@/components/funds/fund-ledger";
@@ -185,8 +184,7 @@ export default function FundsPage() {
   };
 
   return (
-    <AuthGuard>
-      <div className="min-h-screen bg-paper pb-12">
+    <div className="min-h-screen bg-paper pb-12">
       <div className="border-b border-ledger bg-paper">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -420,7 +418,6 @@ export default function FundsPage() {
           ) : null}
         </SheetContent>
       </Sheet>
-      </div>
-    </AuthGuard>
+    </div>
   );
 }

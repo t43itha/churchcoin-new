@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { HandHeart, Users } from "lucide-react";
 
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -140,7 +139,7 @@ export default function DonorDirectoryPage() {
   }, [giftHistory]);
 
   return (
-    <AuthGuard>
+    
       <div className="min-h-screen bg-paper pb-12">
       <div className="border-b border-ledger bg-paper">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
@@ -339,6 +338,6 @@ export default function DonorDirectoryPage() {
         </Card>
       </div>
       </div>
-    </AuthGuard>
+    
   );
 }

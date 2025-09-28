@@ -739,3 +739,40 @@ export const resolvePendingTransaction = mutation({
     return args.transactionId;
   },
 });
+
+// Get recent transactions for dashboard
+export const getRecent = query({
+  args: { limit: v.optional(v.number()) },
+  returns: v.array(v.object({
+    _id: v.id("transactions"),
+    date: v.string(),
+    description: v.string(),
+    amount: v.number(),
+    type: v.union(v.literal("income"), v.literal("expense")),
+    fundId: v.id("funds"),
+    categoryId: v.optional(v.id("categories")),
+    donorId: v.optional(v.id("donors")),
+    method: v.optional(v.string()),
+    reference: v.optional(v.string()),
+    giftAid: v.boolean(),
+    notes: v.optional(v.string()),
+    reconciled: v.boolean(),
+    churchId: v.id("churches"),
+    source: v.optional(v.union(v.literal("manual"), v.literal("csv"), v.literal("api"))),
+    createdBy: v.id("users"),
+    enteredByName: v.optional(v.string()),
+    receiptStorageId: v.optional(v.id("_storage")),
+    receiptFilename: v.optional(v.string()),
+    pendingStatus: v.optional(v.union(v.literal("none"), v.literal("pending"), v.literal("cleared"))),
+    pendingReason: v.optional(v.string()),
+    expectedClearDate: v.optional(v.string()),
+    clearedAt: v.optional(v.number()),
+    _creationTime: v.number(),
+  })),
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("transactions")
+      .order("desc")
+      .take(args.limit || 10);
+  },
+});

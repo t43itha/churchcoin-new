@@ -130,6 +130,42 @@ export const archiveFund = mutation({
   },
 });
 
+// Simple list for dashboard without church context (for demo)
+export const list = query({
+  args: {},
+  returns: v.array(v.object({
+    _id: v.id("funds"),
+    name: v.string(),
+    type: v.union(v.literal("general"), v.literal("restricted"), v.literal("designated")),
+    balance: v.number(),
+    description: v.optional(v.string()),
+    restrictions: v.optional(v.string()),
+    isActive: v.boolean(),
+    churchId: v.id("churches"),
+    _creationTime: v.number(),
+  })),
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("funds")
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+  },
+});
+
+// Get total balance across all funds
+export const getTotalBalance = query({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const funds = await ctx.db
+      .query("funds")
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    return funds.reduce((total, fund) => total + fund.balance, 0);
+  },
+});
+
 export const getFundsOverview = query({
   args: { churchId: v.id("churches") },
   handler: async (ctx, args) => {

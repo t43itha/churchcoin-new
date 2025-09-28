@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { ArrowRight, Layers, NotebookPen } from "lucide-react";
 
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { CsvUploadCard } from "@/components/imports/csv-upload-card";
 import {
   MappingDrawer,
@@ -146,7 +145,7 @@ export default function ImportsPage() {
   const latestRows = rows ?? [];
 
   return (
-    <AuthGuard>
+    
       <div className="min-h-screen bg-paper pb-12">
       <div className="border-b border-ledger bg-paper">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
@@ -257,6 +256,6 @@ export default function ImportsPage() {
         </div>
       </div>
       </div>
-    </AuthGuard>
+    
   );
 }

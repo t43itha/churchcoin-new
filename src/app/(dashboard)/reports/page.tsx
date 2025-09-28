@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { BarChart3, FilePieChart } from "lucide-react";
 
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -206,7 +205,7 @@ export default function ReportsPage() {
   };
 
   return (
-    <AuthGuard>
+    
       <div className="min-h-screen bg-paper pb-12">
       <div className="border-b border-ledger bg-paper">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
@@ -401,6 +400,6 @@ export default function ReportsPage() {
         </Card>
       </div>
       </div>
-    </AuthGuard>
+    
   );
 }
