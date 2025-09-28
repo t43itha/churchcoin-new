@@ -47,6 +47,7 @@ export default defineSchema({
     reconciled: v.boolean(),
     notes: v.optional(v.string()),
     createdBy: v.id("users"),
+    enteredByName: v.optional(v.string()),
     source: v.union(
       v.literal("manual"),
       v.literal("csv"),

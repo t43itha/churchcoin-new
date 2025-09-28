@@ -1,3 +1,4 @@
+import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
@@ -18,10 +19,11 @@ export const getTransactions = query({
       .withIndex("by_church_date", (q) => q.eq("churchId", args.churchId))
       .order("desc");
 
-    if (args.fundId) {
+    const fundId = args.fundId;
+    if (fundId !== undefined) {
       query = ctx.db
         .query("transactions")
-        .withIndex("by_fund", (q) => q.eq("fundId", args.fundId))
+        .withIndex("by_fund", (q) => q.eq("fundId", fundId))
         .order("desc");
     }
 
@@ -64,45 +66,90 @@ export const createTransaction = mutation({
     reference: v.optional(v.string()),
     giftAid: v.boolean(),
     notes: v.optional(v.string()),
-    createdBy: v.id("users"),
-    source: v.union(
-      v.literal("manual"),
-      v.literal("csv"),
-      v.literal("api")
+    createdBy: v.optional(v.id("users")),
+    enteredByName: v.optional(v.string()),
+    source: v.optional(
+      v.union(v.literal("manual"), v.literal("csv"), v.literal("api"))
     ),
     csvBatch: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const {
+      createdBy,
+      enteredByName,
+      source = "manual",
+      ...transactionValues
+    } = args;
+
+    let userId = createdBy;
+    if (!userId) {
+      const existingChurchUser = await ctx.db
+        .query("users")
+        .withIndex("by_church", (q) => q.eq("churchId", transactionValues.churchId))
+        .first();
+
+      if (existingChurchUser) {
+        userId = existingChurchUser._id;
+      } else {
+        const placeholderEmail = `manual+${transactionValues.churchId}@churchcoin.local`;
+        const placeholderUser = await ctx.db
+          .query("users")
+          .withIndex("by_email", (q) => q.eq("email", placeholderEmail))
+          .first();
+
+        if (placeholderUser) {
+          userId = placeholderUser._id;
+        } else {
+          userId = await ctx.db.insert("users", {
+            name: enteredByName ?? "Manual Entry",
+            email: placeholderEmail,
+            role: "admin",
+            churchId: transactionValues.churchId,
+          } satisfies Omit<Doc<"users">, "_id" | "_creationTime">);
+        }
+      }
+    }
+
+    if (!userId) {
+      throw new Error("Unable to determine user for manual transaction");
+    }
+
     // Create the transaction
     const transactionId = await ctx.db.insert("transactions", {
-      ...args,
+      ...transactionValues,
+      source,
+      createdBy: userId,
+      enteredByName,
       reconciled: false,
     });
 
     // Update fund balance
-    const fund = await ctx.db.get(args.fundId);
+    const fund = await ctx.db.get(transactionValues.fundId);
     if (!fund) {
       throw new Error("Fund not found");
     }
 
-    const balanceChange = args.type === "income" ? args.amount : -args.amount;
+    const balanceChange =
+      transactionValues.type === "income"
+        ? transactionValues.amount
+        : -transactionValues.amount;
     const newBalance = fund.balance + balanceChange;
 
-    await ctx.db.patch(args.fundId, {
+    await ctx.db.patch(transactionValues.fundId, {
       balance: newBalance,
     });
 
     // Log audit trail
     await ctx.db.insert("auditLog", {
-      churchId: args.churchId,
-      userId: args.createdBy,
+      churchId: transactionValues.churchId,
+      userId,
       action: "CREATE_TRANSACTION",
       entityType: "transaction",
       entityId: transactionId,
       changes: {
-        amount: args.amount,
-        type: args.type,
-        fundId: args.fundId,
+        amount: transactionValues.amount,
+        type: transactionValues.type,
+        fundId: transactionValues.fundId,
       },
       timestamp: Date.now(),
     });

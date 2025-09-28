@@ -115,8 +115,9 @@ export const getDonorGivingHistory = query({
       .collect();
 
     // Filter by year if specified
-    if (args.year) {
-      transactions = transactions.filter((t) => t.date.startsWith(args.year));
+    const { year } = args;
+    if (year) {
+      transactions = transactions.filter((t) => t.date.startsWith(year));
     }
 
     // Calculate totals

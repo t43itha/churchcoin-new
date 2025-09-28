@@ -12,15 +12,15 @@
 - [ ] Set up error tracking (Sentry) and monitoring
 
 ### Iteration 2: Fund Management (Week 1-2)
-- [ ] Implement Convex schema (churches, funds, transactions, donors, categories)
-- [ ] Create fund CRUD operations (create, read, update, archive)
-- [ ] Build fund dashboard UI with fund cards
-- [ ] Add fund type support (general, restricted, designated)
-- [ ] Implement running balance calculations per fund
+- [x] Implement Convex schema (churches, funds, transactions, donors, categories)
+- [x] Create fund CRUD operations (create, read, update, archive)
+- [x] Build fund dashboard UI with fund cards
+- [x] Add fund type support (general, restricted, designated)
+- [x] Implement running balance calculations per fund
 
 ### Iteration 3: Manual Transaction Entry (Week 2-3)
-- [ ] Build transaction form with React Hook Form + Zod validation
-- [ ] Implement Sunday collection entry workflow
+- [x] Build transaction form with React Hook Form + Zod validation
+- [x] Implement Sunday collection entry workflow
 - [ ] Add midweek donation entry (quick entry with `/` shortcut)
 - [ ] Create transaction ledger table component
 - [ ] Add transaction CRUD with audit trail
