@@ -224,11 +224,6 @@ export const listSessions = query({
       .collect();
   },
 });
-<<<<<<< ours
-<<<<<<< ours
-=======
-=======
->>>>>>> theirs
 
 export const getVarianceReport = query({
   args: { sessionId: v.id("reconciliationSessions") },
@@ -353,7 +348,3 @@ export const getReconciliationReport = query({
     };
   },
 });
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs

@@ -420,10 +420,7 @@ export default function FundsPage() {
           ) : null}
         </SheetContent>
       </Sheet>
-<<<<<<< ours
-<<<<<<< ours
     </div>
-=======
       </div>
     </AuthGuard>
   );

@@ -104,8 +104,6 @@ export const getDonorStatementBatch = query({
       const total = donorTxns.reduce((sum, txn) => sum + txn.amount, 0);
       return {
         donor,
-<<<<<<< ours
-<<<<<<< ours
         transactions: donorTxns.map((txn) => ({
           ...txn,
           fundName: txn.fundId ? fundLookup.get(txn.fundId) ?? null : null,

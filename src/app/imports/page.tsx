@@ -256,9 +256,6 @@ export default function ImportsPage() {
           </Card>
         </div>
       </div>
-<<<<<<< ours
-<<<<<<< ours
-    </div>
       </div>
     </AuthGuard>
   );

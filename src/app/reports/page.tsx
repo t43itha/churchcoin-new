@@ -86,18 +86,12 @@ export default function ReportsPage() {
     churchId
       ? {
           churchId,
-<<<<<<< ours
-<<<<<<< ours
           fromDate: `${new Date().getFullYear()}-01-01`,
           toDate: new Date().toISOString().slice(0, 10),
-=======
           fromDate: statementStart,
           toDate: statementEnd,
->>>>>>> theirs
-=======
           fromDate: statementStart,
           toDate: statementEnd,
->>>>>>> theirs
         }
       : "skip"
   ) as DonorStatementSummary[] | undefined;
@@ -254,20 +248,11 @@ export default function ReportsPage() {
               {donorStatements ? `${donorStatements.length} donor statements queued` : "No donor statements yet"}
             </Badge>
           </div>
-<<<<<<< ours
-<<<<<<< ours
-=======
-=======
->>>>>>> theirs
           {reportError ? (
             <p className="rounded-md border border-error/40 bg-error/5 px-3 py-2 text-sm text-error">
               {reportError}
             </p>
           ) : null}
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
         </div>
       </div>
       <div className="mx-auto grid max-w-6xl gap-6 px-6 py-10 lg:grid-cols-[1.2fr,1fr]">
@@ -292,11 +277,6 @@ export default function ReportsPage() {
                     </li>
                   ))}
                 </ul>
-<<<<<<< ours
-<<<<<<< ours
-=======
-=======
->>>>>>> theirs
                 <div className="flex justify-end">
                   <Button
                     variant="outline"
@@ -307,10 +287,6 @@ export default function ReportsPage() {
                     {isExportingFund ? "Preparing PDF…" : "Export PDF"}
                   </Button>
                 </div>
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
               </>
             ) : (
               <p>Balances will appear once you add funds.</p>
@@ -325,11 +301,6 @@ export default function ReportsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-grey-mid">
-<<<<<<< ours
-<<<<<<< ours
-=======
-=======
->>>>>>> theirs
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="flex flex-col gap-2 text-xs uppercase tracking-wide text-grey-mid">
                 Period start
@@ -350,10 +321,6 @@ export default function ReportsPage() {
                 />
               </label>
             </div>
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
             {incomeExpense ? (
               <>
                 <p>Income {currency.format(incomeExpense.income)}</p>
@@ -363,11 +330,6 @@ export default function ReportsPage() {
             ) : (
               <p>Record transactions to populate the income & expenditure report.</p>
             )}
-<<<<<<< ours
-<<<<<<< ours
-=======
-=======
->>>>>>> theirs
             <div className="flex justify-end">
               <Button
                 variant="outline"
@@ -378,10 +340,6 @@ export default function ReportsPage() {
                 {isExportingIncome ? "Preparing PDF…" : "Export PDF"}
               </Button>
             </div>
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
           </CardContent>
         </Card>
         <Card className="border-ledger bg-paper shadow-none lg:col-span-2">
@@ -392,11 +350,6 @@ export default function ReportsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-grey-mid">
-<<<<<<< ours
-<<<<<<< ours
-=======
-=======
->>>>>>> theirs
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="flex flex-col gap-2 text-xs uppercase tracking-wide text-grey-mid">
                 From date
@@ -427,10 +380,6 @@ export default function ReportsPage() {
                 {isExportingStatements ? "Preparing PDF…" : "Export PDF batch"}
               </Button>
             </div>
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
             {donorStatements && donorStatements.length > 0 ? (
               donorStatements.map((statement: DonorStatementSummary) => (
                 <div key={statement.donor._id} className="flex items-center justify-between rounded-md border border-ledger px-3 py-2">
@@ -440,15 +389,9 @@ export default function ReportsPage() {
                       {statement.transactions.length} gifts · {currency.format(statement.total)} total
                     </p>
                   </div>
-<<<<<<< ours
-<<<<<<< ours
                   <Button variant="outline" className="border-ledger font-primary" disabled>
                     PDF coming soon
                   </Button>
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
                 </div>
               ))
             ) : (
@@ -457,10 +400,7 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
-<<<<<<< ours
-<<<<<<< ours
     </div>
-=======
       </div>
     </AuthGuard>
   );
