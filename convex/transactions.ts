@@ -22,6 +22,9 @@ export type CreateTransactionInput = {
   csvBatch?: string;
   receiptStorageId?: Id<"_storage">;
   receiptFilename?: string;
+  pendingStatus?: "none" | "pending" | "cleared";
+  pendingReason?: string;
+  expectedClearDate?: string;
 };
 
 type DuplicateSearchArgs = {
@@ -59,6 +62,9 @@ const insertTransaction = async (
     source = "manual",
     receiptStorageId,
     receiptFilename,
+    pendingStatus = "none",
+    pendingReason,
+    expectedClearDate,
     ...transactionValues
   } = args;
 
@@ -103,7 +109,22 @@ const insertTransaction = async (
     reconciled: false,
     receiptStorageId,
     receiptFilename,
+    pendingStatus,
+    pendingReason,
+    expectedClearDate,
+    clearedAt: pendingStatus === "cleared" ? Date.now() : undefined,
   });
+
+  if (pendingStatus === "pending") {
+    await ctx.db.insert("pendingTransactions", {
+      churchId: transactionValues.churchId,
+      transactionId,
+      reason: pendingReason ?? "Awaiting clearance",
+      expectedClearDate,
+      createdAt: Date.now(),
+      resolvedAt: undefined,
+    });
+  }
 
   const fund = await ctx.db.get(transactionValues.fundId);
   if (!fund) {
@@ -212,6 +233,11 @@ export const createTransaction = mutation({
     csvBatch: v.optional(v.string()),
     receiptStorageId: v.optional(v.id("_storage")),
     receiptFilename: v.optional(v.string()),
+    pendingStatus: v.optional(
+      v.union(v.literal("none"), v.literal("pending"), v.literal("cleared"))
+    ),
+    pendingReason: v.optional(v.string()),
+    expectedClearDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     return insertTransaction(ctx, args);
@@ -237,6 +263,11 @@ export const updateTransaction = mutation({
     receiptStorageId: v.optional(v.id("_storage")),
     receiptFilename: v.optional(v.string()),
     removeReceipt: v.optional(v.boolean()),
+    pendingStatus: v.optional(
+      v.union(v.literal("none"), v.literal("pending"), v.literal("cleared"))
+    ),
+    pendingReason: v.optional(v.string()),
+    expectedClearDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { transactionId, updatedBy, ...updates } = args;
@@ -275,8 +306,12 @@ export const updateTransaction = mutation({
       }
     }
 
-    const { removeReceipt, ...transactionUpdates } = updates as typeof updates & {
+    const { removeReceipt, ...rawUpdates } = updates as typeof updates & {
       removeReceipt?: boolean;
+    };
+
+    const transactionUpdates: Partial<Doc<"transactions">> = {
+      ...rawUpdates,
     };
 
     const oldAmount = transaction.amount;
@@ -291,8 +326,62 @@ export const updateTransaction = mutation({
       transactionUpdates.receiptFilename = undefined;
     }
 
+    if (rawUpdates.pendingStatus !== undefined) {
+      transactionUpdates.clearedAt =
+        rawUpdates.pendingStatus === "cleared" ? Date.now() : undefined;
+    }
+
     // Update the transaction
     await ctx.db.patch(transactionId, transactionUpdates);
+
+    if (
+      rawUpdates.pendingStatus !== undefined ||
+      rawUpdates.pendingReason !== undefined ||
+      rawUpdates.expectedClearDate !== undefined
+    ) {
+      const pendingRecord = await ctx.db
+        .query("pendingTransactions")
+        .withIndex("by_transaction", (q) => q.eq("transactionId", transactionId))
+        .first();
+
+      const nextStatus =
+        (rawUpdates.pendingStatus ?? transaction.pendingStatus ?? "none") as
+          | "none"
+          | "pending"
+          | "cleared";
+      const nextReason =
+        rawUpdates.pendingReason ?? transaction.pendingReason ?? undefined;
+      const nextExpectedClearDate =
+        rawUpdates.expectedClearDate ?? transaction.expectedClearDate ?? undefined;
+
+      if (nextStatus === "pending") {
+        if (pendingRecord) {
+          await ctx.db.patch(pendingRecord._id, {
+            reason: nextReason ?? pendingRecord.reason,
+            expectedClearDate: nextExpectedClearDate,
+            resolvedAt: undefined,
+          });
+        } else {
+          await ctx.db.insert("pendingTransactions", {
+            churchId: transaction.churchId,
+            transactionId,
+            reason: nextReason ?? "Awaiting clearance",
+            expectedClearDate: nextExpectedClearDate,
+            createdAt: Date.now(),
+            resolvedAt: undefined,
+          });
+        }
+      } else if (pendingRecord) {
+        if (nextStatus === "cleared") {
+          await ctx.db.patch(pendingRecord._id, {
+            resolvedAt: Date.now(),
+          });
+        } else {
+          await ctx.db.delete(pendingRecord._id);
+        }
+      }
+    }
+
 
     // Handle fund balance changes if amount, type, or fund changed
     if (
@@ -488,9 +577,41 @@ export const reconcileTransaction = mutation({
     reconciled: v.boolean(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.transactionId, {
-      reconciled: args.reconciled,
-    });
+    const transaction = await ctx.db.get(args.transactionId);
+    if (!transaction) {
+      throw new Error("Transaction not found");
+    }
+
+    const pendingRecord = await ctx.db
+      .query("pendingTransactions")
+      .withIndex("by_transaction", (q) => q.eq("transactionId", args.transactionId))
+      .first();
+
+    if (args.reconciled) {
+      await ctx.db.patch(args.transactionId, {
+        reconciled: true,
+        pendingStatus: transaction.pendingStatus === "pending" ? "cleared" : transaction.pendingStatus,
+        clearedAt: Date.now(),
+      });
+
+      if (pendingRecord) {
+        await ctx.db.patch(pendingRecord._id, {
+          resolvedAt: Date.now(),
+        });
+      }
+    } else {
+      await ctx.db.patch(args.transactionId, {
+        reconciled: false,
+        pendingStatus: transaction.pendingStatus === "cleared" ? "pending" : transaction.pendingStatus,
+        clearedAt: undefined,
+      });
+
+      if (pendingRecord && pendingRecord.resolvedAt) {
+        await ctx.db.patch(pendingRecord._id, {
+          resolvedAt: undefined,
+        });
+      }
+    }
   },
 });
 
@@ -504,5 +625,117 @@ export const getUnreconciledTransactions = query({
         q.eq("churchId", args.churchId).eq("reconciled", false)
       )
       .collect();
+  },
+});
+export const listPendingTransactions = query({
+  args: { churchId: v.id("churches") },
+  handler: async (ctx, args) => {
+    const pending = await ctx.db
+      .query("pendingTransactions")
+      .withIndex("by_church_status", (q) =>
+        q.eq("churchId", args.churchId).eq("resolvedAt", undefined)
+      )
+      .collect();
+
+    if (pending.length === 0) {
+      return [] as {
+        record: Doc<"pendingTransactions">;
+        transaction: Doc<"transactions"> | null;
+      }[];
+    }
+
+    const transactionIds = pending.map((record) => record.transactionId);
+    const transactions = await Promise.all(
+      transactionIds.map((id) => ctx.db.get(id))
+    );
+
+    return pending.map((record, index) => ({
+      record,
+      transaction: transactions[index] ?? null,
+    }));
+  },
+});
+
+export const markTransactionPending = mutation({
+  args: {
+    transactionId: v.id("transactions"),
+    reason: v.string(),
+    expectedClearDate: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const transaction = await ctx.db.get(args.transactionId);
+    if (!transaction) {
+      throw new Error("Transaction not found");
+    }
+
+    await ctx.db.patch(args.transactionId, {
+      pendingStatus: "pending",
+      pendingReason: args.reason,
+      expectedClearDate: args.expectedClearDate,
+      clearedAt: undefined,
+    });
+
+    const existing = await ctx.db
+      .query("pendingTransactions")
+      .withIndex("by_transaction", (q) => q.eq("transactionId", args.transactionId))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        reason: args.reason,
+        expectedClearDate: args.expectedClearDate,
+        resolvedAt: undefined,
+      });
+    } else {
+      await ctx.db.insert("pendingTransactions", {
+        churchId: transaction.churchId,
+        transactionId: args.transactionId,
+        reason: args.reason,
+        expectedClearDate: args.expectedClearDate,
+        createdAt: Date.now(),
+        resolvedAt: undefined,
+      });
+    }
+
+    return args.transactionId;
+  },
+});
+
+export const resolvePendingTransaction = mutation({
+  args: {
+    transactionId: v.id("transactions"),
+    markCleared: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const transaction = await ctx.db.get(args.transactionId);
+    if (!transaction) {
+      throw new Error("Transaction not found");
+    }
+
+    const pendingRecord = await ctx.db
+      .query("pendingTransactions")
+      .withIndex("by_transaction", (q) => q.eq("transactionId", args.transactionId))
+      .first();
+
+    const shouldClear = Boolean(args.markCleared);
+
+    await ctx.db.patch(args.transactionId, {
+      pendingStatus: shouldClear ? "cleared" : "none",
+      pendingReason: shouldClear ? transaction.pendingReason : undefined,
+      expectedClearDate: shouldClear ? transaction.expectedClearDate : undefined,
+      clearedAt: shouldClear ? Date.now() : undefined,
+    });
+
+    if (pendingRecord) {
+      if (shouldClear) {
+        await ctx.db.patch(pendingRecord._id, {
+          resolvedAt: Date.now(),
+        });
+      } else {
+        await ctx.db.delete(pendingRecord._id);
+      }
+    }
+
+    return args.transactionId;
   },
 });

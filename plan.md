@@ -8,7 +8,7 @@
 - [x] Install and configure shadcn/ui components
 - [x] Set up Convex backend (database, auth, functions)
 - [x] Create base layout with ledger-inspired typography (JetBrains Mono)
-- [ ] Implement authentication flow (login/register pages)
+- [x] Implement authentication flow (login/register pages)
 - [ ] Set up error tracking (Sentry) and monitoring
 
 ### Iteration 2: Fund Management (Week 1-2)
@@ -37,10 +37,10 @@
 ### Iteration 5: AI Categorization (Week 4-5)
 - [x] Integrate OpenAI GPT-3.5 for transaction categorization
 - [x] Implement rule-based preprocessing (pattern matching)
-- [ ] Build AI caching system in Convex
-- [ ] Add confidence scoring for suggestions
-- [ ] Create learning system from user corrections
-- [ ] Implement cost tracking and budget controls
+- [x] Build AI caching system in Convex
+- [x] Add confidence scoring for suggestions
+- [x] Create learning system from user corrections
+- [x] Implement cost tracking and budget controls
 
 ### Iteration 6: Donor Management (Week 5-6)
 - [x] Build donor directory with CRUD operations
@@ -53,18 +53,18 @@
 ### Iteration 7: Reconciliation (Week 6-7)
 - [x] Create bank reconciliation side-by-side view
 - [x] Implement AI-powered transaction matching
-- [ ] Add pending transaction tracking (uncashed cheques)
-- [ ] Build variance reporting
-- [ ] Create month-end closing process
-- [ ] Add reconciliation report generation
+- [x] Add pending transaction tracking (uncashed cheques)
+- [x] Build variance reporting
+- [x] Create month-end closing process
+- [x] Add reconciliation report generation
 
 ### Iteration 8: Reporting & Compliance (Week 7-8)
 - [x] Build fund balance summary report
 - [x] Create Income & Expenditure report by fund
-- [ ] Implement bulk donor statement generation (PDF only)
+- [x] Implement bulk donor statement generation (PDF only)
 - [ ] Add Gift Aid claim calculation (basic - automation in Phase 2)
 - [ ] Integrate Claude Haiku for trustee report narratives
-- [ ] Build PDF export functionality for all reports
+- [x] Build PDF export functionality for all reports
 
 ### Iteration 9: PWA & Beta Testing (Week 8)
 - [ ] Implement Progressive Web App (PWA) functionality

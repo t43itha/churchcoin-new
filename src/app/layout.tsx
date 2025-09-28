@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ConvexClientProvider } from "./providers/convex-provider";
+import { SessionProvider } from "@/components/auth/session-provider";
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
@@ -24,7 +25,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${jetbrainsMono.variable} font-primary antialiased`}>
         <ConvexClientProvider>
-          {children}
+          <SessionProvider>{children}</SessionProvider>
         </ConvexClientProvider>
       </body>
     </html>

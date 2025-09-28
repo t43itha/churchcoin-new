@@ -56,6 +56,16 @@ export default defineSchema({
     csvBatch: v.optional(v.string()), // For tracking imports
     receiptStorageId: v.optional(v.id("_storage")),
     receiptFilename: v.optional(v.string()),
+    pendingStatus: v.optional(
+      v.union(
+        v.literal("none"),
+        v.literal("pending"),
+        v.literal("cleared")
+      )
+    ),
+    pendingReason: v.optional(v.string()),
+    expectedClearDate: v.optional(v.string()),
+    clearedAt: v.optional(v.number()),
   })
     .index("by_church_date", ["churchId", "date"])
     .index("by_fund", ["fundId"])
@@ -128,6 +138,12 @@ export default defineSchema({
     ),
     bankBalance: v.number(),
     ledgerBalance: v.number(),
+    pendingTotal: v.optional(v.number()),
+    variance: v.optional(v.number()),
+    adjustments: v.optional(v.number()),
+    closedAt: v.optional(v.number()),
+    preparedBy: v.optional(v.id("users")),
+    notes: v.optional(v.string()),
   })
     .index("by_church", ["churchId", "startedAt"]),
 
@@ -147,7 +163,8 @@ export default defineSchema({
     type: v.union(
       v.literal("fund-balance"),
       v.literal("income-expense"),
-      v.literal("donor-statements")
+      v.literal("donor-statements"),
+      v.literal("reconciliation")
     ),
     generatedAt: v.number(),
     params: v.optional(v.any()),
@@ -232,6 +249,7 @@ export default defineSchema({
     scope: v.optional(v.string()),
     id_token: v.optional(v.string()),
     session_state: v.optional(v.string()),
+    secret: v.optional(v.string()),
   })
     .index("by_provider_and_account_id", [
       "provider",
@@ -253,9 +271,45 @@ export default defineSchema({
     value: v.string(), // AI response
     model: v.string(),
     expiresAt: v.number(), // Unix timestamp
+    churchId: v.optional(v.id("churches")),
   })
     .index("by_key", ["key"])
     .index("by_expiry", ["expiresAt"]),
+
+  aiFeedback: defineTable({
+    churchId: v.id("churches"),
+    inputHash: v.string(),
+    description: v.string(),
+    amount: v.number(),
+    chosenCategoryId: v.id("categories"),
+    confidence: v.number(),
+    createdAt: v.number(),
+    userId: v.optional(v.id("users")),
+  })
+    .index("by_church_input", ["churchId", "inputHash"])
+    .index("by_church", ["churchId", "createdAt"]),
+
+  aiUsage: defineTable({
+    churchId: v.optional(v.id("churches")),
+    model: v.string(),
+    promptTokens: v.number(),
+    completionTokens: v.number(),
+    totalTokens: v.number(),
+    cost: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_church", ["churchId", "createdAt"]),
+
+  pendingTransactions: defineTable({
+    churchId: v.id("churches"),
+    transactionId: v.id("transactions"),
+    reason: v.string(),
+    expectedClearDate: v.optional(v.string()),
+    createdAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+  })
+    .index("by_church_status", ["churchId", "resolvedAt"])
+    .index("by_transaction", ["transactionId"]),
 
   // Audit Log
   auditLog: defineTable({

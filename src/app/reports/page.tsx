@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { BarChart3, FilePieChart } from "lucide-react";
 
+import { AuthGuard } from "@/components/auth/auth-guard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -49,6 +51,22 @@ const currency = new Intl.NumberFormat("en-GB", {
 export default function ReportsPage() {
   const churches = useQuery(api.churches.listChurches, {});
   const [churchId, setChurchId] = useState<Id<"churches"> | null>(null);
+  const [incomeStart, setIncomeStart] = useState(
+    () => `${new Date().getFullYear()}-01-01`
+  );
+  const [incomeEnd, setIncomeEnd] = useState(
+    () => new Date().toISOString().slice(0, 10)
+  );
+  const [statementStart, setStatementStart] = useState(
+    () => `${new Date().getFullYear()}-01-01`
+  );
+  const [statementEnd, setStatementEnd] = useState(
+    () => new Date().toISOString().slice(0, 10)
+  );
+  const [isExportingFund, setIsExportingFund] = useState(false);
+  const [isExportingIncome, setIsExportingIncome] = useState(false);
+  const [isExportingStatements, setIsExportingStatements] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
   const fundSummary = useQuery(
     api.reports.getFundBalanceSummary,
     churchId ? { churchId } : "skip"
@@ -58,8 +76,8 @@ export default function ReportsPage() {
     churchId
       ? {
           churchId,
-          startDate: `${new Date().getFullYear()}-01-01`,
-          endDate: new Date().toISOString().slice(0, 10),
+          startDate: incomeStart,
+          endDate: incomeEnd,
         }
       : "skip"
   ) as IncomeExpenseReport | undefined;
@@ -68,8 +86,18 @@ export default function ReportsPage() {
     churchId
       ? {
           churchId,
+<<<<<<< ours
+<<<<<<< ours
           fromDate: `${new Date().getFullYear()}-01-01`,
           toDate: new Date().toISOString().slice(0, 10),
+=======
+          fromDate: statementStart,
+          toDate: statementEnd,
+>>>>>>> theirs
+=======
+          fromDate: statementStart,
+          toDate: statementEnd,
+>>>>>>> theirs
         }
       : "skip"
   ) as DonorStatementSummary[] | undefined;
@@ -87,8 +115,105 @@ export default function ReportsPage() {
     return incomeExpense.income - incomeExpense.expense;
   }, [incomeExpense]);
 
+  const triggerDownload = async (response: Response, filename: string) => {
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportFund = async () => {
+    if (!churchId) {
+      return;
+    }
+    setIsExportingFund(true);
+    setReportError(null);
+    try {
+      const response = await fetch("/api/reports/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "fund-balance", churchId }),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to export fund summary");
+      }
+      await triggerDownload(response, `fund-balance-${churchId}.pdf`);
+    } catch (error) {
+      console.error(error);
+      setReportError("Unable to export the fund summary right now.");
+    } finally {
+      setIsExportingFund(false);
+    }
+  };
+
+  const handleExportIncome = async () => {
+    if (!churchId) {
+      return;
+    }
+    setIsExportingIncome(true);
+    setReportError(null);
+    try {
+      const response = await fetch("/api/reports/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "income-expense",
+          churchId,
+          startDate: incomeStart,
+          endDate: incomeEnd,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to export income & expenditure report");
+      }
+      await triggerDownload(response, `income-expense-${incomeStart}-${incomeEnd}.pdf`);
+    } catch (error) {
+      console.error(error);
+      setReportError("Unable to export income & expenditure right now.");
+    } finally {
+      setIsExportingIncome(false);
+    }
+  };
+
+  const handleExportStatements = async () => {
+    if (!churchId) {
+      return;
+    }
+    setIsExportingStatements(true);
+    setReportError(null);
+    try {
+      const response = await fetch("/api/reports/donor-statements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          churchId,
+          fromDate: statementStart,
+          toDate: statementEnd,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to export donor statements");
+      }
+      await triggerDownload(
+        response,
+        `donor-statements-${statementStart}-${statementEnd}.pdf`
+      );
+    } catch (error) {
+      console.error(error);
+      setReportError("Unable to export donor statements right now.");
+    } finally {
+      setIsExportingStatements(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-paper pb-12">
+    <AuthGuard>
+      <div className="min-h-screen bg-paper pb-12">
       <div className="border-b border-ledger bg-paper">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -129,6 +254,20 @@ export default function ReportsPage() {
               {donorStatements ? `${donorStatements.length} donor statements queued` : "No donor statements yet"}
             </Badge>
           </div>
+<<<<<<< ours
+<<<<<<< ours
+=======
+=======
+>>>>>>> theirs
+          {reportError ? (
+            <p className="rounded-md border border-error/40 bg-error/5 px-3 py-2 text-sm text-error">
+              {reportError}
+            </p>
+          ) : null}
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
         </div>
       </div>
       <div className="mx-auto grid max-w-6xl gap-6 px-6 py-10 lg:grid-cols-[1.2fr,1fr]">
@@ -153,6 +292,25 @@ export default function ReportsPage() {
                     </li>
                   ))}
                 </ul>
+<<<<<<< ours
+<<<<<<< ours
+=======
+=======
+>>>>>>> theirs
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    className="border-ledger font-primary"
+                    onClick={handleExportFund}
+                    disabled={isExportingFund}
+                  >
+                    {isExportingFund ? "Preparing PDF…" : "Export PDF"}
+                  </Button>
+                </div>
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
               </>
             ) : (
               <p>Balances will appear once you add funds.</p>
@@ -167,6 +325,35 @@ export default function ReportsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-grey-mid">
+<<<<<<< ours
+<<<<<<< ours
+=======
+=======
+>>>>>>> theirs
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-2 text-xs uppercase tracking-wide text-grey-mid">
+                Period start
+                <Input
+                  type="date"
+                  value={incomeStart}
+                  onChange={(event) => setIncomeStart(event.target.value)}
+                  className="font-primary"
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-xs uppercase tracking-wide text-grey-mid">
+                Period end
+                <Input
+                  type="date"
+                  value={incomeEnd}
+                  onChange={(event) => setIncomeEnd(event.target.value)}
+                  className="font-primary"
+                />
+              </label>
+            </div>
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
             {incomeExpense ? (
               <>
                 <p>Income {currency.format(incomeExpense.income)}</p>
@@ -176,6 +363,25 @@ export default function ReportsPage() {
             ) : (
               <p>Record transactions to populate the income & expenditure report.</p>
             )}
+<<<<<<< ours
+<<<<<<< ours
+=======
+=======
+>>>>>>> theirs
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                className="border-ledger font-primary"
+                onClick={handleExportIncome}
+                disabled={isExportingIncome}
+              >
+                {isExportingIncome ? "Preparing PDF…" : "Export PDF"}
+              </Button>
+            </div>
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
           </CardContent>
         </Card>
         <Card className="border-ledger bg-paper shadow-none lg:col-span-2">
@@ -186,6 +392,45 @@ export default function ReportsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-grey-mid">
+<<<<<<< ours
+<<<<<<< ours
+=======
+=======
+>>>>>>> theirs
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-2 text-xs uppercase tracking-wide text-grey-mid">
+                From date
+                <Input
+                  type="date"
+                  value={statementStart}
+                  onChange={(event) => setStatementStart(event.target.value)}
+                  className="font-primary"
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-xs uppercase tracking-wide text-grey-mid">
+                To date
+                <Input
+                  type="date"
+                  value={statementEnd}
+                  onChange={(event) => setStatementEnd(event.target.value)}
+                  className="font-primary"
+                />
+              </label>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                className="border-ledger font-primary"
+                onClick={handleExportStatements}
+                disabled={isExportingStatements || !donorStatements?.length}
+              >
+                {isExportingStatements ? "Preparing PDF…" : "Export PDF batch"}
+              </Button>
+            </div>
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
             {donorStatements && donorStatements.length > 0 ? (
               donorStatements.map((statement: DonorStatementSummary) => (
                 <div key={statement.donor._id} className="flex items-center justify-between rounded-md border border-ledger px-3 py-2">
@@ -195,9 +440,15 @@ export default function ReportsPage() {
                       {statement.transactions.length} gifts · {currency.format(statement.total)} total
                     </p>
                   </div>
+<<<<<<< ours
+<<<<<<< ours
                   <Button variant="outline" className="border-ledger font-primary" disabled>
                     PDF coming soon
                   </Button>
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
                 </div>
               ))
             ) : (
@@ -206,6 +457,11 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
+<<<<<<< ours
+<<<<<<< ours
     </div>
+=======
+      </div>
+    </AuthGuard>
   );
 }

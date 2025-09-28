@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import { CalendarCheck, NotebookPen, Upload } from "lucide-react";
 
+import { AuthGuard } from "@/components/auth/auth-guard";
 import { SundayCollectionCard } from "@/components/transactions/sunday-collection-card";
 import {
   TransactionForm,
@@ -25,6 +26,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api, type Doc, type Id } from "@/lib/convexGenerated";
+<<<<<<< ours
+<<<<<<< ours
+=======
+import { useSession } from "@/components/auth/session-provider";
+>>>>>>> theirs
+=======
+import { useSession } from "@/components/auth/session-provider";
+>>>>>>> theirs
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -44,6 +53,14 @@ export default function TransactionsPage() {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Doc<"transactions"> | null>(null);
   const editingModeRef = useRef<"create" | "edit">("create");
+<<<<<<< ours
+<<<<<<< ours
+=======
+  const { user } = useSession();
+>>>>>>> theirs
+=======
+  const { user } = useSession();
+>>>>>>> theirs
 
   const funds = useQuery(
     api.funds.getFunds,
@@ -86,6 +103,19 @@ export default function TransactionsPage() {
     editingModeRef.current = isEditing ? "edit" : "create";
 
     if (isEditing && editingTransaction) {
+<<<<<<< ours
+<<<<<<< ours
+=======
+=======
+>>>>>>> theirs
+      const previousCategory = editingTransaction.categoryId;
+      const nextCategory = values.categoryId
+        ? (values.categoryId as Id<"categories">)
+        : undefined;
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
       await updateTransaction({
         transactionId: editingTransaction._id,
         date: values.date,
@@ -104,6 +134,29 @@ export default function TransactionsPage() {
         removeReceipt:
           Boolean(editingTransaction.receiptStorageId) && !values.receiptStorageId,
       });
+<<<<<<< ours
+<<<<<<< ours
+=======
+=======
+>>>>>>> theirs
+      if (
+        churchId &&
+        nextCategory &&
+        nextCategory !== previousCategory
+      ) {
+        await convex.mutation(api.ai.recordFeedback, {
+          churchId,
+          description: editingTransaction.description,
+          amount: editingTransaction.amount,
+          categoryId: nextCategory,
+          confidence: 0.9,
+          userId: user?._id,
+        });
+      }
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
       return;
     }
 
@@ -219,11 +272,26 @@ export default function TransactionsPage() {
   };
 
   const handleSuggestCategory = async (transaction: Doc<"transactions">) => {
+<<<<<<< ours
+<<<<<<< ours
     if (!categories) {
       return;
     }
 
     const suggestion = await convex.query(api.ai.suggestCategory, {
+=======
+=======
+>>>>>>> theirs
+    if (!categories || !churchId) {
+      return;
+    }
+
+    const suggestion = await convex.mutation(api.ai.suggestCategory, {
+      churchId,
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
       description: transaction.description,
       amount: transaction.amount,
       categories: (categories as Doc<"categories">[]).map((category) => ({
@@ -231,6 +299,8 @@ export default function TransactionsPage() {
         name: category.name,
         type: category.type,
       })),
+<<<<<<< ours
+<<<<<<< ours
     });
 
     if (suggestion?.categoryId) {
@@ -241,11 +311,52 @@ export default function TransactionsPage() {
       setFeedback({
         type: "success",
         message: `Categorised using AI suggestion (${suggestion.categoryId}).`,
+=======
+=======
+>>>>>>> theirs
+      userId: user?._id,
+    });
+
+    if (suggestion?.categoryId) {
+      const suggestedCategoryId = suggestion.categoryId as Id<"categories">;
+      const suggestedCategory = (categories as Doc<"categories">[]).find(
+        (category) => category._id === suggestedCategoryId
+      );
+
+      await updateTransaction({
+        transactionId: transaction._id,
+        categoryId: suggestedCategoryId,
+      });
+      await convex.mutation(api.ai.recordFeedback, {
+        churchId,
+        description: transaction.description,
+        amount: transaction.amount,
+        categoryId: suggestedCategoryId,
+        confidence: suggestion.confidence,
+        userId: user?._id,
+      });
+      setFeedback({
+        type: "success",
+        message: `Categorised using AI suggestion${
+          suggestedCategory ? ` (${suggestedCategory.name})` : ""
+        } at ${(suggestion.confidence * 100).toFixed(0)}% confidence.`,
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
       });
     } else {
       setFeedback({ type: "error", message: "No confident suggestion available yet." });
     }
   };
+<<<<<<< ours
+<<<<<<< ours
+=======
+
+>>>>>>> theirs
+=======
+
+>>>>>>> theirs
   const ledgerSnapshot = useMemo(() => {
     if (!funds) {
       return { count: 0, balance: 0 };
@@ -289,6 +400,14 @@ export default function TransactionsPage() {
       receiptFilename: editingTransaction.receiptFilename ?? undefined,
     } satisfies Partial<Omit<TransactionFormValues, "churchId">>;
   }, [editingTransaction]);
+<<<<<<< ours
+<<<<<<< ours
+=======
+
+>>>>>>> theirs
+=======
+
+>>>>>>> theirs
   if (!churches) {
     return (
       <div className="min-h-screen bg-paper">
@@ -311,7 +430,8 @@ export default function TransactionsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-paper pb-12">
+    <AuthGuard>
+      <div className="min-h-screen bg-paper pb-12">
       <div className="border-b border-ledger bg-paper">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -391,7 +511,15 @@ export default function TransactionsPage() {
               heading={editingTransaction ? "Edit transaction" : "Manual transaction entry"}
               subheading={
                 editingTransaction
+<<<<<<< ours
+<<<<<<< ours
                   ? "Adjust ledger entries and we'll automatically log the amendment."
+=======
+                  ? "Adjust ledger entries and we’ll automatically log the amendment."
+>>>>>>> theirs
+=======
+                  ? "Adjust ledger entries and we’ll automatically log the amendment."
+>>>>>>> theirs
                   : "Capture one-off income or expenses with full audit detail."
               }
               submitLabel={editingTransaction ? "Update transaction" : "Record transaction"}
@@ -473,6 +601,11 @@ export default function TransactionsPage() {
           />
         </div>
       </div>
+<<<<<<< ours
+<<<<<<< ours
     </div>
+=======
+      </div>
+    </AuthGuard>
   );
 }

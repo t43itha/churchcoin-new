@@ -74,6 +74,14 @@ export const getDonorStatementBatch = query({
       .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
 
+    const funds = await ctx.db
+      .query("funds")
+      .withIndex("by_church", (q) => q.eq("churchId", args.churchId))
+      .collect();
+
+    const fundLookup = new Map(
+      funds.map((fund) => [fund._id, fund.name] as const)
+    );
     const transactions = await ctx.db
       .query("transactions")
       .withIndex("by_church_date", (q) => q.eq("churchId", args.churchId))
@@ -96,7 +104,12 @@ export const getDonorStatementBatch = query({
       const total = donorTxns.reduce((sum, txn) => sum + txn.amount, 0);
       return {
         donor,
-        transactions: donorTxns,
+<<<<<<< ours
+<<<<<<< ours
+        transactions: donorTxns.map((txn) => ({
+          ...txn,
+          fundName: txn.fundId ? fundLookup.get(txn.fundId) ?? null : null,
+        })),
         total,
       };
     });
