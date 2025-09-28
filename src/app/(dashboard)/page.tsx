@@ -7,6 +7,7 @@ import { PiggyBank, Receipt, Users, TrendingUp, Plus, Eye } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
+import type { Doc } from "@/lib/convexGenerated";
 import { cn } from "@/lib/utils";
 
 interface MetricCardProps {
@@ -52,10 +53,9 @@ interface QuickActionProps {
   description: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  variant?: "default" | "outline";
 }
 
-function QuickAction({ title, description, href, icon: Icon, variant = "default" }: QuickActionProps) {
+function QuickAction({ title, description, href, icon: Icon }: QuickActionProps) {
   return (
     <Link href={href}>
       <Card className="border-ledger bg-paper hover:bg-highlight cursor-pointer transition-colors">
@@ -187,7 +187,7 @@ export default function DashboardPage() {
           <CardContent>
             {recentTransactions && recentTransactions.length > 0 ? (
               <div className="space-y-3">
-                {recentTransactions.map((transaction) => (
+                {recentTransactions.map((transaction: Doc<"transactions">) => (
                   <div
                     key={transaction._id}
                     className="flex items-center justify-between p-3 border border-ledger rounded-lg"
@@ -240,7 +240,7 @@ export default function DashboardPage() {
           <CardContent>
             {funds && funds.length > 0 ? (
               <div className="space-y-3">
-                {funds.slice(0, 4).map((fund) => (
+                {funds.slice(0, 4).map((fund: Doc<"funds">) => (
                   <div
                     key={fund._id}
                     className="flex items-center justify-between p-3 border border-ledger rounded-lg"
