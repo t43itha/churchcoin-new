@@ -400,7 +400,6 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
       </div>
     </AuthGuard>
   );

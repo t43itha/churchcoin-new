@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/select";
 import { api, type Doc, type Id } from "@/lib/convexGenerated";
 import { useSession } from "@/components/auth/session-provider";
-import { useSession } from "@/components/auth/session-provider";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -47,7 +46,6 @@ export default function TransactionsPage() {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Doc<"transactions"> | null>(null);
   const editingModeRef = useRef<"create" | "edit">("create");
-  const { user } = useSession();
   const { user } = useSession();
 
   const funds = useQuery(
@@ -242,11 +240,6 @@ export default function TransactionsPage() {
   };
 
   const handleSuggestCategory = async (transaction: Doc<"transactions">) => {
-    if (!categories) {
-      return;
-    }
-
-    const suggestion = await convex.query(api.ai.suggestCategory, {
     if (!categories || !churchId) {
       return;
     }
@@ -267,12 +260,6 @@ export default function TransactionsPage() {
         transactionId: transaction._id,
         categoryId: suggestion.categoryId as Id<"categories">,
       });
-      setFeedback({
-        type: "success",
-        message: `Categorised using AI suggestion (${suggestion.categoryId}).`,
-      userId: user?._id,
-    });
-
     if (suggestion?.categoryId) {
       const suggestedCategoryId = suggestion.categoryId as Id<"categories">;
       const suggestedCategory = (categories as Doc<"categories">[]).find(
@@ -452,8 +439,6 @@ export default function TransactionsPage() {
               subheading={
                 editingTransaction
                   ? "Adjust ledger entries and we'll automatically log the amendment."
-                  ? "Adjust ledger entries and we’ll automatically log the amendment."
-                  ? "Adjust ledger entries and we’ll automatically log the amendment."
                   : "Capture one-off income or expenses with full audit detail."
               }
               submitLabel={editingTransaction ? "Update transaction" : "Record transaction"}
@@ -535,7 +520,6 @@ export default function TransactionsPage() {
           />
         </div>
       </div>
-    </div>
       </div>
     </AuthGuard>
   );
