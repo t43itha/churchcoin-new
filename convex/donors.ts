@@ -1,3 +1,4 @@
+import Fuse from "fuse.js";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
@@ -34,13 +35,16 @@ export const searchDonors = query({
       .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
 
-    const searchLower = args.searchTerm.toLowerCase();
-    return donors.filter(
-      (donor) =>
-        donor.name.toLowerCase().includes(searchLower) ||
-        (donor.email && donor.email.toLowerCase().includes(searchLower)) ||
-        (donor.bankReference && donor.bankReference.toLowerCase().includes(searchLower))
-    );
+    const fuse = new Fuse(donors, {
+      keys: ["name", "email", "bankReference"],
+      threshold: 0.4,
+    });
+
+    if (!args.searchTerm) {
+      return donors;
+    }
+
+    return fuse.search(args.searchTerm).map((result) => result.item);
   },
 });
 
@@ -100,6 +104,18 @@ export const archiveDonor = mutation({
   },
 });
 
+export const createAnonymousDonor = mutation({
+  args: { churchId: v.id("churches"), label: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("donors", {
+      churchId: args.churchId,
+      name: args.label ?? "Anonymous donor",
+      isActive: true,
+      notes: "System-generated anonymous donor",
+    });
+  },
+});
+
 // Get donor giving history
 export const getDonorGivingHistory = query({
   args: {
@@ -137,6 +153,44 @@ export const getDonorGivingHistory = query({
   },
 });
 
+export const getDonorGivingByFund = query({
+  args: {
+    donorId: v.id("donors"),
+  },
+  handler: async (ctx, args) => {
+    const transactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_donor", (q) => q.eq("donorId", args.donorId))
+      .collect();
+
+    const donor = await ctx.db.get(args.donorId);
+    if (!donor) {
+      throw new Error("Donor not found");
+    }
+
+    const funds = await ctx.db
+      .query("funds")
+      .withIndex("by_church", (q) => q.eq("churchId", donor.churchId!))
+      .collect();
+
+    const fundLookup = new Map(funds.map((fund) => [fund._id, fund.name]));
+
+    const aggregates = new Map<string, { amount: number; count: number }>();
+    for (const txn of transactions) {
+      const key = fundLookup.get(txn.fundId) ?? "Unknown";
+      const aggregate = aggregates.get(key) ?? { amount: 0, count: 0 };
+      aggregate.amount += txn.amount;
+      aggregate.count += 1;
+      aggregates.set(key, aggregate);
+    }
+
+    return Array.from(aggregates.entries()).map(([fundName, stats]) => ({
+      fundName,
+      ...stats,
+    }));
+  },
+});
+
 // Find donors by bank reference (for matching CSV imports)
 export const findDonorByBankReference = query({
   args: {
@@ -150,5 +204,48 @@ export const findDonorByBankReference = query({
         q.eq("churchId", args.churchId).eq("bankReference", args.reference)
       )
       .first();
+  },
+});
+
+export const generateDonorStatement = query({
+  args: {
+    donorId: v.id("donors"),
+    fromDate: v.string(),
+    toDate: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const donor = await ctx.db.get(args.donorId);
+    if (!donor) {
+      throw new Error("Donor not found");
+    }
+
+    const transactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_donor", (q) => q.eq("donorId", args.donorId))
+      .collect();
+
+    const filtered = transactions.filter(
+      (txn) => txn.date >= args.fromDate && txn.date <= args.toDate
+    );
+
+    const total = filtered.reduce((sum, txn) => sum + txn.amount, 0);
+
+    return {
+      donor: {
+        name: donor.name,
+        email: donor.email,
+        address: donor.address,
+      },
+      transactions: filtered,
+      totals: {
+        total,
+        count: filtered.length,
+      },
+      period: {
+        from: args.fromDate,
+        to: args.toDate,
+      },
+      generatedAt: new Date().toISOString(),
+    };
   },
 });

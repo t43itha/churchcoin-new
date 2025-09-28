@@ -21,46 +21,46 @@
 ### Iteration 3: Manual Transaction Entry (Week 2-3)
 - [x] Build transaction form with React Hook Form + Zod validation
 - [x] Implement Sunday collection entry workflow
-- [ ] Add midweek donation entry (quick entry with `/` shortcut)
-- [ ] Create transaction ledger table component
-- [ ] Add transaction CRUD with audit trail
-- [ ] Implement expense recording with receipt attachment
+- [x] Add midweek donation entry (quick entry with `/` shortcut)
+- [x] Create transaction ledger table component
+- [x] Add transaction CRUD with audit trail
+- [x] Implement expense recording with receipt attachment
 
 ### Iteration 4: CSV Upload & Processing (Week 3-4)
-- [ ] Build CSV file upload component with dropzone
-- [ ] Implement CSV parser with column detection
-- [ ] Create mapping configuration UI for bank formats
-- [ ] Add support for standard UK bank formats (Barclays, HSBC)
-- [ ] Implement duplicate transaction detection
-- [ ] Build bulk approval workflow UI
+- [x] Build CSV file upload component with dropzone
+- [x] Implement CSV parser with column detection
+- [x] Create mapping configuration UI for bank formats
+- [x] Add support for standard UK bank formats (Barclays, HSBC)
+- [x] Implement duplicate transaction detection
+- [x] Build bulk approval workflow UI
 
 ### Iteration 5: AI Categorization (Week 4-5)
-- [ ] Integrate OpenAI GPT-3.5 for transaction categorization
-- [ ] Implement rule-based preprocessing (pattern matching)
+- [x] Integrate OpenAI GPT-3.5 for transaction categorization
+- [x] Implement rule-based preprocessing (pattern matching)
 - [ ] Build AI caching system in Convex
 - [ ] Add confidence scoring for suggestions
 - [ ] Create learning system from user corrections
 - [ ] Implement cost tracking and budget controls
 
 ### Iteration 6: Donor Management (Week 5-6)
-- [ ] Build donor directory with CRUD operations
-- [ ] Add Gift Aid declaration tracking
-- [ ] Implement fuzzy donor matching for bank transactions
-- [ ] Create donor giving history view by fund
-- [ ] Add anonymous donation handling
-- [ ] Build donor statement generation (individual)
+- [x] Build donor directory with CRUD operations
+- [x] Add Gift Aid declaration tracking
+- [x] Implement fuzzy donor matching for bank transactions
+- [x] Create donor giving history view by fund
+- [x] Add anonymous donation handling
+- [x] Build donor statement generation (individual)
 
 ### Iteration 7: Reconciliation (Week 6-7)
-- [ ] Create bank reconciliation side-by-side view
-- [ ] Implement AI-powered transaction matching
+- [x] Create bank reconciliation side-by-side view
+- [x] Implement AI-powered transaction matching
 - [ ] Add pending transaction tracking (uncashed cheques)
 - [ ] Build variance reporting
 - [ ] Create month-end closing process
 - [ ] Add reconciliation report generation
 
 ### Iteration 8: Reporting & Compliance (Week 7-8)
-- [ ] Build fund balance summary report
-- [ ] Create Income & Expenditure report by fund
+- [x] Build fund balance summary report
+- [x] Create Income & Expenditure report by fund
 - [ ] Implement bulk donor statement generation (PDF only)
 - [ ] Add Gift Aid claim calculation (basic - automation in Phase 2)
 - [ ] Integrate Claude Haiku for trustee report narratives

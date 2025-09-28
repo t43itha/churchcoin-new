@@ -54,11 +54,106 @@ export default defineSchema({
       v.literal("api")
     ),
     csvBatch: v.optional(v.string()), // For tracking imports
+    receiptStorageId: v.optional(v.id("_storage")),
+    receiptFilename: v.optional(v.string()),
   })
     .index("by_church_date", ["churchId", "date"])
     .index("by_fund", ["fundId"])
     .index("by_donor", ["donorId"])
     .index("by_reconciled", ["churchId", "reconciled"]),
+
+  // CSV Imports
+  csvImports: defineTable({
+    churchId: v.id("churches"),
+    filename: v.string(),
+    uploadedAt: v.number(),
+    bankFormat: v.union(
+      v.literal("barclays"),
+      v.literal("hsbc"),
+      v.literal("generic")
+    ),
+    status: v.union(
+      v.literal("uploaded"),
+      v.literal("mapping"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    rowCount: v.number(),
+    processedCount: v.number(),
+    duplicateCount: v.number(),
+    mapping: v.object({
+      date: v.string(),
+      description: v.string(),
+      amount: v.string(),
+      reference: v.optional(v.string()),
+      type: v.optional(v.string()),
+    }),
+  })
+    .index("by_church", ["churchId", "uploadedAt"])
+    .index("by_status", ["status"]),
+
+  csvRows: defineTable({
+    importId: v.id("csvImports"),
+    raw: v.object({
+      date: v.string(),
+      description: v.string(),
+      amount: v.number(),
+      reference: v.optional(v.string()),
+      type: v.optional(v.string()),
+    }),
+    detectedDonorId: v.optional(v.id("donors")),
+    detectedFundId: v.optional(v.id("funds")),
+    duplicateOf: v.optional(v.id("transactions")),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("duplicate"),
+      v.literal("ready"),
+      v.literal("approved"),
+      v.literal("skipped")
+    ),
+  })
+    .index("by_import", ["importId"])
+    .index("by_duplicate", ["duplicateOf"]),
+
+  // Reconciliation Sessions
+  reconciliationSessions: defineTable({
+    churchId: v.id("churches"),
+    startedAt: v.number(),
+    month: v.string(),
+    status: v.union(
+      v.literal("open"),
+      v.literal("in-progress"),
+      v.literal("completed")
+    ),
+    bankBalance: v.number(),
+    ledgerBalance: v.number(),
+  })
+    .index("by_church", ["churchId", "startedAt"]),
+
+  reconciliationMatches: defineTable({
+    sessionId: v.id("reconciliationSessions"),
+    bankRowId: v.id("csvRows"),
+    transactionId: v.id("transactions"),
+    confidence: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_transaction", ["transactionId"]),
+
+  // Report snapshots for iteration 8
+  reportSnapshots: defineTable({
+    churchId: v.id("churches"),
+    type: v.union(
+      v.literal("fund-balance"),
+      v.literal("income-expense"),
+      v.literal("donor-statements")
+    ),
+    generatedAt: v.number(),
+    params: v.optional(v.any()),
+    payload: v.any(),
+  })
+    .index("by_church_type", ["churchId", "type", "generatedAt"]),
 
   // Categories
   categories: defineTable({

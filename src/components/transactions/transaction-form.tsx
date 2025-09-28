@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useMutation } from "convex/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
@@ -8,7 +9,8 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import type { Doc, Id } from "@/lib/convexGenerated";
+import { Badge } from "@/components/ui/badge";
+import { api, type Doc, type Id } from "@/lib/convexGenerated";
 
 const transactionSchema = z.object({
   churchId: z.string().min(1, "Select a church"),
@@ -27,6 +29,8 @@ const transactionSchema = z.object({
   giftAid: z.boolean().default(false),
   notes: z.string().optional(),
   enteredByName: z.string().optional(),
+  receiptStorageId: z.string().optional(),
+  receiptFilename: z.string().optional(),
 });
 
 export type TransactionFormValues = z.infer<typeof transactionSchema>;
@@ -42,6 +46,7 @@ type TransactionFormProps = {
   heading?: string;
   subheading?: string;
   submitLabel?: string;
+  showReceiptHint?: boolean;
 };
 
 const methodOptions = [
@@ -64,8 +69,12 @@ export function TransactionForm({
   heading = "Manual transaction entry",
   subheading = "Capture one-off income or expenses with full audit detail.",
   submitLabel = "Record transaction",
+  showReceiptHint = true,
 }: TransactionFormProps) {
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+
+  const generateUploadUrl = useMutation(api.files.generateReceiptUploadUrl);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema) as Resolver<TransactionFormValues>,
@@ -83,6 +92,8 @@ export function TransactionForm({
       giftAid: false,
       notes: "",
       enteredByName: "",
+      receiptStorageId: defaultValues?.receiptStorageId,
+      receiptFilename: defaultValues?.receiptFilename,
       ...defaultValues,
     },
   });
@@ -102,6 +113,8 @@ export function TransactionForm({
       giftAid: defaultValues?.giftAid ?? false,
       notes: defaultValues?.notes ?? "",
       enteredByName: defaultValues?.enteredByName ?? "",
+      receiptStorageId: defaultValues?.receiptStorageId,
+      receiptFilename: defaultValues?.receiptFilename,
     });
   }, [churchId, defaultValues, form, funds]);
 
@@ -110,15 +123,24 @@ export function TransactionForm({
     register,
     watch,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = form;
 
   const selectedFundId = watch("fundId");
+  const type = watch("type");
 
   const selectedFund = useMemo(() => {
     return funds.find((fund) => fund._id === selectedFundId) ?? null;
   }, [funds, selectedFundId]);
 
+  const expenseCategories = useMemo(() => {
+    return categories.filter((category) => category.type === "expense");
+  }, [categories]);
+
+  const incomeCategories = useMemo(() => {
+    return categories.filter((category) => category.type === "income");
+  }, [categories]);
   const onSubmitHandler = handleSubmit(async (values) => {
     setSubmitError(null);
 
@@ -133,9 +155,29 @@ export function TransactionForm({
         values.enteredByName && values.enteredByName.trim().length > 0
           ? values.enteredByName.trim()
           : undefined,
+      receiptStorageId: values.receiptStorageId,
+      receiptFilename: values.receiptFilename,
     };
 
     try {
+      if (receiptFile) {
+        const uploadUrl = await generateUploadUrl({});
+        const uploadResponse = await fetch(uploadUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": receiptFile.type,
+          },
+          body: receiptFile,
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error("Failed to upload receipt");
+        }
+
+        const { storageId } = (await uploadResponse.json()) as { storageId: string };
+        sanitized.receiptStorageId = storageId;
+        sanitized.receiptFilename = receiptFile.name;
+      }
       await onSubmit(sanitized);
       reset({
         churchId,
@@ -151,7 +193,10 @@ export function TransactionForm({
         giftAid: false,
         notes: "",
         enteredByName: sanitized.enteredByName ?? "",
+        receiptStorageId: undefined,
+        receiptFilename: undefined,
       });
+      setReceiptFile(null);
       onSubmitSuccess?.();
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Unable to record transaction");
@@ -250,13 +295,11 @@ export function TransactionForm({
                 className="h-9 w-full rounded-md border border-ledger bg-paper px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-grey-mid"
               >
                 <option value="">No category</option>
-                {categories
-                  .filter((category) => category.type === watch("type"))
-                  .map((category) => (
-                    <option key={category._id} value={category._id}>
-                      {category.name}
-                    </option>
-                  ))}
+                {(type === "expense" ? expenseCategories : incomeCategories).map((category) => (
+                  <option key={category._id} value={category._id}>
+                    {category.name}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="flex flex-col gap-2">
@@ -297,17 +340,19 @@ export function TransactionForm({
               />
             </div>
           </div>
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-ink">Gift Aid eligible?</label>
-            <label className="flex items-center gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-ledger accent-ink"
-                {...register("giftAid")}
-              />
-              Gift Aid declaration recorded for this donation
-            </label>
-          </div>
+          {type === "income" ? (
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-ink">Gift Aid eligible?</label>
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-ledger accent-ink"
+                  {...register("giftAid")}
+                />
+                Gift Aid declaration recorded for this donation
+              </label>
+            </div>
+          ) : null}
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-ink">Notes (optional)</label>
             <textarea
@@ -317,6 +362,51 @@ export function TransactionForm({
               {...register("notes")}
             />
           </div>
+          {type === "expense" ? (
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-ink">Receipt attachment</label>
+              <Input
+                type="file"
+                accept="image/*,.pdf"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null;
+                  setReceiptFile(file);
+                  if (file) {
+                    setValue("receiptFilename", file.name);
+                    setValue("receiptStorageId", undefined);
+                  } else {
+                    setValue("receiptFilename", undefined);
+                    setValue("receiptStorageId", undefined);
+                  }
+                }}
+              />
+              {form.watch("receiptFilename") ? (
+                <div className="flex items-center gap-2 text-xs text-grey-mid">
+                  <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
+                    {form.watch("receiptFilename")}
+                  </Badge>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-error"
+                    onClick={() => {
+                      setReceiptFile(null);
+                      setValue("receiptFilename", undefined);
+                      setValue("receiptStorageId", undefined);
+                    }}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ) : null}
+              {showReceiptHint ? (
+                <p className="text-xs text-grey-mid">
+                  Upload PDFs or images. Receipts live alongside the ledger entry for audits.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-ink">Entered by</label>
             <Input

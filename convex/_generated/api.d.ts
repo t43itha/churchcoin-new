@@ -13,9 +13,15 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
+import type * as ai from "../ai.js";
+import type * as categories from "../categories.js";
 import type * as churches from "../churches.js";
 import type * as donors from "../donors.js";
+import type * as files from "../files.js";
 import type * as funds from "../funds.js";
+import type * as imports from "../imports.js";
+import type * as reconciliation from "../reconciliation.js";
+import type * as reports from "../reports.js";
 import type * as transactions from "../transactions.js";
 
 /**
@@ -27,9 +33,15 @@ import type * as transactions from "../transactions.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  ai: typeof ai;
+  categories: typeof categories;
   churches: typeof churches;
   donors: typeof donors;
+  files: typeof files;
   funds: typeof funds;
+  imports: typeof imports;
+  reconciliation: typeof reconciliation;
+  reports: typeof reports;
   transactions: typeof transactions;
 }>;
 export declare const api: FilterApi<
