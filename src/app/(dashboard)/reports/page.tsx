@@ -85,10 +85,6 @@ export default function ReportsPage() {
     churchId
       ? {
           churchId,
-          fromDate: `${new Date().getFullYear()}-01-01`,
-          toDate: new Date().toISOString().slice(0, 10),
-          fromDate: statementStart,
-          toDate: statementEnd,
           fromDate: statementStart,
           toDate: statementEnd,
         }
