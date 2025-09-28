@@ -255,11 +255,6 @@ export default function TransactionsPage() {
     });
 
     if (suggestion?.categoryId) {
-      await updateTransaction({
-        transactionId: transaction._id,
-        categoryId: suggestion.categoryId as Id<"categories">,
-      });
-    if (suggestion?.categoryId) {
       const suggestedCategoryId = suggestion.categoryId as Id<"categories">;
       const suggestedCategory = (categories as Doc<"categories">[]).find(
         (category) => category._id === suggestedCategoryId
@@ -356,8 +351,7 @@ export default function TransactionsPage() {
   }
 
   return (
-    
-      <div className="min-h-screen bg-paper pb-12">
+    <div className="min-h-screen bg-paper pb-12">
       <div className="border-b border-ledger bg-paper">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -519,7 +513,6 @@ export default function TransactionsPage() {
           />
         </div>
       </div>
-      </div>
-    
+    </div>
   );
 }
