@@ -7,7 +7,7 @@ import { PiggyBank, Receipt, Users, TrendingUp, Plus, Eye } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
-import type { Doc } from "@/lib/convexGenerated";
+import type { Doc } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 
 interface MetricCardProps {
