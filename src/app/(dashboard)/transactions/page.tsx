@@ -272,11 +272,15 @@ export default function TransactionsPage() {
         confidence: suggestion.confidence,
         userId: user?._id,
       });
+
+      const suggestionLabel = suggestedCategory
+        ? ` (${suggestedCategory.name})`
+        : "";
+      const confidencePercentage = Math.round(suggestion.confidence * 100);
+
       setFeedback({
         type: "success",
-        message: `Categorised using AI suggestion${
-          suggestedCategory ? ` (${suggestedCategory.name})` : ""
-        } at ${(suggestion.confidence * 100).toFixed(0)}% confidence.`,
+        message: `Categorised using AI suggestion${suggestionLabel} at ${confidencePercentage}% confidence.`,
       });
     } else {
       setFeedback({ type: "error", message: "No confident suggestion available yet." });
