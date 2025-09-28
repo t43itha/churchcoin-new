@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calculator, PoundSterling, Shield, Zap } from "lucide-react";
@@ -14,8 +16,8 @@ export default function Home() {
               <h1 className="text-xl font-semibold text-ink">ChurchCoin</h1>
             </div>
             <div className="flex space-x-4">
-              <Button variant="outline" className="font-primary">
-                Sign In
+              <Button asChild variant="outline" className="font-primary">
+                <Link href="/login">Sign In</Link>
               </Button>
               <Button className="font-primary">
                 Get Started
