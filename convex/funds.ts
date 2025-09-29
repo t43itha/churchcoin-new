@@ -153,24 +153,39 @@ export const archiveFund = mutation({
 // Simple list for dashboard without church context (for demo)
 export const list = query({
   args: {},
-  returns: v.array(v.object({
-    _id: v.id("funds"),
-    name: v.string(),
-    type: v.union(v.literal("general"), v.literal("restricted"), v.literal("designated")),
-    balance: v.number(),
-    description: v.optional(v.string()),
-    restrictions: v.optional(v.string()),
-    isFundraising: v.optional(v.boolean()),
-    fundraisingTarget: v.optional(v.union(v.number(), v.null())),
-    isActive: v.boolean(),
-    churchId: v.id("churches"),
-    _creationTime: v.number(),
-  })),
+  returns: v.array(
+    v.object({
+      _id: v.id("funds"),
+      name: v.string(),
+      type: v.union(
+        v.literal("general"),
+        v.literal("restricted"),
+        v.literal("designated")
+      ),
+      balance: v.float64(),
+      description: v.optional(v.string()),
+      restrictions: v.optional(v.string()),
+      isFundraising: v.boolean(),
+      fundraisingTarget: v.union(v.float64(), v.null()),
+      isActive: v.boolean(),
+      churchId: v.id("churches"),
+      _creationTime: v.float64(),
+    })
+  ),
   handler: async (ctx) => {
-    return await ctx.db
+    const funds = await ctx.db
       .query("funds")
       .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
+
+    return funds.map((fund) => ({
+      ...fund,
+      isFundraising: fund.isFundraising ?? false,
+      fundraisingTarget:
+        fund.isFundraising && fund.fundraisingTarget !== undefined
+          ? fund.fundraisingTarget
+          : null,
+    }));
   },
 });
 
