@@ -39,6 +39,7 @@ export const createChurch = mutation({
       balance: 0,
       description: "General church fund for unrestricted donations",
       isActive: true,
+      isFundraising: false,
     });
 
     await ctx.db.insert("funds", {
@@ -49,6 +50,7 @@ export const createChurch = mutation({
       description: "Restricted fund for building maintenance and improvements",
       restrictions: "Building maintenance, repairs, and capital improvements only",
       isActive: true,
+      isFundraising: false,
     });
 
     // Create default categories

@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -327,6 +328,10 @@ export default function FundsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create a new fund</DialogTitle>
+            <DialogDescription>
+              Track a designated pot of money by giving it a name, type, and optional
+              restrictions.
+            </DialogDescription>
           </DialogHeader>
           <FundForm
             onSubmit={handleCreateFund}
@@ -342,6 +347,10 @@ export default function FundsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit fund details</DialogTitle>
+            <DialogDescription>
+              Update the fund’s metadata to keep your ledger and donor communications in
+              sync.
+            </DialogDescription>
           </DialogHeader>
           {editingFund ? (
             <FundForm

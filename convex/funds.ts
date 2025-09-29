@@ -47,6 +47,7 @@ export const createFund = mutation({
       description: args.description,
       restrictions: args.restrictions,
       isActive: true,
+      isFundraising: false,
     });
 
     return fundId;
@@ -141,6 +142,7 @@ export const list = query({
     description: v.optional(v.string()),
     restrictions: v.optional(v.string()),
     isActive: v.boolean(),
+    isFundraising: v.boolean(),
     churchId: v.id("churches"),
     _creationTime: v.number(),
   })),

@@ -27,6 +27,7 @@ export default defineSchema({
     description: v.optional(v.string()),
     restrictions: v.optional(v.string()),
     isActive: v.boolean(),
+    isFundraising: v.boolean(),
   })
     .index("by_church", ["churchId"])
     .index("by_type", ["churchId", "type"]),
