@@ -160,6 +160,8 @@ export const list = query({
     balance: v.number(),
     description: v.optional(v.string()),
     restrictions: v.optional(v.string()),
+    isFundraising: v.boolean(),
+    fundraisingTarget: v.optional(v.number()),
     isActive: v.boolean(),
     churchId: v.id("churches"),
     _creationTime: v.number(),
