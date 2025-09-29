@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -37,18 +37,17 @@ const fundSchema = z.object({
     .optional()
     .or(z.literal("")),
   isFundraising: z.boolean(),
-  fundraisingTarget: z
-    .preprocess((value) => {
-      if (value === undefined || value === null || value === "") {
-        return undefined;
-      }
-      const numeric = typeof value === "string" ? Number(value) : value;
-      return Number.isFinite(numeric) ? Number(numeric) : value;
-    }, z.number().positive("Enter a fundraising target greater than zero"))
-    .optional(),
+  fundraisingTarget: z.coerce.number().positive("Enter a fundraising target greater than zero").optional(),
 });
 
-export type FundFormValues = z.infer<typeof fundSchema>;
+export type FundFormValues = {
+  name: string;
+  type: "general" | "restricted" | "designated";
+  description?: string;
+  restrictions?: string;
+  isFundraising: boolean;
+  fundraisingTarget?: number;
+};
 
 type FundFormProps = {
   onSubmit: (values: FundFormValues) => Promise<void> | void;
@@ -68,7 +67,7 @@ export function FundForm({
   errorMessage,
 }: FundFormProps) {
   const form = useForm<FundFormValues>({
-    resolver: zodResolver(fundSchema),
+    resolver: zodResolver(fundSchema) as any,
     defaultValues: {
       name: "",
       type: "general",
@@ -264,3 +263,11 @@ export function FundForm({
     </Form>
   );
 }
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,23 +25,9 @@ import {
 
 const pledgeSchema = z.object({
   donorId: z.string().min(1, "Select a donor"),
-  amount: z
-    .preprocess((value) => {
-      if (value === undefined || value === null || value === "") {
-        return undefined;
-      }
-      const numeric = typeof value === "string" ? Number(value) : value;
-      return Number.isFinite(numeric) ? Number(numeric) : value;
-    }, z.number().positive("Enter a pledge amount")),
+  amount: z.coerce.number().positive("Enter a pledge amount"),
   pledgedAt: z.string().min(1, "Select pledge date"),
-  dueDate: z
-    .preprocess((value) => {
-      if (value === undefined || value === null || value === "") {
-        return undefined;
-      }
-      return value;
-    }, z.string())
-    .optional(),
+  dueDate: z.string().optional(),
   notes: z
     .string()
     .max(320, "Keep notes brief")
@@ -49,7 +35,7 @@ const pledgeSchema = z.object({
     .or(z.literal("")),
 });
 
-export type FundPledgeFormValues = z.infer<typeof pledgeSchema>;
+export type FundPledgeFormValues = { donorId: string; amount: number; pledgedAt: string; dueDate?: string; notes?: string; };
 
 type DonorOption = {
   id: string;
@@ -72,7 +58,7 @@ export function FundPledgeForm({
   errorMessage,
 }: FundPledgeFormProps) {
   const form = useForm<FundPledgeFormValues>({
-    resolver: zodResolver(pledgeSchema),
+    resolver: zodResolver(pledgeSchema) as any,
     defaultValues: {
       donorId: donors[0]?.id ?? "",
       amount: undefined,
@@ -231,3 +217,4 @@ export function FundPledgeForm({
     </Form>
   );
 }
+

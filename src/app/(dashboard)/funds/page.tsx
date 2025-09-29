@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -56,7 +56,7 @@ type FundSupporter = {
   pledgedAt: string;
   dueDate: string | null;
   status: "open" | "fulfilled" | "cancelled";
-  computedStatus: "open" | "fulfilled" | "cancelled";
+  computedStatus: string;
   completion: number;
   notes: string | null;
   lastDonationDate: string | null;
@@ -392,12 +392,12 @@ export default function FundsPage() {
         ) : null}
         {churchId && fundsOverview === undefined ? (
           <div className="rounded-lg border border-ledger bg-paper px-6 py-10 text-center text-grey-mid">
-            Loading fund information…
+            Loading fund informationâ€¦
           </div>
         ) : null}
         {churchId && fundsOverview?.length === 0 ? (
           <div className="rounded-lg border border-dashed border-ledger bg-paper px-6 py-10 text-center text-grey-mid">
-            No funds created yet. Use the “New fund” button to create your first fund.
+            No funds created yet. Use the â€œNew fundâ€ button to create your first fund.
           </div>
         ) : null}
         {fundCards.length > 0 ? (
@@ -435,7 +435,7 @@ export default function FundsPage() {
             onCancel={() => setIsCreateOpen(false)}
             isSubmitting={isCreateSubmitting}
             errorMessage={createError}
-            submitLabel={isCreateSubmitting ? "Creating…" : "Create fund"}
+            submitLabel={isCreateSubmitting ? "Creatingâ€¦" : "Create fund"}
           />
         </DialogContent>
       </Dialog>
@@ -451,7 +451,7 @@ export default function FundsPage() {
               onCancel={() => setEditingFund(null)}
               isSubmitting={isUpdateSubmitting}
               errorMessage={updateError}
-              submitLabel={isUpdateSubmitting ? "Saving…" : "Save changes"}
+              submitLabel={isUpdateSubmitting ? "Savingâ€¦" : "Save changes"}
               initialValues={{
                 name: editingFund.fund.name,
                 type: editingFund.fund.type,
@@ -630,12 +630,12 @@ export default function FundsPage() {
                                 <TableCell>
                                   {supporter.dueDate
                                     ? new Date(supporter.dueDate).toLocaleDateString("en-GB")
-                                    : "—"}
+                                    : "â€”"}
                                 </TableCell>
                                 <TableCell>
                                   {supporter.lastDonationDate
                                     ? new Date(supporter.lastDonationDate).toLocaleDateString("en-GB")
-                                    : "—"}
+                                    : "â€”"}
                                 </TableCell>
                               </TableRow>
                             ))}
@@ -717,3 +717,4 @@ export default function FundsPage() {
     </div>
   );
 }
+
