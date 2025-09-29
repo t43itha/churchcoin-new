@@ -239,7 +239,7 @@ export default function DashboardPage() {
           <CardContent>
             {funds && funds.length > 0 ? (
               <div className="space-y-3">
-                {funds.slice(0, 4).map((fund: Doc<"funds">) => (
+                {funds.slice(0, 4).map((fund) => (
                   <div
                     key={fund._id}
                     className="flex items-center justify-between p-3 border border-ledger rounded-lg"
