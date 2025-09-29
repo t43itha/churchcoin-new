@@ -26,10 +26,30 @@ export default defineSchema({
     balance: v.number(),
     description: v.optional(v.string()),
     restrictions: v.optional(v.string()),
+    isFundraising: v.boolean(),
+    fundraisingTarget: v.optional(v.number()),
     isActive: v.boolean(),
   })
     .index("by_church", ["churchId"])
     .index("by_type", ["churchId", "type"]),
+
+  fundPledges: defineTable({
+    churchId: v.id("churches"),
+    fundId: v.id("funds"),
+    donorId: v.id("donors"),
+    amount: v.number(),
+    pledgedAt: v.string(), // ISO date
+    dueDate: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    status: v.union(
+      v.literal("open"),
+      v.literal("fulfilled"),
+      v.literal("cancelled")
+    ),
+  })
+    .index("by_church", ["churchId"])
+    .index("by_fund", ["fundId"])
+    .index("by_donor", ["donorId"]),
 
   // Transactions
   transactions: defineTable({
@@ -324,3 +344,4 @@ export default defineSchema({
     .index("by_church", ["churchId", "timestamp"])
     .index("by_user", ["userId", "timestamp"]),
 });
+

@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import type { Resolver } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -26,11 +27,28 @@ import {
 const fundSchema = z.object({
   name: z.string().min(2, "Fund name must be at least 2 characters"),
   type: z.enum(["general", "restricted", "designated"]),
-  description: z.string().max(280, "Keep the description under 280 characters").optional().or(z.literal("")),
-  restrictions: z.string().max(320, "Keep restrictions concise").optional().or(z.literal("")),
+  description: z
+    .string()
+    .max(280, "Keep the description under 280 characters")
+    .optional()
+    .or(z.literal("")),
+  restrictions: z
+    .string()
+    .max(320, "Keep restrictions concise")
+    .optional()
+    .or(z.literal("")),
+  isFundraising: z.boolean(),
+  fundraisingTarget: z.coerce.number().positive("Enter a fundraising target greater than zero").optional(),
 });
 
-export type FundFormValues = z.infer<typeof fundSchema>;
+export type FundFormValues = {
+  name: string;
+  type: "general" | "restricted" | "designated";
+  description?: string;
+  restrictions?: string;
+  isFundraising: boolean;
+  fundraisingTarget?: number;
+};
 
 type FundFormProps = {
   onSubmit: (values: FundFormValues) => Promise<void> | void;
@@ -50,14 +68,27 @@ export function FundForm({
   errorMessage,
 }: FundFormProps) {
   const form = useForm<FundFormValues>({
-    resolver: zodResolver(fundSchema),
+    resolver: zodResolver(fundSchema) as unknown as import("react-hook-form").Resolver<FundFormValues>,
     defaultValues: {
       name: "",
       type: "general",
       description: "",
       restrictions: "",
+      isFundraising: false,
+      fundraisingTarget: undefined,
     },
   });
+
+  const isFundraising = form.watch("isFundraising");
+
+  useEffect(() => {
+    if (!isFundraising) {
+      form.setValue("fundraisingTarget", undefined, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+  }, [isFundraising, form]);
 
   useEffect(() => {
     if (initialValues) {
@@ -66,6 +97,11 @@ export function FundForm({
         type: initialValues.type ?? "general",
         description: initialValues.description ?? "",
         restrictions: initialValues.restrictions ?? "",
+        isFundraising: initialValues.isFundraising ?? false,
+        fundraisingTarget:
+          initialValues.isFundraising && initialValues.fundraisingTarget !== undefined
+            ? initialValues.fundraisingTarget
+            : undefined,
       });
     }
   }, [initialValues, form]);
@@ -123,6 +159,57 @@ export function FundForm({
         />
         <FormField
           control={form.control}
+          name="isFundraising"
+          render={({ field }) => (
+            <FormItem>
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <FormLabel>Fundraising fund</FormLabel>
+                  <p className="text-sm text-grey-mid">
+                    Enable pledge tracking, donor insights, and fundraising targets.
+                  </p>
+                </div>
+                <FormControl>
+                  <input
+                    type="checkbox"
+                    checked={field.value}
+                    onChange={(event) => field.onChange(event.target.checked)}
+                    className="h-4 w-4 rounded border-ledger text-ink focus:ring-2 focus:ring-grey-mid"
+                  />
+                </FormControl>
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        {isFundraising ? (
+          <FormField
+            control={form.control}
+            name="fundraisingTarget"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Fundraising target (optional)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={field.value ?? ""}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      field.onChange(value === "" ? undefined : Number(value));
+                    }}
+                    placeholder="e.g. 25000"
+                    className="font-primary"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        ) : null}
+        <FormField
+          control={form.control}
           name="description"
           render={({ field }) => (
             <FormItem>
@@ -177,3 +264,16 @@ export function FundForm({
     </Form>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+

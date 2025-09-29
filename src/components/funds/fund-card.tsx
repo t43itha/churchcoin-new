@@ -39,6 +39,12 @@ export type FundCardSummary = {
   incomeTotal: number;
   expenseTotal: number;
   lastTransactionDate?: string | null;
+  isFundraising: boolean;
+  fundraisingTarget: number | null;
+  fundraisingRaised: number;
+  fundraisingPledged: number;
+  outstandingToTarget: number | null;
+  supporterCount: number;
 };
 
 type FundCardProps = {
@@ -49,6 +55,12 @@ type FundCardProps = {
 
 export function FundCard({ fund, onViewLedger, onEdit }: FundCardProps) {
   const type = typeLabels[fund.type];
+  const hasFundraising = fund.isFundraising;
+  const target = fund.fundraisingTarget;
+  const raised = fund.fundraisingRaised;
+  const pledged = fund.fundraisingPledged;
+  const outstanding = fund.outstandingToTarget;
+  const progress = target && target > 0 ? Math.min(raised / target, 1) : null;
 
   return (
     <Card className="h-full border-ledger bg-paper shadow-sm">
@@ -78,6 +90,36 @@ export function FundCard({ fund, onViewLedger, onEdit }: FundCardProps) {
             <p className="text-sm text-error">-{currency.format(fund.expenseTotal)}</p>
           </div>
         </div>
+        {hasFundraising ? (
+          <div className="space-y-2 rounded-md border border-ledger bg-paper px-3 py-3">
+            <div className="flex items-center justify-between text-xs text-grey-mid">
+              <span>Target {target ? currency.format(target) : "Not set"}</span>
+              <span>
+                {progress !== null
+                  ? `${Math.round(progress * 100)}% raised`
+                  : `${currency.format(raised)} raised`}
+              </span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-ledger">
+              <div
+                className="h-2 rounded-full bg-success transition-all"
+                style={{ width: `${progress !== null ? Math.min(progress, 1) * 100 : 100}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-xs text-grey-mid">
+              <span>{currency.format(raised)} raised</span>
+              <span>
+                {fund.supporterCount} supporter{fund.supporterCount === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="text-xs text-grey-mid">
+              {pledged > raised ? `${currency.format(pledged)} pledged` : null}
+              {outstanding !== null ? (
+                <span className="ml-2">{currency.format(outstanding)} to target</span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         {fund.restrictions ? (
           <div className="rounded-md border border-dashed border-ledger bg-paper px-3 py-2">
             <p className="text-xs font-medium uppercase tracking-wide text-grey-mid">

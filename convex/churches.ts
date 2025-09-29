@@ -38,6 +38,7 @@ export const createChurch = mutation({
       type: "general",
       balance: 0,
       description: "General church fund for unrestricted donations",
+      isFundraising: false,
       isActive: true,
     });
 
@@ -48,6 +49,7 @@ export const createChurch = mutation({
       balance: 0,
       description: "Restricted fund for building maintenance and improvements",
       restrictions: "Building maintenance, repairs, and capital improvements only",
+      isFundraising: false,
       isActive: true,
     });
 
