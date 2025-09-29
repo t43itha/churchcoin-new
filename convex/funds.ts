@@ -166,7 +166,7 @@ export const list = query({
       description: v.optional(v.string()),
       restrictions: v.optional(v.string()),
       isFundraising: v.boolean(),
-      fundraisingTarget: v.union(v.float64(), v.null()),
+      fundraisingTarget: v.optional(v.union(v.float64(), v.null())),
       isActive: v.boolean(),
       churchId: v.id("churches"),
       _creationTime: v.float64(),
@@ -184,7 +184,7 @@ export const list = query({
       fundraisingTarget:
         fund.isFundraising && fund.fundraisingTarget !== undefined
           ? fund.fundraisingTarget
-          : null,
+          : undefined,
     }));
   },
 });
