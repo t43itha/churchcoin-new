@@ -9,26 +9,21 @@ import { Sidebar } from "./sidebar";
 // Navigation breadcrumb mapping
 const breadcrumbMap: Record<string, string[]> = {
   "/dashboard": ["Dashboard"],
-  "/dashboard/funds": ["Dashboard", "Funds"],
-  "/dashboard/transactions": ["Dashboard", "Transactions"],
-  "/dashboard/reconciliation": ["Dashboard", "Reconciliation"],
-  "/dashboard/donors": ["Dashboard", "Donors"],
-  "/dashboard/imports": ["Dashboard", "Import"],
-  "/dashboard/reports": ["Dashboard", "Reports"],
+  "/funds": ["Dashboard", "Funds"],
+  "/transactions": ["Dashboard", "Transactions"],
+  "/reconciliation": ["Dashboard", "Reconciliation"],
+  "/donors": ["Dashboard", "Donors"],
+  "/imports": ["Dashboard", "Import"],
+  "/reports": ["Dashboard", "Reports"],
 };
 
 interface HeaderProps {
-  title?: string;
-  description?: string;
   children?: React.ReactNode;
 }
 
-export function Header({ title, description, children }: HeaderProps) {
+export function Header({ children }: HeaderProps) {
   const pathname = usePathname();
   const breadcrumbs = breadcrumbMap[pathname] || ["Dashboard"];
-
-  // If custom title is provided, use it, otherwise derive from breadcrumbs
-  const pageTitle = title || breadcrumbs[breadcrumbs.length - 1];
 
   return (
     <header className="border-b border-ledger bg-paper">
@@ -76,21 +71,6 @@ export function Header({ title, description, children }: HeaderProps) {
         {children}
       </div>
 
-      {/* Page title and description */}
-      {(pageTitle || description) && (
-        <div className="border-b border-ledger bg-paper px-6 py-4">
-          {pageTitle && (
-            <h1 className="text-2xl font-semibold text-ink font-primary">
-              {pageTitle}
-            </h1>
-          )}
-          {description && (
-            <p className="text-sm text-grey-mid font-primary mt-1">
-              {description}
-            </p>
-          )}
-        </div>
-      )}
     </header>
   );
 }

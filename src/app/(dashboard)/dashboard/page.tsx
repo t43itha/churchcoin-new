@@ -87,7 +87,6 @@ export default function DashboardPage() {
     return (
       <div className="p-6">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold font-primary text-ink mb-2">Dashboard</h1>
           <p className="text-grey-mid font-primary">
             Loading your church finance overview...
           </p>
@@ -115,7 +114,6 @@ export default function DashboardPage() {
     <div className="p-6">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold font-primary text-ink mb-2">Dashboard</h1>
         <p className="text-grey-mid font-primary">
           Welcome to your church finance management dashboard
         </p>
