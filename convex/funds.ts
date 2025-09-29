@@ -144,7 +144,7 @@ export const list = query({
     churchId: v.id("churches"),
     _creationTime: v.number(),
   })),
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     return await ctx.db
       .query("funds")
       .filter((q) => q.eq(q.field("isActive"), true))
@@ -156,7 +156,7 @@ export const list = query({
 export const getTotalBalance = query({
   args: {},
   returns: v.number(),
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     const funds = await ctx.db
       .query("funds")
       .filter((q) => q.eq(q.field("isActive"), true))
