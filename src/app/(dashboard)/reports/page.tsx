@@ -209,7 +209,7 @@ export default function ReportsPage() {
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-grey-mid">
                 <FilePieChart className="h-5 w-5 text-grey-mid" />
-                <span className="text-sm uppercase tracking-wide">Iteration 8</span>
+                <span className="text-sm uppercase tracking-wide">Statements</span>
               </div>
               <h1 className="text-3xl font-semibold text-ink">Reporting & compliance</h1>
               <p className="text-sm text-grey-mid">
