@@ -158,19 +158,19 @@ export default function DashboardPage() {
           <QuickAction
             title="Create New Fund"
             description="Set up a new fund for your church"
-            href="/dashboard/funds"
+            href="/funds"
             icon={Plus}
           />
           <QuickAction
             title="Record Transaction"
             description="Add income or expenses"
-            href="/dashboard/transactions"
+            href="/transactions"
             icon={Receipt}
           />
           <QuickAction
             title="View Reports"
             description="Generate financial reports"
-            href="/dashboard/reports"
+            href="/reports"
             icon={Eye}
           />
         </div>
@@ -210,7 +210,7 @@ export default function DashboardPage() {
                   </div>
                 ))}
                 <div className="pt-2">
-                  <Link href="/dashboard/transactions">
+                  <Link href="/transactions">
                     <Button variant="outline" className="w-full font-primary border-ledger">
                       View All Transactions
                     </Button>
@@ -221,7 +221,7 @@ export default function DashboardPage() {
               <div className="text-center py-6">
                 <Receipt className="h-8 w-8 text-grey-mid mx-auto mb-2" />
                 <p className="text-grey-mid font-primary text-sm">No recent transactions</p>
-                <Link href="/dashboard/transactions">
+                <Link href="/transactions">
                   <Button variant="outline" className="mt-2 font-primary border-ledger">
                     Add First Transaction
                   </Button>
@@ -265,7 +265,7 @@ export default function DashboardPage() {
                   </p>
                 )}
                 <div className="pt-2">
-                  <Link href="/dashboard/funds">
+                  <Link href="/funds">
                     <Button variant="outline" className="w-full font-primary border-ledger">
                       Manage All Funds
                     </Button>
@@ -276,7 +276,7 @@ export default function DashboardPage() {
               <div className="text-center py-6">
                 <PiggyBank className="h-8 w-8 text-grey-mid mx-auto mb-2" />
                 <p className="text-grey-mid font-primary text-sm">No funds created yet</p>
-                <Link href="/dashboard/funds">
+                <Link href="/funds">
                   <Button variant="outline" className="mt-2 font-primary border-ledger">
                     Create First Fund
                   </Button>

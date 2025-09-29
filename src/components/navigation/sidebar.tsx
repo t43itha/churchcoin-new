@@ -21,37 +21,37 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 const navigation = [
   {
     name: "Dashboard",
-    href: "/dashboard",
+    href: "/",
     icon: Calculator,
   },
   {
     name: "Funds",
-    href: "/dashboard/funds",
+    href: "/funds",
     icon: PiggyBank,
   },
   {
     name: "Transactions",
-    href: "/dashboard/transactions",
+    href: "/transactions",
     icon: Receipt,
   },
   {
     name: "Reconciliation",
-    href: "/dashboard/reconciliation",
+    href: "/reconciliation",
     icon: GitMerge,
   },
   {
     name: "Donors",
-    href: "/dashboard/donors",
+    href: "/donors",
     icon: Users,
   },
   {
     name: "Import",
-    href: "/dashboard/imports",
+    href: "/imports",
     icon: Upload,
   },
   {
     name: "Reports",
-    href: "/dashboard/reports",
+    href: "/reports",
     icon: FileText,
   },
 ];
@@ -85,7 +85,7 @@ export function Sidebar({ className }: SidebarProps) {
         <ul className="space-y-2">
           {navigation.map((item) => {
             const isActive = pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href));
+              (item.href !== "/" && pathname.startsWith(item.href));
 
             return (
               <li key={item.name}>

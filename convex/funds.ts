@@ -163,6 +163,8 @@ export const list = query({
     isActive: v.boolean(),
     churchId: v.id("churches"),
     _creationTime: v.number(),
+    isFundraising: v.optional(v.boolean()),
+    fundraisingTarget: v.optional(v.number()),
   })),
   handler: async (ctx) => {
     return await ctx.db
