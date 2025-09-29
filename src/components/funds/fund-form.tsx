@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import type { Resolver } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -67,7 +68,7 @@ export function FundForm({
   errorMessage,
 }: FundFormProps) {
   const form = useForm<FundFormValues>({
-    resolver: zodResolver(fundSchema) as any,
+    resolver: zodResolver(fundSchema) as unknown as import("react-hook-form").Resolver<FundFormValues>,
     defaultValues: {
       name: "",
       type: "general",
@@ -263,6 +264,11 @@ export function FundForm({
     </Form>
   );
 }
+
+
+
+
+
 
 
 

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import type { Resolver } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -58,7 +59,7 @@ export function FundPledgeForm({
   errorMessage,
 }: FundPledgeFormProps) {
   const form = useForm<FundPledgeFormValues>({
-    resolver: zodResolver(pledgeSchema) as any,
+    resolver: zodResolver(pledgeSchema) as unknown as import("react-hook-form").Resolver<FundPledgeFormValues>,
     defaultValues: {
       donorId: donors[0]?.id ?? "",
       amount: undefined,
@@ -217,4 +218,9 @@ export function FundPledgeForm({
     </Form>
   );
 }
+
+
+
+
+
 
