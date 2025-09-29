@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams?.get("redirect") ?? "/funds";
+  const redirect = searchParams?.get("redirect") ?? "/dashboard";
   const { user, loading, refresh } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,7 +21,7 @@ function LoginPageContent() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace(redirect || "/funds");
+      router.replace(redirect || "/dashboard");
     }
   }, [loading, user, redirect, router]);
 
@@ -48,7 +48,7 @@ function LoginPageContent() {
     }
 
     await refresh();
-    router.replace(redirect || "/funds");
+    router.replace(redirect || "/dashboard");
   };
 
   return (
