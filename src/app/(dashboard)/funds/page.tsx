@@ -7,6 +7,7 @@ import { Banknote, LineChart, PiggyBank, PlusCircle } from "lucide-react";
 import { FundCard, type FundCardSummary } from "@/components/funds/fund-card";
 import { FundForm, type FundFormValues } from "@/components/funds/fund-form";
 import { FundLedger } from "@/components/funds/fund-ledger";
+import { FundPledgeForm, type FundPledgeFormValues } from "@/components/funds/fund-pledge-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Sheet,
   SheetContent,
@@ -38,6 +40,46 @@ const currency = new Intl.NumberFormat("en-GB", {
   minimumFractionDigits: 2,
 });
 
+const pledgeStatusTone: Record<FundSupporter["computedStatus"], string> = {
+  open: "border border-highlight/50 bg-highlight/30 text-grey-dark",
+  fulfilled: "border border-success/40 bg-success/10 text-success",
+  cancelled: "border border-error/40 bg-error/10 text-error",
+};
+
+type FundSupporter = {
+  pledgeId: Id<"fundPledges">;
+  donorId: Id<"donors">;
+  donorName: string;
+  amountPledged: number;
+  amountDonated: number;
+  outstandingAmount: number;
+  pledgedAt: string;
+  dueDate: string | null;
+  status: "open" | "fulfilled" | "cancelled";
+  computedStatus: "open" | "fulfilled" | "cancelled";
+  completion: number;
+  notes: string | null;
+  lastDonationDate: string | null;
+};
+
+type FundContributor = {
+  donorId: Id<"donors">;
+  donorName: string;
+  total: number;
+  lastDonationDate: string | null;
+};
+
+type FundraisingSnapshot = {
+  target: number | null;
+  pledgedTotal: number;
+  donationTotal: number;
+  outstandingToTarget: number | null;
+  pledgeCount: number;
+  supporterCount: number;
+  supporters: FundSupporter[];
+  donorsWithoutPledge: FundContributor[];
+};
+
 type FundOverview = {
   fund: Doc<"funds">;
   incomeTotal: number;
@@ -51,6 +93,7 @@ type FundOverview = {
     amount: number;
     balance: number;
   }[];
+  fundraising: FundraisingSnapshot | null;
 };
 
 export default function FundsPage() {
@@ -63,20 +106,35 @@ export default function FundsPage() {
   const [isUpdateSubmitting, setIsUpdateSubmitting] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [viewingFund, setViewingFund] = useState<FundOverview | null>(null);
+  const [isPledgeDialogOpen, setIsPledgeDialogOpen] = useState(false);
+  const [isCreatePledgeSubmitting, setIsCreatePledgeSubmitting] = useState(false);
+  const [createPledgeError, setCreatePledgeError] = useState<string | null>(null);
 
   const fundsOverview = useQuery(
     api.funds.getFundsOverview,
     churchId ? { churchId } : "skip"
   );
+  const donors = useQuery(
+    api.donors.getDonors,
+    churchId ? { churchId } : "skip"
+  );
 
   const createFund = useMutation(api.funds.createFund);
   const updateFund = useMutation(api.funds.updateFund);
+  const createPledge = useMutation(api.fundraising.createPledge);
 
   useEffect(() => {
     if (!churchId && churches && churches.length > 0) {
       setChurchId(churches[0]._id);
     }
   }, [churchId, churches]);
+
+  useEffect(() => {
+    if (!viewingFund) {
+      setIsPledgeDialogOpen(false);
+      setCreatePledgeError(null);
+    }
+  }, [viewingFund]);
 
   const fundLookup = useMemo(() => {
     if (!fundsOverview) {
@@ -103,8 +161,16 @@ export default function FundsPage() {
       incomeTotal: entry.incomeTotal,
       expenseTotal: entry.expenseTotal,
       lastTransactionDate: entry.lastTransactionDate,
+      isFundraising: entry.fund.isFundraising ?? false,
+      fundraisingTarget: entry.fund.fundraisingTarget ?? null,
+      fundraisingRaised: entry.incomeTotal,
+      fundraisingPledged: entry.fundraising?.pledgedTotal ?? 0,
+      outstandingToTarget: entry.fundraising?.outstandingToTarget ?? null,
+      supporterCount: entry.fundraising?.supporterCount ?? 0,
     }));
   }, [fundsOverview]);
+
+  const fundraisingSnapshot = viewingFund?.fundraising ?? null;
 
   const totals = useMemo(() => {
     return fundCards.reduce(
@@ -146,6 +212,11 @@ export default function FundsPage() {
         restrictions: values.restrictions?.trim()
           ? values.restrictions.trim()
           : undefined,
+        isFundraising: values.isFundraising,
+        fundraisingTarget:
+          values.isFundraising && values.fundraisingTarget !== undefined
+            ? values.fundraisingTarget
+            : undefined,
       });
       setIsCreateOpen(false);
     } catch (error) {
@@ -174,12 +245,43 @@ export default function FundsPage() {
         restrictions: values.restrictions?.trim()
           ? values.restrictions.trim()
           : null,
+        isFundraising: values.isFundraising,
+        fundraisingTarget: values.isFundraising
+          ? values.fundraisingTarget ?? null
+          : null,
       });
       setEditingFund(null);
     } catch (error) {
       setUpdateError(error instanceof Error ? error.message : "Unable to update fund");
     } finally {
       setIsUpdateSubmitting(false);
+    }
+  };
+
+  const handleCreatePledge = async (values: FundPledgeFormValues) => {
+    if (!viewingFund || !churchId) {
+      setCreatePledgeError("Select a fund before adding pledges");
+      return;
+    }
+
+    setIsCreatePledgeSubmitting(true);
+    setCreatePledgeError(null);
+
+    try {
+      await createPledge({
+        churchId,
+        fundId: viewingFund.fund._id,
+        donorId: values.donorId as Id<"donors">,
+        amount: values.amount,
+        pledgedAt: values.pledgedAt,
+        dueDate: values.dueDate ?? undefined,
+        notes: values.notes?.trim() ? values.notes.trim() : undefined,
+      });
+      setIsPledgeDialogOpen(false);
+    } catch (error) {
+      setCreatePledgeError(error instanceof Error ? error.message : "Unable to save pledge");
+    } finally {
+      setIsCreatePledgeSubmitting(false);
     }
   };
 
@@ -355,6 +457,9 @@ export default function FundsPage() {
                 type: editingFund.fund.type,
                 description: editingFund.fund.description ?? "",
                 restrictions: editingFund.fund.restrictions ?? "",
+                isFundraising: editingFund.fund.isFundraising ?? false,
+                fundraisingTarget:
+                  editingFund.fund.fundraisingTarget ?? undefined,
               }}
             />
           ) : null}
@@ -402,7 +507,171 @@ export default function FundsPage() {
                   </div>
                 ) : null}
               </SheetHeader>
-              <div className="flex-1 overflow-y-auto pb-8">
+              <div className="flex-1 overflow-y-auto space-y-6 pb-8">
+                {viewingFund.fund.isFundraising && fundraisingSnapshot ? (
+                  <div className="space-y-4 rounded-lg border border-ledger bg-paper p-4">
+                    <div className="grid gap-4 sm:grid-cols-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-grey-mid">Raised</p>
+                        <p className="text-lg font-semibold text-ink">
+                          {currency.format(fundraisingSnapshot.donationTotal)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-grey-mid">Pledged</p>
+                        <p className="text-lg font-semibold text-ink">
+                          {currency.format(fundraisingSnapshot.pledgedTotal)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-grey-mid">Target</p>
+                        <p className="text-lg font-semibold text-ink">
+                          {fundraisingSnapshot.target
+                            ? currency.format(fundraisingSnapshot.target)
+                            : "Not set"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-grey-mid">Supporters</p>
+                        <p className="text-lg font-semibold text-ink">
+                          {fundraisingSnapshot.supporterCount}
+                        </p>
+                      </div>
+                    </div>
+                    {fundraisingSnapshot.target ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs text-grey-mid">
+                          <span>Progress</span>
+                          <span>
+                            {Math.min(
+                              Math.round(
+                                (fundraisingSnapshot.donationTotal /
+                                  fundraisingSnapshot.target) *
+                                  100
+                              ),
+                              100
+                            )}
+                            %
+                          </span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-ledger">
+                          <div
+                            className="h-2 rounded-full bg-success transition-all"
+                            style={{
+                              width: `${Math.min(
+                                (fundraisingSnapshot.donationTotal /
+                                  fundraisingSnapshot.target) *
+                                  100,
+                                100
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                        {fundraisingSnapshot.outstandingToTarget !== null ? (
+                          <p className="text-xs text-grey-mid">
+                            {currency.format(fundraisingSnapshot.outstandingToTarget)} still to reach the target.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h3 className="text-base font-semibold text-ink">Pledges</h3>
+                      <Button
+                        size="sm"
+                        className="font-primary"
+                        onClick={() => {
+                          setCreatePledgeError(null);
+                          setIsPledgeDialogOpen(true);
+                        }}
+                        disabled={isCreatePledgeSubmitting || !donors || donors.length === 0}
+                      >
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add pledge
+                      </Button>
+                    </div>
+                    {fundraisingSnapshot.supporters.length ? (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Donor</TableHead>
+                              <TableHead>Pledged</TableHead>
+                              <TableHead>Donated</TableHead>
+                              <TableHead>Outstanding</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Due Date</TableHead>
+                              <TableHead>Last Gift</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {fundraisingSnapshot.supporters.map((supporter) => (
+                              <TableRow key={supporter.pledgeId}>
+                                <TableCell>
+                                  <div className="font-medium text-ink">{supporter.donorName}</div>
+                                  {supporter.notes ? (
+                                    <p className="text-xs text-grey-mid">{supporter.notes}</p>
+                                  ) : null}
+                                </TableCell>
+                                <TableCell>{currency.format(supporter.amountPledged)}</TableCell>
+                                <TableCell>{currency.format(supporter.amountDonated)}</TableCell>
+                                <TableCell>{currency.format(supporter.outstandingAmount)}</TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant="outline"
+                                    className={pledgeStatusTone[supporter.computedStatus]}
+                                  >
+                                    {supporter.computedStatus === "open"
+                                      ? "Open"
+                                      : supporter.computedStatus === "fulfilled"
+                                      ? "Fulfilled"
+                                      : "Cancelled"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  {supporter.dueDate
+                                    ? new Date(supporter.dueDate).toLocaleDateString("en-GB")
+                                    : "—"}
+                                </TableCell>
+                                <TableCell>
+                                  {supporter.lastDonationDate
+                                    ? new Date(supporter.lastDonationDate).toLocaleDateString("en-GB")
+                                    : "—"}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <div className="rounded-md border border-dashed border-ledger bg-paper px-4 py-6 text-sm text-grey-mid">
+                        No pledges recorded yet.
+                      </div>
+                    )}
+                    {fundraisingSnapshot.donorsWithoutPledge.length ? (
+                      <div className="rounded-md border border-ledger bg-paper px-3 py-3">
+                        <p className="text-xs font-medium uppercase tracking-wide text-grey-mid">
+                          Donors without pledges
+                        </p>
+                        <div className="mt-2 space-y-1 text-sm text-ink">
+                          {fundraisingSnapshot.donorsWithoutPledge.map((donor) => (
+                            <div
+                              key={donor.donorId}
+                              className="flex items-center justify-between gap-4"
+                            >
+                              <span>{donor.donorName}</span>
+                              <span className="text-grey-mid">
+                                {currency.format(donor.total)}
+                                {donor.lastDonationDate
+                                  ? ` - ${new Date(donor.lastDonationDate).toLocaleDateString("en-GB")}`
+                                  : ""}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
                 <FundLedger
                   entries={viewingFund.runningBalance.map((entry) => ({
                     transactionId: entry.transactionId,
@@ -418,6 +687,33 @@ export default function FundsPage() {
           ) : null}
         </SheetContent>
       </Sheet>
+      <Dialog
+        open={isPledgeDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsPledgeDialogOpen(false);
+            setCreatePledgeError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add pledge</DialogTitle>
+          </DialogHeader>
+          {viewingFund ? (
+            <FundPledgeForm
+              donors={(donors ?? []).map((donor) => ({
+                id: donor._id,
+                name: donor.name,
+              }))}
+              onSubmit={handleCreatePledge}
+              onCancel={() => setIsPledgeDialogOpen(false)}
+              isSubmitting={isCreatePledgeSubmitting}
+              errorMessage={createPledgeError}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
