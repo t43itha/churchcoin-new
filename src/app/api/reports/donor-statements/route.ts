@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 import { NextResponse } from "next/server";
 import {
@@ -706,6 +707,9 @@ export async function POST(request: Request) {
 
     let logoImage: PDFImage | undefined;
     if (fundTypeLabel === "Building Fund") {
+      const publicDir = process.env.VERCEL
+        ? join(process.cwd(), "public")
+        : join(process.cwd(), "public");
       const logoFiles = [
         "legacy logo.jpg",
         "legacy-logo.jpg",
@@ -718,7 +722,7 @@ export async function POST(request: Request) {
       for (const fileName of logoFiles) {
         if (logoImage) break;
         try {
-          const logoPath = `${process.cwd()}/public/${fileName}`;
+          const logoPath = join(publicDir, fileName);
           const logoBytes = await readFile(logoPath);
           try {
             logoImage = await pdfDoc.embedJpg(logoBytes);
