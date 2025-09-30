@@ -13,17 +13,12 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatUkDateNumeric } from "@/lib/dates";
 import type { Doc, Id } from "@/lib/convexGenerated";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
   currency: "GBP",
-});
-
-const dateFormatter = new Intl.DateTimeFormat("en-GB", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
 });
 
 export type TransactionLedgerRow = {
@@ -114,7 +109,7 @@ export function TransactionLedger({
                 key={transaction._id}
                 className={reconciled ? "bg-success/5" : undefined}
               >
-                <TableCell>{dateFormatter.format(new Date(transaction.date))}</TableCell>
+                <TableCell>{formatUkDateNumeric(transaction.date) || "—"}</TableCell>
                 <TableCell>
                   <div className="flex flex-col">
                     <span className="font-medium text-ink">{transaction.description}</span>

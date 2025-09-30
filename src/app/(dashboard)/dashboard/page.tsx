@@ -7,6 +7,7 @@ import { PiggyBank, Receipt, Users, TrendingUp, Plus, Eye } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api, type Doc } from "@/lib/convexGenerated";
+import { formatUkDateNumeric } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
 interface MetricCardProps {
@@ -194,7 +195,7 @@ export default function DashboardPage() {
                         {transaction.description}
                       </p>
                       <p className="text-xs text-grey-mid font-primary">
-                        {new Date(transaction.date).toLocaleDateString()}
+                        {formatUkDateNumeric(transaction.date) || "—"}
                       </p>
                     </div>
                     <div className="text-right">

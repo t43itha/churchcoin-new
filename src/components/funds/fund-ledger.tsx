@@ -1,6 +1,7 @@
 "use client";
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatUkDateNumeric } from "@/lib/dates";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -46,7 +47,7 @@ export function FundLedger({ entries }: FundLedgerProps) {
           {entries.map((entry) => (
             <TableRow key={entry.transactionId} className="border-ledger">
               <TableCell className="text-sm text-ink">
-                {new Date(entry.date).toLocaleDateString("en-GB")}
+                {formatUkDateNumeric(entry.date) || "—"}
               </TableCell>
               <TableCell className="text-sm text-ink">{entry.description}</TableCell>
               <TableCell className="text-right text-sm text-success">

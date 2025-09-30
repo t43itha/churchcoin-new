@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { deriveMapping, normalizeCsvDate, type ParsedCsvRow } from "@/lib/csv";
 import { api, type Doc, type Id } from "@/lib/convexGenerated";
+import { formatUkDateTime } from "@/lib/dates";
 
 type ParsedFileState = {
   filename: string;
@@ -262,7 +263,7 @@ export default function ImportsPage() {
                   >
                     <span className="font-medium text-ink">{record.filename}</span>
                     <span className="text-xs text-grey-mid">
-                      {new Date(record.uploadedAt).toLocaleString()} · Status: {record.status}
+                      {formatUkDateTime(record.uploadedAt) || "—"} · Status: {record.status}
                     </span>
                     <span className="text-xs text-grey-mid">
                       {record.processedCount}/{record.rowCount} processed · Duplicates {record.duplicateCount}
