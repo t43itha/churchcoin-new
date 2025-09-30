@@ -340,18 +340,29 @@ export const getFundsOverview = query({
         let donatedAmount = 0;
         let lastDonationAfterPledge: string | null = null;
 
+        // Convert pledge date to comparable format (YYYY-MM-DD)
+        const pledgeDate = pledge.pledgedAt; // Already in YYYY-MM-DD format
+
         for (const entry of summary.transactions) {
           const transaction = entry.transaction;
+          
+          // Convert transaction date from DD/MM/YYYY to YYYY-MM-DD for comparison
+          let transactionDateISO = transaction.date;
+          if (transaction.date.includes('/')) {
+            const [day, month, year] = transaction.date.split('/');
+            transactionDateISO = `${year}-${month}-${day}`;
+          }
+
           if (
             transaction.type === "income" &&
             transaction.donorId &&
             transaction.donorId === pledge.donorId &&
-            transaction.date >= pledge.pledgedAt
+            transactionDateISO >= pledgeDate
           ) {
             donatedAmount += transaction.amount;
             if (
               !lastDonationAfterPledge ||
-              lastDonationAfterPledge < transaction.date
+              transaction.date > lastDonationAfterPledge // Keep original format for display
             ) {
               lastDonationAfterPledge = transaction.date;
             }

@@ -239,3 +239,65 @@ export function deriveMapping(
       : undefined,
   };
 }
+
+export function deriveDonorMapping(headers: string[]): {
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  bankReference?: string;
+  giftAidSigned?: string;
+  giftAidDate?: string;
+  notes?: string;
+} {
+  const lower = headers.map((header) => header.toLowerCase());
+  const findHeader = (candidates: string[]) => {
+    for (const candidate of candidates) {
+      const index = lower.indexOf(candidate);
+      if (index !== -1) {
+        return headers[index];
+      }
+    }
+    return undefined;
+  };
+
+  return {
+    name: findHeader(["name", "donor name", "full name", "donor"]) ?? headers[0] ?? "Name",
+    email: findHeader(["email", "e-mail", "email address"]),
+    phone: findHeader(["phone", "telephone", "mobile", "phone number"]),
+    address: findHeader(["address", "postal address", "home address"]),
+    bankReference: findHeader(["bank reference", "reference", "bank ref", "ref"]),
+    giftAidSigned: findHeader(["gift aid", "giftaid", "gift aid signed", "ga signed"]),
+    giftAidDate: findHeader(["gift aid date", "ga date", "declaration date"]),
+    notes: findHeader(["notes", "comments", "remarks"]),
+  };
+}
+
+export function derivePledgeMapping(headers: string[]): {
+  donorName: string;
+  donorEmail?: string;
+  amount: string;
+  pledgedDate: string;
+  dueDate?: string;
+  notes?: string;
+} {
+  const lower = headers.map((header) => header.toLowerCase());
+  const findHeader = (candidates: string[]) => {
+    for (const candidate of candidates) {
+      const index = lower.indexOf(candidate);
+      if (index !== -1) {
+        return headers[index];
+      }
+    }
+    return undefined;
+  };
+
+  return {
+    donorName: findHeader(["donor name", "name", "donor", "supporter", "member name"]) ?? headers[0] ?? "Donor Name",
+    donorEmail: findHeader(["donor email", "email", "e-mail", "email address"]),
+    amount: findHeader(["amount", "pledged", "pledge amount", "commitment", "total"]) ?? headers[1] ?? "Amount",
+    pledgedDate: findHeader(["pledged date", "date", "pledge date", "commitment date", "date pledged"]) ?? headers[2] ?? "Pledged Date",
+    dueDate: findHeader(["due date", "deadline", "target date", "expiry", "due"]),
+    notes: findHeader(["notes", "comments", "remarks", "description", "memo"]),
+  };
+}

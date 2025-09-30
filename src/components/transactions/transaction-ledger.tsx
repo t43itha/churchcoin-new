@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, FileText, Pencil, Sparkles, Trash2, Undo2 } from "lucide-react";
+import { CheckCircle2, FileText, Pencil, Search, Sparkles, Trash2, Undo2, X } from "lucide-react";
 
 import {
   Table,
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { formatUkDateNumeric } from "@/lib/dates";
 import type { Doc, Id } from "@/lib/convexGenerated";
 
@@ -49,9 +50,33 @@ export function TransactionLedger({
 }: TransactionLedgerProps) {
   const [deletingId, setDeletingId] = useState<Id<"transactions"> | null>(null);
   const [togglingId, setTogglingId] = useState<Id<"transactions"> | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredRows = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return rows;
+    }
+
+    const search = searchTerm.toLowerCase().trim();
+    return rows.filter((row) => {
+      const description = row.transaction.description.toLowerCase();
+      const reference = (row.transaction.reference ?? "").toLowerCase();
+      const donorName = row.donor?.name.toLowerCase() ?? "";
+      const fundName = row.fund?.name.toLowerCase() ?? "";
+      const enteredBy = (row.transaction.enteredByName ?? "").toLowerCase();
+
+      return (
+        description.includes(search) ||
+        reference.includes(search) ||
+        donorName.includes(search) ||
+        fundName.includes(search) ||
+        enteredBy.includes(search)
+      );
+    });
+  }, [rows, searchTerm]);
 
   const totals = useMemo(() => {
-    return rows.reduce(
+    return filteredRows.reduce(
       (acc, row) => {
         if (row.transaction.type === "income") {
           acc.income += row.transaction.amount;
@@ -62,7 +87,7 @@ export function TransactionLedger({
       },
       { income: 0, expense: 0 }
     );
-  }, [rows]);
+  }, [filteredRows]);
 
   if (loading) {
     return (
@@ -74,19 +99,39 @@ export function TransactionLedger({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2 text-xs text-grey-mid">
-        <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
-          {rows.length} entries
-        </Badge>
-        <Badge variant="secondary" className="border-ledger bg-highlight text-success">
-          Income {currency.format(totals.income)}
-        </Badge>
-        <Badge variant="secondary" className="border-ledger bg-highlight text-error">
-          Expenses {currency.format(totals.expense)}
-        </Badge>
-        <span className="text-xs text-grey-mid">
-          Net {currency.format(totals.income - totals.expense)}
-        </span>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-grey-mid">
+          <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
+            {filteredRows.length} of {rows.length} entries
+          </Badge>
+          <Badge variant="secondary" className="border-ledger bg-highlight text-success">
+            Income {currency.format(totals.income)}
+          </Badge>
+          <Badge variant="secondary" className="border-ledger bg-highlight text-error">
+            Expenses {currency.format(totals.expense)}
+          </Badge>
+          <span className="text-xs text-grey-mid">
+            Net {currency.format(totals.income - totals.expense)}
+          </span>
+        </div>
+        <div className="relative w-full sm:w-auto sm:min-w-[300px]">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-grey-mid" />
+          <Input
+            type="text"
+            placeholder="Search transactions..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 pr-9 font-primary"
+          />
+          {searchTerm ? (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-mid hover:text-ink"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
       </div>
       <Table>
         <TableHeader>
@@ -101,7 +146,7 @@ export function TransactionLedger({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((row) => {
+          {filteredRows.map((row) => {
             const { transaction, fund, category, donor } = row;
             const reconciled = transaction.reconciled;
             return (

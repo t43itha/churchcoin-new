@@ -45,6 +45,7 @@ export default function TransactionsPage() {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Doc<"transactions"> | null>(null);
   const editingModeRef = useRef<"create" | "edit">("create");
+  const formRef = useRef<HTMLDivElement>(null);
   const { user } = useSession();
 
   const funds = useQuery(
@@ -61,7 +62,7 @@ export default function TransactionsPage() {
   );
   const ledger = useQuery(
     api.transactions.getLedger,
-    churchId ? { churchId, limit: 200 } : "skip"
+    churchId ? { churchId, limit: 1000 } : "skip"
   );
 
   const createTransaction = useMutation(api.transactions.createTransaction);
@@ -420,11 +421,24 @@ export default function TransactionsPage() {
           </div>
         ) : null}
         <div className="grid gap-6 lg:grid-cols-[2fr,1.1fr]">
-          <div className="space-y-4">
+          <div className="space-y-4" ref={formRef}>
             {editingTransaction ? (
-              <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
-                Editing {editingTransaction.description} · changes are tracked in the audit log
-              </Badge>
+              <div className="space-y-2">
+                <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
+                  Editing {editingTransaction.description} · changes are tracked in the audit log
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditingTransaction(null);
+                    setFeedback(null);
+                  }}
+                  className="text-xs text-grey-mid hover:text-ink"
+                >
+                  Cancel editing
+                </Button>
+              </div>
             ) : null}
             <TransactionForm
               churchId={churchId}
@@ -500,7 +514,7 @@ export default function TransactionsPage() {
             <div>
               <h2 className="text-xl font-semibold text-ink">Ledger activity</h2>
               <p className="text-sm text-grey-mid">
-                Review and reconcile the most recent 200 transactions across your funds.
+                Search and edit transactions. Click Edit to assign donors, change amounts, or update details. Use Reconcile when matched to bank statements.
               </p>
             </div>
           </div>
@@ -509,6 +523,10 @@ export default function TransactionsPage() {
             loading={!ledger}
             onEdit={(transaction) => {
               setEditingTransaction(transaction);
+              // Scroll to form
+              setTimeout(() => {
+                formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }, 100);
             }}
             onDelete={handleDelete}
             onToggleReconciled={handleToggleReconciled}

@@ -8,6 +8,7 @@ import { FundCard, type FundCardSummary } from "@/components/funds/fund-card";
 import { FundForm, type FundFormValues } from "@/components/funds/fund-form";
 import { FundLedger } from "@/components/funds/fund-ledger";
 import { FundPledgeForm, type FundPledgeFormValues } from "@/components/funds/fund-pledge-form";
+import { PledgeImportDialog } from "@/components/funds/pledge-import-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -110,6 +111,7 @@ export default function FundsPage() {
   const [isPledgeDialogOpen, setIsPledgeDialogOpen] = useState(false);
   const [isCreatePledgeSubmitting, setIsCreatePledgeSubmitting] = useState(false);
   const [createPledgeError, setCreatePledgeError] = useState<string | null>(null);
+  const [isPledgeImportOpen, setIsPledgeImportOpen] = useState(false);
 
   const fundsOverview = useQuery(
     api.funds.getFundsOverview,
@@ -577,18 +579,29 @@ export default function FundsPage() {
                     ) : null}
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <h3 className="text-base font-semibold text-ink">Pledges</h3>
-                      <Button
-                        size="sm"
-                        className="font-primary"
-                        onClick={() => {
-                          setCreatePledgeError(null);
-                          setIsPledgeDialogOpen(true);
-                        }}
-                        disabled={isCreatePledgeSubmitting || !donors || donors.length === 0}
-                      >
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Add pledge
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="font-primary"
+                          onClick={() => setIsPledgeImportOpen(true)}
+                          disabled={!donors || donors.length === 0}
+                        >
+                          Import CSV
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="font-primary"
+                          onClick={() => {
+                            setCreatePledgeError(null);
+                            setIsPledgeDialogOpen(true);
+                          }}
+                          disabled={isCreatePledgeSubmitting || !donors || donors.length === 0}
+                        >
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          Add pledge
+                        </Button>
+                      </div>
                     </div>
                     {fundraisingSnapshot.supporters.length ? (
                       <div className="overflow-x-auto">
@@ -711,6 +724,15 @@ export default function FundsPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {viewingFund && churchId ? (
+        <PledgeImportDialog
+          open={isPledgeImportOpen}
+          onOpenChange={setIsPledgeImportOpen}
+          churchId={churchId}
+          fund={viewingFund.fund}
+        />
+      ) : null}
     </div>
   );
 }

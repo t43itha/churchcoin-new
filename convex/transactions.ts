@@ -406,6 +406,11 @@ export const updateTransaction = mutation({
       });
     }
 
+    // Note: Pledge fulfillment recalculation
+    // When donorId changes on an income transaction, pledge fulfillment is automatically
+    // recalculated via Convex's reactive queries (getFundsOverview reads from transactions
+    // and fundPledges). No explicit trigger needed - the UI will update automatically.
+
     // Log audit trail
     await ctx.db.insert("auditLog", {
       churchId: transaction.churchId,
