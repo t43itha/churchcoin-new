@@ -227,7 +227,7 @@ export function DuplicateReview({
                 <SelectItem value="__all_categories">All categories</SelectItem>
                 {categories.map((category) => (
                   <SelectItem key={category._id} value={category._id}>
-                    {category.displayName}
+                    {category.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -285,7 +285,7 @@ export function DuplicateReview({
               )}
               {categoryFilter && (
                 <Badge variant="outline" className="border-ledger text-ink">
-                  Category: {categories.find(c => c._id === categoryFilter)?.displayName}
+                  Category: {categories.find(c => c._id === categoryFilter)?.name}
                 </Badge>
               )}
               {statusFilter && (
