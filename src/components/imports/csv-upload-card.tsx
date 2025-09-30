@@ -55,7 +55,7 @@ export function CsvUploadCard({ onFileParsed }: CsvUploadCardProps) {
       <CardHeader>
         <CardTitle className="text-ink">Upload bank export</CardTitle>
         <CardDescription className="text-grey-mid">
-          We support Barclays, HSBC, and Metro Bank templates out of the box. Drop a CSV and we'll detect the format.
+          We support Barclays, HSBC, and Metro Bank templates out of the box. Drop a CSV and we&apos;ll detect the format.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -105,7 +105,7 @@ export function CsvUploadCard({ onFileParsed }: CsvUploadCardProps) {
           <p className="text-sm text-error">{error}</p>
         ) : (
           <p className="text-xs text-grey-mid">
-            We’ll keep the raw file in memory until you confirm the mapping. Nothing is sent to the server yet.
+            We&apos;ll keep the raw file in memory until you confirm the mapping. Nothing is sent to the server yet.
           </p>
         )}
       </CardContent>

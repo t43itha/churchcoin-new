@@ -280,7 +280,7 @@ export function DuplicateReview({
             <div className="flex gap-2">
               {searchQuery.trim() && (
                 <Badge variant="outline" className="border-ledger text-ink">
-                  Search: "{searchQuery}"
+                  Search: &ldquo;{searchQuery}&rdquo;
                 </Badge>
               )}
               {categoryFilter && (
@@ -305,9 +305,9 @@ export function DuplicateReview({
                 checked={isAllSelected}
                 onCheckedChange={handleSelectAll}
                 className="border-2 border-ink data-[state=checked]:bg-ink data-[state=checked]:border-ink"
-                ref={(el: any) => {
+                ref={(el: HTMLButtonElement | null) => {
                   if (el) {
-                    el.indeterminate = isPartiallySelected;
+                    (el as HTMLButtonElement & { indeterminate: boolean }).indeterminate = isPartiallySelected;
                   }
                 }}
               />
@@ -332,7 +332,7 @@ export function DuplicateReview({
                 <TableCell>
                   <Checkbox
                     checked={isChecked}
-                    onCheckedChange={(checked: any) => handleRowCheck(row._id, !!checked)}
+                    onCheckedChange={(checked: boolean | "indeterminate") => handleRowCheck(row._id, checked === true)}
                     disabled={isProcessed}
                     className="border-2 border-ink data-[state=checked]:bg-ink data-[state=checked]:border-ink"
                   />
