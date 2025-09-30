@@ -1,6 +1,7 @@
 import Fuse from "fuse.js";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 
 // Get all donors for a church
 export const getDonors = query({
@@ -246,6 +247,84 @@ export const generateDonorStatement = query({
         to: args.toDate,
       },
       generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// Bulk create donors from CSV import
+export const bulkCreateDonors = mutation({
+  args: {
+    churchId: v.id("churches"),
+    donors: v.array(
+      v.object({
+        name: v.string(),
+        email: v.optional(v.string()),
+        phone: v.optional(v.string()),
+        address: v.optional(v.string()),
+        bankReference: v.optional(v.string()),
+        giftAidDeclaration: v.optional(
+          v.object({
+            signed: v.boolean(),
+            date: v.string(),
+          })
+        ),
+        notes: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const created: Id<"donors">[] = [];
+    const skipped: { name: string; reason: string }[] = [];
+
+    for (const donor of args.donors) {
+      // Check for duplicates by email or bank reference
+      let existingDonor = null;
+
+      if (donor.email) {
+        existingDonor = await ctx.db
+          .query("donors")
+          .withIndex("by_email", (q) =>
+            q.eq("churchId", args.churchId).eq("email", donor.email)
+          )
+          .first();
+      }
+
+      if (!existingDonor && donor.bankReference) {
+        existingDonor = await ctx.db
+          .query("donors")
+          .withIndex("by_reference", (q) =>
+            q.eq("churchId", args.churchId).eq("bankReference", donor.bankReference)
+          )
+          .first();
+      }
+
+      if (existingDonor) {
+        skipped.push({
+          name: donor.name,
+          reason: "Duplicate email or bank reference",
+        });
+        continue;
+      }
+
+      const donorId = await ctx.db.insert("donors", {
+        churchId: args.churchId,
+        name: donor.name,
+        email: donor.email,
+        phone: donor.phone,
+        address: donor.address,
+        bankReference: donor.bankReference,
+        giftAidDeclaration: donor.giftAidDeclaration,
+        notes: donor.notes,
+        isActive: true,
+      });
+
+      created.push(donorId);
+    }
+
+    return {
+      created,
+      skipped,
+      summary: `Created ${created.length} donor${created.length === 1 ? "" : "s"}, skipped ${skipped.length} duplicate${skipped.length === 1 ? "" : "s"}`,
     };
   },
 });

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { HandHeart, Users } from "lucide-react";
+import { HandHeart, Upload, Users } from "lucide-react";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -173,13 +174,21 @@ export default function DonorDirectoryPage() {
               </Select>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-grey-mid">
-            <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
-              <HandHeart className="mr-1 h-3 w-3" /> Anonymous giving supported
-            </Badge>
-            <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
-              {donorTotals.transactionCount} gifts tracked · £{donorTotals.totalGiving.toFixed(2)} total
-            </Badge>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-grey-mid">
+              <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
+                <HandHeart className="mr-1 h-3 w-3" /> Anonymous giving supported
+              </Badge>
+              <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
+                {donorTotals.transactionCount} gifts tracked · £{donorTotals.totalGiving.toFixed(2)} total
+              </Badge>
+            </div>
+            <Link href="/donors/import">
+              <Button variant="outline" className="border-ledger font-primary">
+                <Upload className="mr-2 h-4 w-4" />
+                Bulk import
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
