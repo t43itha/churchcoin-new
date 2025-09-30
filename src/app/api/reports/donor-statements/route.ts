@@ -709,7 +709,15 @@ export async function POST(request: Request) {
       try {
         const logoPath = `${process.cwd()}/public/legacy logo.jpg`;
         const logoBytes = await readFile(logoPath);
-        logoImage = await pdfDoc.embedJpg(logoBytes);
+        try {
+          logoImage = await pdfDoc.embedJpg(logoBytes);
+        } catch (jpgError) {
+          try {
+            logoImage = await pdfDoc.embedPng(logoBytes);
+          } catch (pngError) {
+            console.warn("Failed to embed building fund logo", { jpgError, pngError });
+          }
+        }
       } catch (error) {
         console.warn("Failed to load building fund logo", error);
       }
