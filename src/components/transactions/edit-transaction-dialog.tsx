@@ -53,7 +53,7 @@ export function EditTransactionDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const form = useForm({
+  const form = useForm<EditFormValues>({
     resolver: zodResolver(editSchema),
     values: {
       categoryId: transaction?.categoryId ?? "",

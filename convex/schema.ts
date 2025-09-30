@@ -359,5 +359,58 @@ export default defineSchema({
   })
     .index("by_church", ["churchId", "timestamp"])
     .index("by_user", ["userId", "timestamp"]),
+
+  // AI Conversations
+  aiConversations: defineTable({
+    churchId: v.id("churches"),
+    userId: v.id("users"),
+    messages: v.array(
+      v.object({
+        role: v.union(v.literal("user"), v.literal("assistant")),
+        content: v.string(),
+        timestamp: v.number(),
+        attachments: v.optional(v.array(v.id("_storage"))),
+      })
+    ),
+    context: v.optional(
+      v.object({
+        page: v.optional(v.string()),
+        fundId: v.optional(v.id("funds")),
+        donorId: v.optional(v.id("donors")),
+        transactionId: v.optional(v.id("transactions")),
+      })
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_church_user", ["churchId", "userId", "updatedAt"]),
+
+  // AI Insights
+  aiInsights: defineTable({
+    churchId: v.id("churches"),
+    type: v.union(
+      v.literal("anomaly"),
+      v.literal("trend"),
+      v.literal("compliance"),
+      v.literal("prediction"),
+      v.literal("recommendation")
+    ),
+    title: v.string(),
+    description: v.string(),
+    severity: v.union(
+      v.literal("info"),
+      v.literal("warning"),
+      v.literal("critical")
+    ),
+    actionable: v.boolean(),
+    actionUrl: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+    isRead: v.boolean(),
+    isDismissed: v.boolean(),
+    createdAt: v.number(),
+    expiresAt: v.optional(v.number()),
+  })
+    .index("by_church_unread", ["churchId", "isRead", "createdAt"])
+    .index("by_church_active", ["churchId", "isDismissed", "createdAt"]),
 });
 

@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { useQuery } from "convex/react";
 import {
   Calculator,
   PiggyBank,
@@ -11,12 +13,15 @@ import {
   Upload,
   FileText,
   Settings,
-  LogOut
+  LogOut,
+  Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/components/auth/session-provider";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ChatDialog } from "@/components/ai/chat-dialog";
+import { api } from "@/lib/convexGenerated";
 
 const navigation = [
   {
@@ -63,11 +68,16 @@ interface SidebarProps {
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
   const { user, signOut } = useSession();
+  const [chatOpen, setChatOpen] = useState(false);
+  const churches = useQuery(api.churches.listChurches, {});
+  const churchId = churches?.[0]?._id;
 
   const handleSignOut = async () => {
     await signOut();
     window.location.href = "/";
   };
+
+  const currentPage = pathname.split("/")[1] || "dashboard";
 
   return (
     <div className={cn("flex h-full flex-col bg-paper border-r border-ledger", className)}>
@@ -80,8 +90,19 @@ export function Sidebar({ className }: SidebarProps) {
         </div>
       </div>
 
+      {/* AI Assistant Button */}
+      <div className="px-4 pt-6 pb-3">
+        <Button
+          onClick={() => setChatOpen(true)}
+          className="w-full gap-2 bg-ink text-paper hover:bg-grey-dark font-primary"
+        >
+          <Sparkles className="h-4 w-4" />
+          AI Assistant
+        </Button>
+      </div>
+
       {/* Navigation */}
-      <nav className="flex-1 px-4 py-6">
+      <nav className="flex-1 px-4 pb-6">
         <ul className="space-y-2">
           {navigation.map((item) => {
             const isActive = pathname === item.href ||
@@ -111,6 +132,13 @@ export function Sidebar({ className }: SidebarProps) {
           })}
         </ul>
       </nav>
+
+      <ChatDialog
+        open={chatOpen}
+        onOpenChange={setChatOpen}
+        churchId={churchId}
+        context={{ page: currentPage }}
+      />
 
       {/* User Profile Section */}
       <div className="border-t border-ledger p-4">

@@ -349,3 +349,109 @@ export const listFeedback = query({
       .take(50);
   },
 });
+
+const CLAUDE_MODEL = "claude-3-haiku-20240307";
+const NARRATIVE_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+
+export const generateReportNarrative = mutation({
+  args: {
+    churchId: v.id("churches"),
+    reportType: v.union(
+      v.literal("fund-balance"),
+      v.literal("income-expense"),
+      v.literal("gift-aid"),
+      v.literal("annual-summary"),
+      v.literal("monthly")
+    ),
+    reportData: v.any(),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const cacheKey = buildCacheKey(
+      args.churchId,
+      `${args.reportType}-narrative`,
+      Date.now()
+    );
+
+    const cached = await ctx.db
+      .query("aiCache")
+      .withIndex("by_key", (q) => q.eq("key", cacheKey))
+      .first();
+
+    if (cached && cached.expiresAt > Date.now()) {
+      const payload = JSON.parse(cached.value);
+      return { narrative: payload.narrative, source: "cache" };
+    }
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      throw new ConvexError("ANTHROPIC_API_KEY not configured");
+    }
+
+    const systemPrompt = `You are a financial advisor for UK churches and charities. Generate clear, trustee-friendly narratives explaining financial reports. Focus on insights, trends, and actionable recommendations. Keep explanations concise (2-3 paragraphs max) and in plain English.`;
+
+    const userPrompt = `Generate a narrative summary for this ${args.reportType} report:\n\n${JSON.stringify(
+      args.reportData,
+      null,
+      2
+    )}\n\nExplain the key findings, notable trends, and any recommendations for the church leadership.`;
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: CLAUDE_MODEL,
+        max_tokens: 500,
+        messages: [
+          {
+            role: "user",
+            content: userPrompt,
+          },
+        ],
+        system: systemPrompt,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new ConvexError("Failed to generate narrative");
+    }
+
+    const json = await response.json();
+    const narrative = json.content?.[0]?.text;
+
+    if (!narrative) {
+      throw new ConvexError("No narrative returned");
+    }
+
+    const narrativePayload = { narrative, source: "model" };
+    const cachePayload = { 
+      categoryId: null, 
+      confidence: 0, 
+      source: "model" as const,
+      narrative 
+    };
+    await upsertCache(ctx, cacheKey, cachePayload, args.churchId);
+
+    const usage = json.usage ?? {};
+    const inputTokens = Number(usage.input_tokens ?? 0);
+    const outputTokens = Number(usage.output_tokens ?? 0);
+    const totalTokens = inputTokens + outputTokens;
+    const cost = totalTokens > 0 ? (totalTokens / 1000) * 0.0005 : 0;
+
+    await ctx.db.insert("aiUsage", {
+      churchId: args.churchId,
+      model: CLAUDE_MODEL,
+      promptTokens: inputTokens,
+      completionTokens: outputTokens,
+      totalTokens,
+      cost,
+      createdAt: Date.now(),
+    });
+
+    return narrativePayload;
+  },
+});
