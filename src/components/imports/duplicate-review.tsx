@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/select";
 import { Search, X } from "lucide-react";
 import type { Doc, Id } from "@/lib/convexGenerated";
+import { BulkActionsBar } from "./bulk-actions-bar";
+import { BulkAssignmentDialog } from "./bulk-assignment-dialog";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -55,6 +57,8 @@ type DuplicateReviewProps = {
   onSkipSelection: (rowIds: Id<"csvRows">[]) => void;
 };
 
+type BulkAssignmentType = "fund" | "category" | "donor";
+
 export function DuplicateReview({
   rows,
   funds,
@@ -65,6 +69,13 @@ export function DuplicateReview({
 }: DuplicateReviewProps) {
   const [checkedRows, setCheckedRows] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Record<string, { fundId: string; categoryId?: string; donorId?: string }>>({});
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkDialogType, setBulkDialogType] = useState<BulkAssignmentType>("fund");
+  const [bulkAssignments, setBulkAssignments] = useState<Record<string, Set<string>>>({
+    fund: new Set(),
+    category: new Set(),
+    donor: new Set(),
+  });
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -174,6 +185,50 @@ export function DuplicateReview({
         [key]: value,
       },
     }));
+  };
+
+  // Bulk assignment handlers
+  const handleBulkAssign = (type: BulkAssignmentType) => {
+    setBulkDialogType(type);
+    setBulkDialogOpen(true);
+  };
+
+  const handleBulkConfirm = (value: string) => {
+    const availableRowIds = Array.from(checkedRows).filter((rowId) => {
+      const row = filteredRows.find((r) => r._id === rowId);
+      return row && row.status !== "skipped" && row.status !== "approved";
+    });
+
+    // Update selected state for all checked rows
+    const newSelected = { ...selected };
+    availableRowIds.forEach((rowId) => {
+      if (!newSelected[rowId]) {
+        newSelected[rowId] = { fundId: funds[0]?._id || "" };
+      }
+      if (bulkDialogType === "fund") {
+        newSelected[rowId].fundId = value;
+      } else if (bulkDialogType === "category") {
+        newSelected[rowId].categoryId = value || undefined;
+      } else if (bulkDialogType === "donor") {
+        newSelected[rowId].donorId = value || undefined;
+      }
+    });
+    setSelected(newSelected);
+
+    // Track which rows have been bulk-assigned for visual indicators
+    setBulkAssignments((prev) => ({
+      ...prev,
+      [bulkDialogType]: new Set(availableRowIds),
+    }));
+  };
+
+  const handleClearSelection = () => {
+    setCheckedRows(new Set());
+    setBulkAssignments({
+      fund: new Set(),
+      category: new Set(),
+      donor: new Set(),
+    });
   };
 
   // Helper functions for filters
@@ -350,52 +405,85 @@ export function DuplicateReview({
                   {currency.format(Math.abs(row.raw.amount))}
                 </TableCell>
                 <TableCell>
-                  {funds.length > 0 ? (
+                  <div className="flex flex-col gap-1">
+                    {funds.length > 0 ? (
+                      <select
+                        value={config.fundId}
+                        className={`h-8 rounded-md border px-2 text-sm ${
+                          bulkAssignments.fund.has(row._id)
+                            ? "border-ink bg-highlight font-medium"
+                            : "border-ledger bg-paper"
+                        }`}
+                        onChange={(event) => updateSelection(row._id, "fundId", event.target.value)}
+                        disabled={isProcessed}
+                      >
+                        {funds.map((fund) => (
+                          <option key={fund._id} value={fund._id}>
+                            {fund.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-sm text-error">No funds available</span>
+                    )}
+                    {bulkAssignments.fund.has(row._id) && (
+                      <Badge variant="outline" className="border-ink text-xs text-ink w-fit">
+                        Bulk assigned
+                      </Badge>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col gap-1">
                     <select
-                      value={config.fundId}
-                      className="h-8 rounded-md border border-ledger bg-paper px-2 text-sm"
-                      onChange={(event) => updateSelection(row._id, "fundId", event.target.value)}
+                      value={config.categoryId ?? ""}
+                      className={`h-8 rounded-md border px-2 text-sm ${
+                        bulkAssignments.category.has(row._id)
+                          ? "border-ink bg-highlight font-medium"
+                          : "border-ledger bg-paper"
+                      }`}
+                      onChange={(event) => updateSelection(row._id, "categoryId", event.target.value)}
                       disabled={isProcessed}
                     >
-                      {funds.map((fund) => (
-                        <option key={fund._id} value={fund._id}>
-                          {fund.name}
+                      <option value="">Auto-detect</option>
+                      {categories.map((category) => (
+                        <option key={category._id} value={category._id}>
+                          {category.name}
                         </option>
                       ))}
                     </select>
-                  ) : (
-                    <span className="text-sm text-error">No funds available</span>
-                  )}
+                    {bulkAssignments.category.has(row._id) && (
+                      <Badge variant="outline" className="border-ink text-xs text-ink w-fit">
+                        Bulk assigned
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
-                  <select
-                    value={config.categoryId ?? ""}
-                    className="h-8 rounded-md border border-ledger bg-paper px-2 text-sm"
-                    onChange={(event) => updateSelection(row._id, "categoryId", event.target.value)}
-                    disabled={isProcessed}
-                  >
-                    <option value="">Auto-detect</option>
-                    {categories.map((category) => (
-                      <option key={category._id} value={category._id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                </TableCell>
-                <TableCell>
-                  <select
-                    value={config.donorId ?? ""}
-                    className="h-8 rounded-md border border-ledger bg-paper px-2 text-sm"
-                    onChange={(event) => updateSelection(row._id, "donorId", event.target.value)}
-                    disabled={isProcessed}
-                  >
-                    <option value="">No donor</option>
-                    {donors.map((donor) => (
-                      <option key={donor._id} value={donor._id}>
-                        {donor.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex flex-col gap-1">
+                    <select
+                      value={config.donorId ?? ""}
+                      className={`h-8 rounded-md border px-2 text-sm ${
+                        bulkAssignments.donor.has(row._id)
+                          ? "border-ink bg-highlight font-medium"
+                          : "border-ledger bg-paper"
+                      }`}
+                      onChange={(event) => updateSelection(row._id, "donorId", event.target.value)}
+                      disabled={isProcessed}
+                    >
+                      <option value="">No donor</option>
+                      {donors.map((donor) => (
+                        <option key={donor._id} value={donor._id}>
+                          {donor.name}
+                        </option>
+                      ))}
+                    </select>
+                    {bulkAssignments.donor.has(row._id) && (
+                      <Badge variant="outline" className="border-ink text-xs text-ink w-fit">
+                        Bulk assigned
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <Badge
@@ -445,6 +533,27 @@ export function DuplicateReview({
           </Button>
         </div>
       </div>
+
+      {/* Bulk Actions Bar */}
+      <BulkActionsBar
+        selectedCount={checkedRowsArray.length}
+        onClearSelection={handleClearSelection}
+        onAssignFund={() => handleBulkAssign("fund")}
+        onAssignCategory={() => handleBulkAssign("category")}
+        onAssignDonor={() => handleBulkAssign("donor")}
+      />
+
+      {/* Bulk Assignment Dialog */}
+      <BulkAssignmentDialog
+        open={bulkDialogOpen}
+        onOpenChange={setBulkDialogOpen}
+        type={bulkDialogType}
+        selectedRows={filteredRows.filter((row) => checkedRows.has(row._id) && row.status !== "skipped" && row.status !== "approved")}
+        funds={funds}
+        categories={categories}
+        donors={donors}
+        onConfirm={handleBulkConfirm}
+      />
     </div>
   );
 }

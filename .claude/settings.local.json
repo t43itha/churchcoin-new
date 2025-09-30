@@ -6,7 +6,9 @@
       "Bash(node:*)",
       "Bash(python:*)",
       "Bash(ls:*)",
-      "Bash(npx convex run:*)"
+      "Bash(npx convex run:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run lint:*)"
     ],
     "deny": [],
     "ask": []
