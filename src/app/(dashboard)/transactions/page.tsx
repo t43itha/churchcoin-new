@@ -1,22 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useConvex, useMutation, useQuery } from "convex/react";
-import { CalendarCheck, NotebookPen, Upload } from "lucide-react";
+import { Banknote, LineChart, NotebookPen, PlusCircle } from "lucide-react";
 
-import { SundayCollectionCard } from "@/components/transactions/sunday-collection-card";
+import {
+  ManualTransactionDialog,
+  type TransactionCreateValues,
+} from "@/components/transactions/manual-transaction-dialog";
 import {
   TransactionForm,
   type TransactionFormValues,
 } from "@/components/transactions/transaction-form";
-import { QuickDonationDialog, type QuickEntryValues } from "@/components/transactions/quick-donation-dialog";
+import { EditTransactionDialog } from "@/components/transactions/edit-transaction-dialog";
 import {
   TransactionLedger,
   type TransactionLedgerRow,
 } from "@/components/transactions/transaction-ledger";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -33,19 +41,14 @@ const currency = new Intl.NumberFormat("en-GB", {
   minimumFractionDigits: 2,
 });
 
-type Feedback = {
-  type: "success" | "error";
-  message: string;
-};
-
 export default function TransactionsPage() {
   const convex = useConvex();
   const churches = useQuery(api.churches.listChurches, {});
   const [churchId, setChurchId] = useState<Id<"churches"> | null>(null);
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Doc<"transactions"> | null>(null);
-  const editingModeRef = useRef<"create" | "edit">("create");
-  const formRef = useRef<HTMLDivElement>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { user } = useSession();
 
   const funds = useQuery(
@@ -76,135 +79,64 @@ export default function TransactionsPage() {
     }
   }, [churches, churchId]);
 
-  const activeChurch = useMemo(() => {
-    return churches?.find((church) => church._id === churchId) ?? null;
-  }, [churches, churchId]);
-
-  const handleManualSubmit = async (values: TransactionFormValues) => {
-    if (!churchId) {
-      throw new Error("Select a church before recording transactions");
+  const handleCreateTransactions = async (transactions: TransactionCreateValues[]) => {
+    for (const transaction of transactions) {
+      await createTransaction(transaction);
     }
-
-    const isEditing = Boolean(editingTransaction);
-    editingModeRef.current = isEditing ? "edit" : "create";
-
-    if (isEditing && editingTransaction) {
-      const previousCategory = editingTransaction.categoryId;
-      const nextCategory = values.categoryId
-        ? (values.categoryId as Id<"categories">)
-        : undefined;
-      await updateTransaction({
-        transactionId: editingTransaction._id,
-        date: values.date,
-        description: values.description.trim(),
-        amount: values.amount,
-        type: values.type,
-        fundId: values.fundId as Id<"funds">,
-        categoryId: values.categoryId ? (values.categoryId as Id<"categories">) : undefined,
-        donorId: values.donorId ? (values.donorId as Id<"donors">) : undefined,
-        method: values.method,
-        reference: values.reference,
-        giftAid: values.giftAid,
-        notes: values.notes,
-        receiptStorageId: values.receiptStorageId ? (values.receiptStorageId as Id<"_storage">) : undefined,
-        receiptFilename: values.receiptFilename,
-        removeReceipt:
-          Boolean(editingTransaction.receiptStorageId) && !values.receiptStorageId,
-      });
-      if (
-        churchId &&
-        nextCategory &&
-        nextCategory !== previousCategory
-      ) {
-        await convex.mutation(api.ai.recordFeedback, {
-          churchId,
-          description: editingTransaction.description,
-          amount: editingTransaction.amount,
-          categoryId: nextCategory,
-          confidence: 0.9,
-          userId: user?._id,
-        });
-      }
-      return;
-    }
-
-    await createTransaction({
-      churchId,
-      date: values.date,
-      description: values.description.trim(),
-      amount: values.amount,
-      type: values.type,
-      fundId: values.fundId as Id<"funds">,
-      categoryId: values.categoryId ? (values.categoryId as Id<"categories">) : undefined,
-      donorId: values.donorId ? (values.donorId as Id<"donors">) : undefined,
-      method: values.method,
-      reference: values.reference,
-      giftAid: values.type === "income" ? values.giftAid : false,
-      notes: values.notes,
-      enteredByName: values.enteredByName,
-      source: "manual",
-      receiptStorageId: values.receiptStorageId ? (values.receiptStorageId as Id<"_storage">) : undefined,
-      receiptFilename: values.receiptFilename,
+    setFeedback({
+      type: "success",
+      message: `Successfully recorded ${transactions.length} transaction${transactions.length > 1 ? "s" : ""}.`,
     });
+    setTimeout(() => setFeedback(null), 5000);
   };
 
-  const handleSundaySubmit = async (entries: TransactionFormValues[]) => {
-    if (!churchId) {
-      throw new Error("Select a church before recording Sunday collections");
-    }
+  const handleUpdateTransaction = async (transactionId: Id<"transactions">, updates: {
+    date?: string;
+    description?: string;
+    amount?: number;
+    type?: "income" | "expense";
+    fundId?: Id<"funds">;
+    categoryId?: Id<"categories">;
+    donorId?: Id<"donors">;
+    method?: string;
+    reference?: string;
+    giftAid?: boolean;
+    notes?: string;
+  }) => {
+    const previousCategory = editingTransaction?.categoryId;
+    const nextCategory = updates.categoryId;
 
-    for (const entry of entries) {
-      await createTransaction({
-        churchId: entry.churchId as Id<"churches">,
-        date: entry.date,
-        description: entry.description,
-        amount: entry.amount,
-        type: entry.type,
-        fundId: entry.fundId as Id<"funds">,
-        categoryId: entry.categoryId ? (entry.categoryId as Id<"categories">) : undefined,
-        donorId: entry.donorId ? (entry.donorId as Id<"donors">) : undefined,
-        method: entry.method,
-        reference: entry.reference,
-        giftAid: entry.giftAid,
-        notes: entry.notes,
-        enteredByName: entry.enteredByName,
-        source: "manual",
+    await updateTransaction({
+      transactionId,
+      ...updates,
+    });
+
+    if (churchId && nextCategory && nextCategory !== previousCategory && editingTransaction) {
+      await convex.mutation(api.ai.recordFeedback, {
+        churchId,
+        description: editingTransaction.description,
+        amount: editingTransaction.amount,
+        categoryId: nextCategory,
+        confidence: 0.9,
+        userId: user?._id,
       });
     }
 
     setFeedback({
       type: "success",
-      message: `Recorded ${entries.length} Sunday collection entr${entries.length === 1 ? "y" : "ies"}.`,
+      message: "Transaction updated successfully.",
     });
+    setTimeout(() => setFeedback(null), 5000);
+    setIsEditDialogOpen(false);
+    setEditingTransaction(null);
   };
 
-  const handleQuickEntry = async (entry: QuickEntryValues) => {
-    if (!churchId) {
-      throw new Error("Select a church before recording transactions");
-    }
-
-    editingModeRef.current = "create";
-
-    await createTransaction({
-      churchId,
-      date: entry.date,
-      description: entry.description.trim(),
-      amount: entry.amount,
-      type: "income",
-      fundId: entry.fundId as Id<"funds">,
-      categoryId: entry.categoryId ? (entry.categoryId as Id<"categories">) : undefined,
-      donorId: entry.donorId ? (entry.donorId as Id<"donors">) : undefined,
-      method: entry.method,
-      reference: undefined,
-      giftAid: Boolean(entry.giftAid),
-      notes: undefined,
-      enteredByName: undefined,
-      source: "manual",
-      receiptStorageId: undefined,
-      receiptFilename: undefined,
-    });
-
-    setFeedback({ type: "success", message: "Midweek donation captured." });
+  const handleQuickUpdateTransaction = async (updates: {
+    categoryId?: Id<"categories">;
+    donorId?: Id<"donors">;
+  }) => {
+    if (!editingTransaction) return;
+    await handleUpdateTransaction(editingTransaction._id, updates);
   };
 
   const handleDelete = async (transactionId: Id<"transactions">) => {
@@ -289,49 +221,27 @@ export default function TransactionsPage() {
   };
 
 
-  const ledgerSnapshot = useMemo(() => {
-    if (!funds) {
-      return { count: 0, balance: 0 };
+  const totals = useMemo(() => {
+    if (!ledger) {
+      return { income: 0, expense: 0, count: 0, unreconciled: 0 };
     }
 
-    return funds.reduce(
-      (acc, fund) => {
+    return ledger.reduce(
+      (acc, row) => {
         acc.count += 1;
-        acc.balance += fund.balance;
+        if (row.transaction.type === "income") {
+          acc.income += row.transaction.amount;
+        } else {
+          acc.expense += row.transaction.amount;
+        }
+        if (!row.transaction.reconciled) {
+          acc.unreconciled += 1;
+        }
         return acc;
       },
-      { count: 0, balance: 0 }
+      { income: 0, expense: 0, count: 0, unreconciled: 0 }
     );
-  }, [funds]);
-
-  const incomeCategories = useMemo(() => {
-    return (categories ?? []).filter(
-      (category: Doc<"categories">) => category.type === "income"
-    );
-  }, [categories]);
-
-  const editingDefaults = useMemo(() => {
-    if (!editingTransaction) {
-      return undefined;
-    }
-
-    return {
-      date: editingTransaction.date,
-      type: editingTransaction.type,
-      description: editingTransaction.description,
-      amount: editingTransaction.amount,
-      fundId: editingTransaction.fundId as string,
-      categoryId: editingTransaction.categoryId ?? "",
-      donorId: editingTransaction.donorId ?? "",
-      method: editingTransaction.method ?? "",
-      reference: editingTransaction.reference ?? "",
-      giftAid: editingTransaction.giftAid,
-      notes: editingTransaction.notes ?? "",
-      enteredByName: editingTransaction.enteredByName ?? "",
-      receiptStorageId: editingTransaction.receiptStorageId ?? undefined,
-      receiptFilename: editingTransaction.receiptFilename ?? undefined,
-    } satisfies Partial<Omit<TransactionFormValues, "churchId">>;
-  }, [editingTransaction]);
+  }, [ledger]);
 
 
   if (!churches) {
@@ -363,178 +273,221 @@ export default function TransactionsPage() {
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-grey-mid">
                 <NotebookPen className="h-5 w-5 text-grey-mid" />
-                <span className="text-sm uppercase tracking-wide">Manual entry</span>
+                <span className="text-sm uppercase tracking-wide">Transaction Management</span>
               </div>
-              <h1 className="text-3xl font-semibold text-ink">Manual transaction entry</h1>
+              <h1 className="text-3xl font-semibold text-ink">Transactions</h1>
               <p className="text-sm text-grey-mid">
-                Capture offerings, reimbursements, and corrections straight into the ledger with audit-ready context.
+                Record in-person donations and manage your transaction ledger with powerful search and filters.
               </p>
             </div>
-            <div className="flex flex-col gap-2 md:items-end">
-              <span className="text-xs uppercase tracking-wide text-grey-mid">Active church</span>
+            <div className="flex flex-col items-start gap-3 md:items-end">
               <Select
-                value={churchId}
+                value={churchId ?? undefined}
                 onValueChange={(value) => setChurchId(value as Id<"churches">)}
+                disabled={!churches?.length}
               >
-                <SelectTrigger className="w-[240px] font-primary">
+                <SelectTrigger className="min-w-[220px] border-ledger font-primary">
                   <SelectValue placeholder="Select church" />
                 </SelectTrigger>
                 <SelectContent className="font-primary">
-                  {churches.map((church) => (
+                  {churches?.map((church) => (
                     <SelectItem key={church._id} value={church._id}>
                       {church.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {activeChurch ? (
-                <p className="text-xs text-grey-mid">
-                  FY end {activeChurch.settings.fiscalYearEnd} · Gift Aid {activeChurch.settings.giftAidEnabled ? "enabled" : "disabled"}
-                </p>
-              ) : null}
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-grey-mid">
-            <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
-              {ledgerSnapshot.count} active funds
-            </Badge>
-            <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
-              Ledger balance {currency.format(ledgerSnapshot.balance)}
-            </Badge>
-            <div className="flex items-center gap-2 rounded-md border border-ledger bg-highlight px-3 py-1.5">
-              <CalendarCheck className="h-4 w-4 text-grey-mid" />
-              <span>Bulk CSV uploads & AI mapping available in the import workspace</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
-        {feedback ? (
-          <div
-            className={`rounded-md border px-4 py-3 text-sm ${
-              feedback.type === "success"
-                ? "border-success/40 bg-success/10 text-success"
-                : "border-error/40 bg-error/10 text-error"
-            }`}
-          >
-            {feedback.message}
-          </div>
-        ) : null}
-        <div className="grid gap-6 lg:grid-cols-[2fr,1.1fr]">
-          <div className="space-y-4" ref={formRef}>
-            {editingTransaction ? (
-              <div className="space-y-2">
-                <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
-                  Editing {editingTransaction.description} · changes are tracked in the audit log
-                </Badge>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setEditingTransaction(null);
-                    setFeedback(null);
-                  }}
-                  className="text-xs text-grey-mid hover:text-ink"
-                >
-                  Cancel editing
-                </Button>
-              </div>
-            ) : null}
-            <TransactionForm
-              churchId={churchId}
-              funds={funds as Doc<"funds">[]}
-              categories={categories as Doc<"categories">[]}
-              donors={donors as Doc<"donors">[]}
-              defaultValues={editingDefaults}
-              heading={editingTransaction ? "Edit transaction" : "Manual transaction entry"}
-              subheading={
-                editingTransaction
-                  ? "Adjust ledger entries and we'll automatically log the amendment."
-                  : "Capture one-off income or expenses with full audit detail."
-              }
-              submitLabel={editingTransaction ? "Update transaction" : "Record transaction"}
-              showReceiptHint
-              onSubmit={handleManualSubmit}
-              onSubmitSuccess={() => {
-                const mode = editingModeRef.current;
-                setFeedback({
-                  type: "success",
-                  message:
-                    mode === "edit"
-                      ? "Transaction updated successfully."
-                      : "Manual transaction recorded successfully.",
-                });
-                if (mode === "edit") {
+              <Button
+                className="font-primary"
+                onClick={() => {
                   setEditingTransaction(null);
-                }
-                editingModeRef.current = "create";
-              }}
-            />
+                  setIsDialogOpen(true);
+                }}
+                disabled={!churchId}
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                New transaction
+              </Button>
+            </div>
           </div>
-          <div className="space-y-6">
-            <QuickDonationDialog
-              churchId={churchId}
-              funds={funds as Doc<"funds">[]}
-              categories={categories as Doc<"categories">[]}
-              donors={donors as Doc<"donors">[]}
-              onCreate={handleQuickEntry}
-            />
-            <SundayCollectionCard
-              churchId={churchId}
-              funds={funds as Doc<"funds">[]}
-              categories={incomeCategories as Doc<"categories">[]}
-              onCreate={handleSundaySubmit}
-              defaultFundId={funds[0]?._id}
-            />
-            <Card className="border-ledger bg-paper shadow-none">
-              <CardHeader>
-                <CardTitle className="text-ink">CSV import workspace</CardTitle>
-                <CardDescription className="text-grey-mid">
-                  Drag and drop Barclays or HSBC exports, map the columns, and review duplicates before approving.
-                </CardDescription>
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card className="border-ledger">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
+                  <Banknote className="h-4 w-4 text-grey-mid" />
+                  Total income
+                </CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-col gap-3 text-sm text-grey-mid">
-                <div className="flex items-center gap-2">
-                  <Upload className="h-4 w-4 text-grey-mid" />
-                  Ready for iteration 4 bulk entry
-                </div>
-                <Button
-                  variant="outline"
-                  className="w-fit border-ledger font-primary"
-                  asChild
-                >
-                  <a href="/imports">Open import workspace</a>
-                </Button>
+              <CardContent className="text-2xl font-semibold text-success">
+                +{currency.format(totals.income)}
+              </CardContent>
+            </Card>
+            <Card className="border-ledger">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
+                  <LineChart className="h-4 w-4 text-grey-mid" />
+                  Total expenses
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-2xl font-semibold text-error">
+                -{currency.format(totals.expense)}
+              </CardContent>
+            </Card>
+            <Card className="border-ledger">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
+                  <NotebookPen className="h-4 w-4 text-grey-mid" />
+                  Transactions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-2xl font-semibold text-ink">
+                {totals.count}
+              </CardContent>
+            </Card>
+            <Card className="border-ledger">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
+                  <Banknote className="h-4 w-4 text-grey-mid" />
+                  Unreconciled
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-semibold text-ink">{totals.unreconciled}</div>
+                <p className="text-xs text-grey-mid">Need bank matching</p>
               </CardContent>
             </Card>
           </div>
         </div>
-        <div className="rounded-lg border border-ledger bg-paper p-6 shadow-none">
-          <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-ink">Ledger activity</h2>
-              <p className="text-sm text-grey-mid">
-                Search and edit transactions. Click Edit to assign donors, change amounts, or update details. Use Reconcile when matched to bank statements.
-              </p>
+      </div>
+      <div className="mx-auto max-w-6xl px-6 py-10">
+        {!churchId ? (
+          <div className="rounded-lg border border-dashed border-ledger bg-paper px-6 py-10 text-center text-grey-mid">
+            Add a church to Convex and select it to begin tracking transactions.
+          </div>
+        ) : null}
+        {churchId && ledger === undefined ? (
+          <div className="rounded-lg border border-ledger bg-paper px-6 py-10 text-center text-grey-mid">
+            Loading transactions…
+          </div>
+        ) : null}
+        {churchId && ledger ? (
+          <div className="space-y-6">
+            {feedback ? (
+              <div
+                className={`rounded-md border px-4 py-3 text-sm ${
+                  feedback.type === "success"
+                    ? "border-success/40 bg-success/10 text-success"
+                    : "border-error/40 bg-error/10 text-error"
+                }`}
+              >
+                {feedback.message}
+              </div>
+            ) : null}
+            
+            <div className="rounded-lg border border-ledger bg-paper p-6 shadow-none">
+              <div className="mb-6 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-ink">Transaction ledger</h2>
+                  <p className="text-sm text-grey-mid">
+                    Search, filter, and manage all transactions. Click edit to update details or reconcile when matched to bank statements.
+                  </p>
+                </div>
+              </div>
+              <TransactionLedger
+                rows={(ledger ?? []) as TransactionLedgerRow[]}
+                loading={!ledger}
+                onEdit={(transaction) => {
+                  setEditingTransaction(transaction);
+                  setIsEditDialogOpen(true);
+                }}
+                onDelete={handleDelete}
+                onToggleReconciled={handleToggleReconciled}
+                onRequestReceipt={handleRequestReceipt}
+                onSuggestCategory={handleSuggestCategory}
+              />
             </div>
           </div>
-          <TransactionLedger
-            rows={(ledger ?? []) as TransactionLedgerRow[]}
-            loading={!ledger}
-            onEdit={(transaction) => {
-              setEditingTransaction(transaction);
-              // Scroll to form
-              setTimeout(() => {
-                formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }, 100);
-            }}
-            onDelete={handleDelete}
-            onToggleReconciled={handleToggleReconciled}
-            onRequestReceipt={handleRequestReceipt}
-            onSuggestCategory={handleSuggestCategory}
-          />
-        </div>
+        ) : null}
       </div>
+
+      {churchId && funds && categories && donors ? (
+        <>
+          <ManualTransactionDialog
+            open={isDialogOpen}
+            onOpenChange={setIsDialogOpen}
+            churchId={churchId}
+            funds={funds as Doc<"funds">[]}
+            categories={categories as Doc<"categories">[]}
+            donors={donors as Doc<"donors">[]}
+            onSubmit={handleCreateTransactions}
+          />
+
+          {editingTransaction && (editingTransaction.source === "csv" || editingTransaction.source === "api") ? (
+            <EditTransactionDialog
+              open={isEditDialogOpen}
+              onOpenChange={setIsEditDialogOpen}
+              transaction={editingTransaction}
+              fund={(ledger ?? []).find(row => row.transaction._id === editingTransaction._id)?.fund ?? null}
+              categories={categories as Doc<"categories">[]}
+              donors={donors as Doc<"donors">[]}
+              onSubmit={handleQuickUpdateTransaction}
+            />
+          ) : (
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+              <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Edit transaction</DialogTitle>
+                </DialogHeader>
+                {editingTransaction ? (
+                  <TransactionForm
+                    churchId={churchId}
+                    funds={funds as Doc<"funds">[]}
+                    categories={categories as Doc<"categories">[]}
+                    donors={donors as Doc<"donors">[]}
+                    defaultValues={{
+                      date: editingTransaction.date,
+                      type: editingTransaction.type,
+                      description: editingTransaction.description,
+                      amount: editingTransaction.amount,
+                      fundId: editingTransaction.fundId,
+                      categoryId: editingTransaction.categoryId ?? "",
+                      donorId: editingTransaction.donorId ?? "",
+                      method: editingTransaction.method ?? "",
+                      reference: editingTransaction.reference ?? "",
+                      giftAid: editingTransaction.giftAid,
+                      notes: editingTransaction.notes ?? "",
+                      enteredByName: editingTransaction.enteredByName ?? "",
+                      receiptStorageId: editingTransaction.receiptStorageId ?? undefined,
+                      receiptFilename: editingTransaction.receiptFilename ?? undefined,
+                    }}
+                    heading="Edit transaction"
+                    subheading="Update transaction details. Changes are tracked in the audit log."
+                    submitLabel="Save changes"
+                    onSubmit={async (values: TransactionFormValues) => {
+                      await handleUpdateTransaction(editingTransaction._id, {
+                        date: values.date,
+                        description: values.description.trim(),
+                        amount: values.amount,
+                        type: values.type,
+                        fundId: values.fundId as Id<"funds">,
+                        categoryId: values.categoryId ? (values.categoryId as Id<"categories">) : undefined,
+                        donorId: values.donorId ? (values.donorId as Id<"donors">) : undefined,
+                        method: values.method,
+                        reference: values.reference,
+                        giftAid: values.giftAid,
+                        notes: values.notes,
+                      });
+                    }}
+                    onSubmitSuccess={() => {
+                      // Already handled in handleUpdateTransaction
+                    }}
+                  />
+                ) : null}
+              </DialogContent>
+            </Dialog>
+          )}
+        </>
+      ) : null}
     </div>
   );
 }
