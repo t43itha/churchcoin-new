@@ -79,11 +79,6 @@ export default function ReportsPage() {
     churchId ? { churchId, startDate: monthlyStart, endDate: monthlyEnd } : "skip"
   );
   
-  const donorStatements = useQuery(
-    api.reports.getDonorStatementBatch,
-    churchId ? { churchId, fromDate: statementStart, toDate: statementEnd, fundType: "all" } : "skip"
-  );
-  
   const tithesStatements = useQuery(
     api.reports.getDonorStatementBatch,
     churchId ? { churchId, fromDate: statementStart, toDate: statementEnd, fundType: "general" } : "skip"

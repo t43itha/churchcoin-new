@@ -12,6 +12,19 @@ const currencyFormatter = new Intl.NumberFormat("en-GB", {
   currency: "GBP",
 });
 
+const formatCurrencyMaybe = (value: unknown) => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return currencyFormatter.format(value);
+  }
+  if (typeof value === "string") {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      return currencyFormatter.format(numeric);
+    }
+  }
+  return null;
+};
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -334,81 +347,97 @@ function isDonorResult(value: unknown): value is DonorResult {
 }
 
 function formatResponse(content: string, functionResults?: Record<string, unknown>): string {
-  const baseResponse = content;
   const supplements: string[] = [];
 
   if (functionResults) {
     if (functionResults.totalBalance !== undefined) {
-      const total = currencyFormatter.format(functionResults.totalBalance);
-      const lines: string[] = [`Total balance across funds: ${total}`];
-      if (Array.isArray(functionResults.funds)) {
-        const funds = functionResults.funds.filter(isFundResult);
-        const fundList = funds
-          .map(
-            (fund) =>
-              `• ${fund.name}: ${currencyFormatter.format(fund.balance)} (${fund.type ?? "Fund"})`
-          )
-          .join("\n");
-        if (fundList) {
-          lines.push(fundList);
+      const total = formatCurrencyMaybe(functionResults.totalBalance);
+      if (total) {
+        const lines: string[] = [`Total balance across funds: ${total}`];
+        if (Array.isArray(functionResults.funds)) {
+          const fundLines = functionResults.funds
+            .filter(isFundResult)
+            .map((fund) => {
+              const balance = formatCurrencyMaybe(fund.balance);
+              return balance
+                ? `• ${fund.name}: ${balance} (${fund.type ?? "Fund"})`
+                : null;
+            })
+            .filter(Boolean);
+          if (fundLines.length > 0) {
+            lines.push(fundLines.join("\n"));
+          }
         }
+        supplements.push(lines.join("\n"));
       }
-      supplements.push(lines.join("\n"));
     } else if (functionResults.transactions) {
       if (Array.isArray(functionResults.transactions)) {
-        const txnList = functionResults.transactions
+        const txnLines = functionResults.transactions
           .filter(isTransactionResult)
-          .map(
-            (txn) =>
-              `• ${txn.date}: ${txn.description} - ${currencyFormatter.format(txn.amount)} (${txn.type ?? "transaction"})`
-          )
-          .join("\n");
-        if (txnList) {
-          supplements.push(`Recent transactions:\n${txnList}`);
+          .map((txn) => {
+            const amount = formatCurrencyMaybe(txn.amount);
+            return amount
+              ? `• ${txn.date}: ${txn.description} - ${amount} (${txn.type ?? "transaction"})`
+              : null;
+          })
+          .filter(Boolean);
+        if (txnLines.length > 0) {
+          supplements.push(`Recent transactions:\n${txnLines.join("\n")}`);
         }
       }
     } else if (functionResults.donors) {
       if (Array.isArray(functionResults.donors)) {
-        const donorList = functionResults.donors
+        const donorLines = functionResults.donors
           .filter(isDonorResult)
           .map((donor) => {
             const giving = donor.totalGiving
-              ? ` - ${currencyFormatter.format(donor.totalGiving)} total`
+              ? ` - ${formatCurrencyMaybe(donor.totalGiving) ?? ""}`
               : "";
             const giftAid = donor.hasGiftAid ? " ✓ Gift Aid" : "";
             return `• ${donor.name}${giving}${giftAid}`;
-          })
-          .join("\n");
-        if (donorList) {
-          supplements.push(`Found ${functionResults.count} donor(s):\n${donorList}`);
+          });
+        if (donorLines.length > 0) {
+          const donorCount = typeof functionResults.count === "number"
+            ? functionResults.count
+            : donorLines.length;
+          supplements.push(`Found ${donorCount} donor(s):\n${donorLines.join("\n")}`);
         }
       }
     } else if (functionResults.giftAidValue !== undefined) {
-      supplements.push(
-        `Gift Aid summary:\n• Claimable donations: ${currencyFormatter.format(
-          functionResults.claimableAmount
-        )}\n• Gift Aid value (25%): ${currencyFormatter.format(
-          functionResults.giftAidValue
-        )}\n• Donors: ${functionResults.donorCount} across ${functionResults.transactionCount} transactions`
-      );
+      const claimable = formatCurrencyMaybe(functionResults.claimableAmount);
+      const giftAid = formatCurrencyMaybe(functionResults.giftAidValue);
+      if (claimable || giftAid) {
+        const donorCount = typeof functionResults.donorCount === "number"
+          ? functionResults.donorCount
+          : "unknown";
+        const txnCount = typeof functionResults.transactionCount === "number"
+          ? functionResults.transactionCount
+          : "unknown";
+        const giftAidLines: string[] = [];
+        if (claimable) giftAidLines.push(`• Claimable donations: ${claimable}`);
+        if (giftAid) giftAidLines.push(`• Gift Aid value (25%): ${giftAid}`);
+        giftAidLines.push(`• Donors: ${donorCount} across ${txnCount} transactions`);
+        supplements.push(`Gift Aid summary:\n${giftAidLines.join("\n")}`);
+      }
     } else if (functionResults.netSurplus !== undefined) {
-      supplements.push(
-        `Period summary:\n• Total Income: ${currencyFormatter.format(
-          functionResults.totalIncome
-        )}\n• Total Expense: ${currencyFormatter.format(
-          functionResults.totalExpense
-        )}\n• Net Surplus: ${currencyFormatter.format(
-          functionResults.netSurplus
-        )}`
-      );
+      const income = formatCurrencyMaybe(functionResults.totalIncome);
+      const expense = formatCurrencyMaybe(functionResults.totalExpense);
+      const net = formatCurrencyMaybe(functionResults.netSurplus);
+      if (income || expense || net) {
+        const summaryLines: string[] = [];
+        if (income) summaryLines.push(`• Total Income: ${income}`);
+        if (expense) summaryLines.push(`• Total Expense: ${expense}`);
+        if (net) summaryLines.push(`• Net Surplus: ${net}`);
+        supplements.push(`Period summary:\n${summaryLines.join("\n")}`);
+      }
     }
   }
 
-  if (supplements.length > 0) {
-    return `${baseResponse}\n\n${supplements.join("\n\n")}`;
+  if (supplements.length === 0) {
+    return content;
   }
 
-  return baseResponse;
+  return `${content}\n\n${supplements.join("\n\n")}`;
 }
 
 async function buildFinancialSnapshot(churchId: string) {
@@ -433,35 +462,35 @@ async function buildFinancialSnapshot(churchId: string) {
     const overviewLines: string[] = [];
 
     if (fundSummary) {
-      overviewLines.push(
-        `Current total fund balance: ${currencyFormatter.format(
-          fundSummary.total
-        )}`
-      );
+      const total = formatCurrencyMaybe(fundSummary.total);
+      if (total) {
+        overviewLines.push(`Current total fund balance: ${total}`);
+      }
 
       if (Array.isArray(fundSummary.funds) && fundSummary.funds.length > 0) {
         const topFunds = [...fundSummary.funds]
           .sort((a, b) => b.balance - a.balance)
           .slice(0, 3)
-          .map(
-            (fund) =>
-              `• ${fund.name}: ${currencyFormatter.format(fund.balance)} (${fund.type})`
-          );
-        overviewLines.push(`Top funds:\n${topFunds.join("\n")}`);
+          .map((fund) => {
+            const balance = formatCurrencyMaybe(fund.balance);
+            return balance ? `• ${fund.name}: ${balance} (${fund.type})` : null;
+          })
+          .filter(Boolean);
+        if (topFunds.length > 0) {
+          overviewLines.push(`Top funds:\n${topFunds.join("\n")}`);
+        }
       }
     }
 
     if (monthlyReport && Array.isArray(monthlyReport.monthlyBreakdown)) {
       const recentMonths = monthlyReport.monthlyBreakdown
         .slice(-3)
-        .map(
-          (month: { month: string; income: number; expense: number; net: number }) =>
-            `• ${month.month}: income ${currencyFormatter.format(
-              month.income
-            )}, expense ${currencyFormatter.format(
-              month.expense
-            )}, net ${currencyFormatter.format(month.net)}`
-        );
+        .map((month) => {
+          const income = formatCurrencyMaybe(month.income) ?? "n/a";
+          const expense = formatCurrencyMaybe(month.expense) ?? "n/a";
+          const net = formatCurrencyMaybe(month.net) ?? "n/a";
+          return `• ${month.month}: income ${income}, expense ${expense}, net ${net}`;
+        });
       if (recentMonths.length > 0) {
         overviewLines.push(`Recent monthly performance:\n${recentMonths.join("\n")}`);
       }
