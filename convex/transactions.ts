@@ -759,6 +759,7 @@ export const getRecent = query({
     reconciled: v.boolean(),
     churchId: v.id("churches"),
     source: v.optional(v.union(v.literal("manual"), v.literal("csv"), v.literal("api"))),
+    csvBatch: v.optional(v.string()),
     createdBy: v.id("users"),
     enteredByName: v.optional(v.string()),
     receiptStorageId: v.optional(v.id("_storage")),

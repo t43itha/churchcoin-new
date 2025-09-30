@@ -3,7 +3,10 @@
     "allow": [
       "WebFetch(domain:www.anthropic.com)",
       "Bash(git diff:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(python:*)",
+      "Bash(ls:*)",
+      "Bash(npx convex run:*)"
     ],
     "deny": [],
     "ask": []

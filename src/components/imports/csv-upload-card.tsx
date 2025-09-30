@@ -14,7 +14,7 @@ type CsvUploadCardProps = {
     headers: string[];
     rows: ParsedCsvRow[];
     rawContent: string;
-    bankFormat: "barclays" | "hsbc" | "generic";
+    bankFormat: "barclays" | "hsbc" | "metrobank" | "generic";
   }) => void;
 };
 
@@ -55,7 +55,7 @@ export function CsvUploadCard({ onFileParsed }: CsvUploadCardProps) {
       <CardHeader>
         <CardTitle className="text-ink">Upload bank export</CardTitle>
         <CardDescription className="text-grey-mid">
-          We support Barclays and HSBC templates out of the box. Drop a CSV and we’ll detect the format.
+          We support Barclays, HSBC, and Metro Bank templates out of the box. Drop a CSV and we'll detect the format.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

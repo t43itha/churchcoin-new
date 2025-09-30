@@ -78,6 +78,8 @@ export const createChurch = mutation({
         churchId,
         name: category,
         type: "income",
+        parentId: undefined,
+        isSubcategory: false,
         isSystem: true,
       });
     }
@@ -87,6 +89,8 @@ export const createChurch = mutation({
         churchId,
         name: category,
         type: "expense",
+        parentId: undefined,
+        isSubcategory: false,
         isSystem: true,
       });
     }
