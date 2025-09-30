@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { useQuery } from "convex/react";
+import React, { useEffect } from "react";
+import { useQuery, useMutation } from "convex/react";
 import Link from "next/link";
 import { PiggyBank, Receipt, Users, TrendingUp, Plus, Eye } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { api, type Doc } from "@/lib/convexGenerated";
 import { formatUkDateNumeric } from "@/lib/dates";
 import { cn } from "@/lib/utils";
+import { InsightsWidget } from "@/components/ai/insights-widget";
 
 interface MetricCardProps {
   title: string;
@@ -74,9 +75,20 @@ function QuickAction({ title, description, href, icon: Icon }: QuickActionProps)
 }
 
 export default function DashboardPage() {
+  const churches = useQuery(api.churches.listChurches, {});
   const funds = useQuery(api.funds.list);
   const recentTransactions = useQuery(api.transactions.getRecent, { limit: 5 });
   const totalFunds = useQuery(api.funds.getTotalBalance);
+  const generateInsights = useMutation(api.aiInsights.generateInsights);
+
+  const churchId = churches?.[0]?._id;
+
+  // Generate AI insights on mount
+  useEffect(() => {
+    if (churchId) {
+      generateInsights({ churchId }).catch(console.error);
+    }
+  }, [churchId, generateInsights]);
 
   // Calculate metrics
   const fundsCount = funds?.length || 0;
@@ -149,6 +161,13 @@ export default function DashboardPage() {
           trend={{ value: "3", positive: true }}
         />
       </div>
+
+      {/* AI Insights Widget */}
+      {churchId && (
+        <div className="mb-8">
+          <InsightsWidget churchId={churchId} />
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="mb-8">
