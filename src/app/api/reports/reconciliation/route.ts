@@ -1,4 +1,4 @@
-import PDFDocument from "pdfkit";
+import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import { NextResponse } from "next/server";
 
 import type { Doc, Id } from "@/lib/convexGenerated";
@@ -33,6 +33,29 @@ type PendingSnapshot = {
   record?: { reason?: string };
 };
 
+function wrapText(text: string, font: PDFFont, fontSize: number, maxWidth: number) {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let currentLine = "";
+
+  words.forEach((word) => {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    const width = font.widthOfTextAtSize(testLine, fontSize);
+    if (width > maxWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = testLine;
+    }
+  });
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const sessionId = searchParams.get("sessionId");
@@ -50,10 +73,34 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Report not found" }, { status: 404 });
   }
 
-  const doc = new PDFDocument({ margin: 48 });
-  const buffers: Uint8Array[] = [];
+  const pdfDoc = await PDFDocument.create();
+  let page = pdfDoc.addPage([595, 842]);
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const margin = 48;
+  const lineHeight = 16;
+  let y = page.getHeight() - margin;
 
-  doc.on("data", (chunk: Uint8Array) => buffers.push(chunk));
+  const writeLine = (text: string, options?: { bold?: boolean; size?: number }) => {
+    if (y < margin + lineHeight) {
+      page = pdfDoc.addPage([595, 842]);
+      y = page.getHeight() - margin;
+    }
+    const size = options?.size ?? 12;
+    const bold = options?.bold ?? false;
+    page.drawText(text, {
+      x: margin,
+      y,
+      size,
+      font: bold ? fontBold : font,
+      color: rgb(0.1, 0.1, 0.1),
+    });
+    y -= lineHeight;
+  };
+
+  const addSpacer = (amount = lineHeight / 2) => {
+    y -= amount;
+  };
 
   const session = report.session;
   const bankBalance = report.bankBalance ?? session.bankBalance;
@@ -62,30 +109,34 @@ export async function GET(request: Request) {
   const variance = report.variance ?? 0;
   const adjustments = report.adjustments ?? 0;
 
-  doc.fontSize(20).text(`Reconciliation Report – ${session.month}`, { align: "center" });
-  doc.moveDown();
-  doc.fontSize(12).text(`Generated ${formatDate(Date.now())}`);
-  doc.text(`Church ID: ${session.churchId}`);
-  doc.moveDown();
+  writeLine(`Reconciliation Report – ${session.month}`, { bold: true, size: 18 });
+  addSpacer();
+  writeLine(`Generated ${formatDate(Date.now())}`);
+  writeLine(`Church ID: ${session.churchId}`);
+  addSpacer();
 
-  doc.fontSize(14).text("Summary", { underline: true });
-  doc.moveDown(0.5);
-  doc.fontSize(12).text(`Bank balance: ${currency.format(bankBalance)}`);
-  doc.text(`Ledger balance: ${currency.format(ledgerBalance)}`);
-  doc.text(`Adjustments: ${currency.format(adjustments)}`);
-  doc.text(`Outstanding items: ${currency.format(pendingTotal)}`);
-  doc.text(`Variance: ${currency.format(variance)}`);
+  writeLine("Summary", { bold: true, size: 14 });
+  addSpacer(6);
+  writeLine(`Bank balance: ${currency.format(bankBalance)}`);
+  writeLine(`Ledger balance: ${currency.format(ledgerBalance)}`);
+  writeLine(`Adjustments: ${currency.format(adjustments)}`);
+  writeLine(`Outstanding items: ${currency.format(pendingTotal)}`);
+  writeLine(`Variance: ${currency.format(variance)}`);
   if (report.notes) {
-    doc.moveDown();
-    doc.fontSize(12).text("Notes:");
-    doc.fontSize(11).text(report.notes, { indent: 12 });
+    addSpacer();
+    writeLine("Notes:", { bold: true });
+    const lines = wrapText(report.notes, font, 11, page.getWidth() - margin * 2);
+    lines.forEach((line) => {
+      writeLine(line, { size: 11 });
+    });
   }
 
   const pending = (report.pendingTransactions ?? report.pending ?? []) as PendingSnapshot[];
   if (pending.length > 0) {
-    doc.addPage();
-    doc.fontSize(14).text("Outstanding items", { underline: true });
-    doc.moveDown(0.5);
+    page = pdfDoc.addPage([595, 842]);
+    y = page.getHeight() - margin;
+    writeLine("Outstanding items", { bold: true, size: 14 });
+    addSpacer(6);
     pending.forEach((entry, index) => {
       const transaction =
         entry.transaction ??
@@ -100,42 +151,42 @@ export async function GET(request: Request) {
       const signAdjusted = transaction.type === "expense" ? -Math.abs(amount) : Math.abs(amount);
       const displayAmount = currency.format(signAdjusted);
 
-      doc.fontSize(12).text(`${index + 1}. ${transaction.description ?? "Pending item"}`);
-      doc.fontSize(11).text(`Amount: ${displayAmount}`);
+      writeLine(`${index + 1}. ${transaction.description ?? "Pending item"}`, {
+        bold: true,
+      });
+      writeLine(`Amount: ${displayAmount}`, { size: 11 });
       if (transaction.date) {
-        doc.fontSize(11).text(`Date: ${formatDate(transaction.date)}`);
+        writeLine(`Date: ${formatDate(transaction.date)}`, { size: 11 });
       }
       if (reason) {
-        doc.fontSize(11).text(`Reason: ${reason}`);
+        writeLine(`Reason: ${reason}`, { size: 11 });
       }
-      doc.moveDown(0.5);
+      addSpacer();
     });
   }
 
   const unreconciled = (report.unreconciled ?? []) as Doc<"transactions">[];
   if (unreconciled.length > 0) {
-    doc.addPage();
-    doc.fontSize(14).text("Unreconciled transactions", { underline: true });
-    doc.moveDown(0.5);
+    page = pdfDoc.addPage([595, 842]);
+    y = page.getHeight() - margin;
+    writeLine("Unreconciled transactions", { bold: true, size: 14 });
+    addSpacer(6);
     unreconciled.forEach((txn, index) => {
       const amount = currency.format(txn.type === "income" ? txn.amount : -txn.amount);
-      doc.fontSize(12).text(`${index + 1}. ${txn.description}`);
-      doc.fontSize(11).text(`Amount: ${amount}`);
-      doc.fontSize(11).text(`Date: ${formatDate(txn.date)}`);
-      doc.moveDown(0.5);
+      writeLine(`${index + 1}. ${txn.description}`, { bold: true });
+      writeLine(`Amount: ${amount}`, { size: 11 });
+      writeLine(`Date: ${formatDate(txn.date)}`, { size: 11 });
+      addSpacer();
     });
   }
 
-  doc.end();
+  const pdfBytes = await pdfDoc.save();
 
-  await new Promise((resolve) => doc.on("end", resolve));
-  const pdfBuffer = Buffer.concat(buffers);
-
-  return new NextResponse(pdfBuffer, {
+  return new NextResponse(Buffer.from(pdfBytes), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="reconciliation-${session.month}.pdf"`,
-      "Content-Length": pdfBuffer.length.toString(),
+      "Content-Length": pdfBytes.length.toString(),
     },
   });
 }
