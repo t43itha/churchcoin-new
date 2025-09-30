@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { deriveMapping, type ParsedCsvRow } from "@/lib/csv";
+import { deriveMapping, normalizeCsvDate, type ParsedCsvRow } from "@/lib/csv";
 import { api, type Doc, type Id } from "@/lib/convexGenerated";
 
 type ParsedFileState = {
@@ -123,7 +123,7 @@ export default function ImportsPage() {
       }
 
       return {
-        date: String(row[mapping.date] ?? ""),
+        date: normalizeCsvDate(row[mapping.date]),
         description: String(row[mapping.description] ?? ""),
         amount,
         reference: mapping.reference ? String(row[mapping.reference] ?? "") : undefined,
