@@ -706,20 +706,35 @@ export async function POST(request: Request) {
 
     let logoImage: PDFImage | undefined;
     if (fundTypeLabel === "Building Fund") {
-      try {
-        const logoPath = `${process.cwd()}/public/legacy logo.jpg`;
-        const logoBytes = await readFile(logoPath);
+      const logoFiles = [
+        "legacy logo.jpg",
+        "legacy-logo.jpg",
+        "legacy_logo.jpg",
+        "legacy-logo.png",
+        "legacy_logo.png",
+        "legacy-logo.jpeg",
+      ];
+
+      for (const fileName of logoFiles) {
+        if (logoImage) break;
         try {
-          logoImage = await pdfDoc.embedJpg(logoBytes);
-        } catch (jpgError) {
+          const logoPath = `${process.cwd()}/public/${fileName}`;
+          const logoBytes = await readFile(logoPath);
           try {
-            logoImage = await pdfDoc.embedPng(logoBytes);
-          } catch (pngError) {
-            console.warn("Failed to embed building fund logo", { jpgError, pngError });
+            logoImage = await pdfDoc.embedJpg(logoBytes);
+          } catch {
+            try {
+              logoImage = await pdfDoc.embedPng(logoBytes);
+            } catch {
+              logoImage = undefined;
+            }
           }
+        } catch {
+          // try next file name
         }
-      } catch (error) {
-        console.warn("Failed to load building fund logo", error);
+      }
+      if (!logoImage) {
+        console.warn("Building fund logo could not be embedded from known filenames");
       }
     }
 
