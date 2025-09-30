@@ -19,13 +19,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { deriveMapping, type ParsedCsvRow } from "@/lib/csv";
+import { deriveMapping, normalizeCsvDate, type ParsedCsvRow } from "@/lib/csv";
 import { api, type Doc, type Id } from "@/lib/convexGenerated";
+import { formatUkDateTime } from "@/lib/dates";
 
 type ParsedFileState = {
   filename: string;
   headers: string[];
-  bankFormat: "barclays" | "hsbc" | "generic";
+  bankFormat: "barclays" | "hsbc" | "metrobank" | "generic";
 };
 
 export default function ImportsPage() {
@@ -38,15 +39,14 @@ export default function ImportsPage() {
   const [parsedRows, setParsedRows] = useState<ParsedCsvRow[]>([]);
 
   const funds = useQuery(api.funds.getFunds, churchId ? { churchId } : "skip");
-  const categories = useQuery(api.categories.getCategories, churchId ? { churchId } : "skip");
+  const categories = useQuery(api.categories.getSubcategoriesWithParents, churchId ? { churchId } : "skip");
   const donors = useQuery(api.donors.getDonors, churchId ? { churchId } : "skip");
   const imports = useQuery(api.imports.listImports, churchId ? { churchId } : "skip");
   const rows = useQuery(api.imports.getImportRows, activeImportId ? { importId: activeImportId } : "skip");
 
   const createImport = useMutation(api.imports.createCsvImport);
   const saveRows = useMutation(api.imports.saveCsvRows);
-  const markReady = useMutation(api.imports.markRowReady);
-  const skipRow = useMutation(api.imports.skipRow);
+  const skipRows = useMutation(api.imports.skipRows);
   const approveRows = useMutation(api.imports.approveRows);
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export default function ImportsPage() {
   }: {
     filename: string;
     headers: string[];
-    bankFormat: "barclays" | "hsbc" | "generic";
+    bankFormat: "barclays" | "hsbc" | "metrobank" | "generic";
     rows: ParsedCsvRow[];
   }) => {
     setParsedFile({ filename, headers, bankFormat });
@@ -84,8 +84,16 @@ export default function ImportsPage() {
       return;
     }
 
-    if (!mapping.date || !mapping.description || !mapping.amount) {
-      setStatusMessage("Please map the date, description, and amount columns before continuing.");
+    // Validate required fields
+    if (!mapping.date || !mapping.description) {
+      setStatusMessage("Please map the date and description columns before continuing.");
+      return;
+    }
+
+    // Validate amount fields - either single amount or both amountIn/amountOut for Metro Bank
+    const hasAmountFields = mapping.amount || (mapping.amountIn && mapping.amountOut);
+    if (!hasAmountFields) {
+      setStatusMessage("Please map the amount column(s) before continuing.");
       return;
     }
 
@@ -100,11 +108,23 @@ export default function ImportsPage() {
     });
 
     const mappedRows = parsedRows.map((row) => {
-      const rawAmount = Number(row[mapping.amount]);
-      const amount = Number.isNaN(rawAmount) ? 0 : rawAmount;
+      let amount = 0;
+
+      // Handle Metro Bank dual amount columns
+      if (mapping.amountIn && mapping.amountOut) {
+        const amountIn = Number(row[mapping.amountIn]) || 0;
+        const amountOut = Number(row[mapping.amountOut]) || 0;
+
+        // Income is positive, expense is negative
+        amount = amountIn - amountOut;
+      } else {
+        // Handle single amount column
+        const rawAmount = Number(row[mapping.amount]);
+        amount = Number.isNaN(rawAmount) ? 0 : rawAmount;
+      }
 
       return {
-        date: String(row[mapping.date] ?? ""),
+        date: normalizeCsvDate(row[mapping.date]),
         description: String(row[mapping.description] ?? ""),
         amount,
         reference: mapping.reference ? String(row[mapping.reference] ?? "") : undefined,
@@ -140,6 +160,11 @@ export default function ImportsPage() {
       rows: selection,
     });
     setStatusMessage(`Approved ${selection.length} rows. They are now in the ledger.`);
+  };
+
+  const handleSkipSelection = async (rowIds: Id<"csvRows">[]) => {
+    await skipRows({ rowIds });
+    setStatusMessage(`Skipped ${rowIds.length} rows.`);
   };
 
   const latestRows = rows ?? [];
@@ -211,13 +236,10 @@ export default function ImportsPage() {
               <DuplicateReview
                 rows={latestRows as Doc<"csvRows">[]}
                 funds={funds as Doc<"funds">[]}
-                categories={categories as Doc<"categories">[]}
+                categories={categories}
                 donors={donors as Doc<"donors">[]}
-                onMarkReady={(rowId, fundId, categoryId, donorId) =>
-                  markReady({ rowId, fundId, categoryId, donorId })
-                }
-                onSkip={(rowId) => skipRow({ rowId })}
                 onApproveSelection={handleApproveSelection}
+                onSkipSelection={handleSkipSelection}
               />
             ) : null}
           </div>
@@ -241,7 +263,7 @@ export default function ImportsPage() {
                   >
                     <span className="font-medium text-ink">{record.filename}</span>
                     <span className="text-xs text-grey-mid">
-                      {new Date(record.uploadedAt).toLocaleString()} · Status: {record.status}
+                      {formatUkDateTime(record.uploadedAt) || "—"} · Status: {record.status}
                     </span>
                     <span className="text-xs text-grey-mid">
                       {record.processedCount}/{record.rowCount} processed · Duplicates {record.duplicateCount}

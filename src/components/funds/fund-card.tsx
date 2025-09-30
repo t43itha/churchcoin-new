@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatUkDateNumeric } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
 const typeLabels: Record<string, { label: string; description: string; tone: string }> = {
@@ -130,7 +131,7 @@ export function FundCard({ fund, onViewLedger, onEdit }: FundCardProps) {
         ) : null}
         <div className="text-xs text-grey-mid">
           {fund.lastTransactionDate ? (
-            <span>Last activity: {new Date(fund.lastTransactionDate).toLocaleDateString("en-GB")}</span>
+            <span>Last activity: {formatUkDateNumeric(fund.lastTransactionDate) || "—"}</span>
           ) : (
             <span>No activity recorded yet</span>
           )}

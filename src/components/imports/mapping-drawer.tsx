@@ -10,6 +10,8 @@ export type MappingConfig = {
   date: string;
   description: string;
   amount: string;
+  amountIn?: string;
+  amountOut?: string;
   reference?: string;
   type?: string;
 };
@@ -68,7 +70,14 @@ export function MappingDrawer({ headers, mapping, onChange, onConfirm }: Mapping
         <div className="grid gap-4 md:grid-cols-2">
           {renderSelect("Transaction date", mapping.date, "date")}
           {renderSelect("Description", mapping.description, "description")}
-          {renderSelect("Amount", mapping.amount, "amount")}
+          {mapping.amountIn || mapping.amountOut ? (
+            <>
+              {renderSelect("Income Amount (In)", mapping.amountIn ?? "", "amountIn", true)}
+              {renderSelect("Expense Amount (Out)", mapping.amountOut ?? "", "amountOut", true)}
+            </>
+          ) : (
+            renderSelect("Amount", mapping.amount, "amount")
+          )}
           {renderSelect("Reference", mapping.reference ?? "", "reference", true)}
           {renderSelect("Type", mapping.type ?? "", "type", true)}
         </div>

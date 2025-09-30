@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { api, type Doc, type Id } from "@/lib/convexGenerated";
+import { formatUkDateNumeric } from "@/lib/dates";
 
 type SuggestedMatch = {
   bankRowId: string;
@@ -502,7 +503,7 @@ export default function ReconciliationPage() {
                         </span>
                       </div>
                       <div className="text-xs text-grey-mid">
-                        Recorded {new Date(entry.record.createdAt).toLocaleDateString()} · {" "}
+                        Recorded {formatUkDateNumeric(entry.record.createdAt) || "—"} · {" "}
                         {entry.record.reason}
                       </div>
                       <div className="flex flex-wrap gap-2">

@@ -100,6 +100,7 @@ export default defineSchema({
     bankFormat: v.union(
       v.literal("barclays"),
       v.literal("hsbc"),
+      v.literal("metrobank"),
       v.literal("generic")
     ),
     status: v.union(
@@ -116,6 +117,8 @@ export default defineSchema({
       date: v.string(),
       description: v.string(),
       amount: v.string(),
+      amountIn: v.optional(v.string()),
+      amountOut: v.optional(v.string()),
       reference: v.optional(v.string()),
       type: v.optional(v.string()),
     }),
@@ -198,10 +201,23 @@ export default defineSchema({
     name: v.string(),
     type: v.union(v.literal("income"), v.literal("expense")),
     parentId: v.optional(v.id("categories")),
+    isSubcategory: v.boolean(), // true for subcategories, false for main categories
     isSystem: v.boolean(), // Pre-defined categories
   })
     .index("by_church", ["churchId"])
-    .index("by_type", ["churchId", "type"]),
+    .index("by_type", ["churchId", "type"])
+    .index("by_subcategory", ["churchId", "isSubcategory"]),
+
+  // Category Keywords (only linked to subcategories)
+  categoryKeywords: defineTable({
+    churchId: v.id("churches"),
+    categoryId: v.id("categories"), // Links to subcategory only
+    keyword: v.string(),
+    isActive: v.boolean(),
+  })
+    .index("by_church", ["churchId"])
+    .index("by_category", ["categoryId"])
+    .index("by_keyword", ["churchId", "keyword"]),
 
   // Donors
   donors: defineTable({

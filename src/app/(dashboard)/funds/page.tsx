@@ -33,6 +33,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { api, type Doc, type Id } from "@/lib/convexGenerated";
+import { formatUkDateNumeric } from "@/lib/dates";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -628,14 +629,10 @@ export default function FundsPage() {
                                   </Badge>
                                 </TableCell>
                                 <TableCell>
-                                  {supporter.dueDate
-                                    ? new Date(supporter.dueDate).toLocaleDateString("en-GB")
-                                    : "â€”"}
+                                  {formatUkDateNumeric(supporter.dueDate) || "—"}
                                 </TableCell>
                                 <TableCell>
-                                  {supporter.lastDonationDate
-                                    ? new Date(supporter.lastDonationDate).toLocaleDateString("en-GB")
-                                    : "â€”"}
+                                  {formatUkDateNumeric(supporter.lastDonationDate) || "—"}
                                 </TableCell>
                               </TableRow>
                             ))}
@@ -662,7 +659,7 @@ export default function FundsPage() {
                               <span className="text-grey-mid">
                                 {currency.format(donor.total)}
                                 {donor.lastDonationDate
-                                  ? ` - ${new Date(donor.lastDonationDate).toLocaleDateString("en-GB")}`
+                                  ? ` - ${formatUkDateNumeric(donor.lastDonationDate)}`
                                   : ""}
                               </span>
                             </div>
