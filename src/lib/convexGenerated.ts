@@ -79,7 +79,7 @@ type AugmentedAuthModule = Omit<
     "mutation",
     "public",
     { invitationId: Id<"userInvites"> },
-    void
+    null
   >;
 };
 
