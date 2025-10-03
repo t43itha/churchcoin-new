@@ -1,8 +1,11 @@
-export type UserRole =
-  | "administrator"
-  | "finance"
-  | "pastorate"
-  | "secured_guest";
+export const ALL_ROLES = [
+  "administrator",
+  "finance",
+  "pastorate",
+  "secured_guest",
+] as const;
+
+export type UserRole = (typeof ALL_ROLES)[number];
 
 export type RolePermissions = {
   /** Ability to view financial dashboards and ledgers */
@@ -63,23 +66,27 @@ const DEFAULT_PERMISSIONS: RolePermissions = {
   restrictedToManualEntry: false,
 };
 
-export function getRolePermissions(role: UserRole | null | undefined): RolePermissions {
-  if (!role) {
-    return DEFAULT_PERMISSIONS;
-  }
-  return ROLE_PERMISSIONS[role] ?? DEFAULT_PERMISSIONS;
+const ROLE_LOOKUP = new Set<UserRole>(ALL_ROLES);
+
+export const DEFAULT_ROLE: UserRole = "administrator";
+
+export function isUserRole(value: unknown): value is UserRole {
+  return typeof value === "string" && ROLE_LOOKUP.has(value as UserRole);
 }
 
-export function getRoleDisplayName(role: UserRole | null | undefined): string {
-  if (!role) {
-    return "";
+export function resolveUserRole(role: unknown): UserRole {
+  if (isUserRole(role)) {
+    return role;
   }
-  return ROLE_LABELS[role] ?? role;
+  return DEFAULT_ROLE;
 }
 
-export const ALL_ROLES: UserRole[] = [
-  "administrator",
-  "finance",
-  "pastorate",
-  "secured_guest",
-];
+export function getRolePermissions(role: unknown): RolePermissions {
+  const resolved = resolveUserRole(role);
+  return ROLE_PERMISSIONS[resolved] ?? DEFAULT_PERMISSIONS;
+}
+
+export function getRoleDisplayName(role: unknown): string {
+  const resolved = resolveUserRole(role);
+  return ROLE_LABELS[resolved] ?? resolved;
+}
