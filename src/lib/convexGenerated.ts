@@ -26,7 +26,12 @@ type SubcategoriesWithParentsQuery = FunctionReference<
 
 type BaseApi = typeof generatedApi;
 
-type AugmentedAuthModule = BaseApi["auth"] & {
+type BaseAuthModule = BaseApi["auth"];
+
+type AugmentedAuthModule = Omit<
+  BaseAuthModule,
+  "createInvitation" | "listInvitations" | "getInvitationByToken" | "revokeInvitation"
+> & {
   createInvitation: FunctionReference<
     "mutation",
     "public",
