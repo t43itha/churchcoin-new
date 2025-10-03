@@ -32,11 +32,10 @@ async function requireSession(): Promise<SessionUser | null> {
   return session.user as SessionUser;
 }
 
-export async function GET(
-  _request: Request,
-  { params }: { params: { token: string } }
-) {
-  const token = params.token;
+type RouteContext = { params: Promise<{ token: string }> };
+
+export async function GET(_request: Request, context: RouteContext) {
+  const { token } = await context.params;
 
   const invitation = await convexServerClient.query(
     api.users.getInvitationByToken,
@@ -60,10 +59,7 @@ export async function GET(
   });
 }
 
-export async function DELETE(
-  _request: Request,
-  { params }: { params: { token: string } }
-) {
+export async function DELETE(_request: Request, context: RouteContext) {
   const user = await requireSession();
 
   if (!user) {
@@ -76,9 +72,11 @@ export async function DELETE(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const { token } = await context.params;
+
   const invitation = await convexServerClient.query(
     api.users.getInvitationByToken,
-    { token: params.token }
+    { token }
   );
 
   if (!invitation || invitation.churchId !== user.churchId) {
