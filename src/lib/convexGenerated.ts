@@ -36,14 +36,14 @@ type AugmentedAuthModule = BaseApi["auth"] & {
       churchId: Id<"churches">;
       invitedBy: Id<"users">;
     },
-    { invitationId: string; token: string; expiresAt: number }
+    { invitationId: Id<"userInvites">; token: string; expiresAt: number }
   >;
   listInvitations: FunctionReference<
     "query",
     "public",
     { churchId: Id<"churches"> },
     Array<{
-      _id: string;
+      _id: Id<"userInvites">;
       email: string;
       role: UserRole;
       token: string;
@@ -51,7 +51,7 @@ type AugmentedAuthModule = BaseApi["auth"] & {
       expiresAt: number;
       acceptedAt?: number;
       revokedAt?: number;
-      invitedByUser?: { _id: string; name: string } | null;
+      invitedByUser?: { _id: Id<"users">; name: string } | null;
     }>
   >;
   getInvitationByToken: FunctionReference<
@@ -59,7 +59,7 @@ type AugmentedAuthModule = BaseApi["auth"] & {
     "public",
     { token: string },
     | ({
-        _id: string;
+        _id: Id<"userInvites">;
         email: string;
         role: UserRole;
         churchId: Id<"churches">;
@@ -73,7 +73,7 @@ type AugmentedAuthModule = BaseApi["auth"] & {
   revokeInvitation: FunctionReference<
     "mutation",
     "public",
-    { invitationId: string },
+    { invitationId: Id<"userInvites"> },
     void
   >;
 };

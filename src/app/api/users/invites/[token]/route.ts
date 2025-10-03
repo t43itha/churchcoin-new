@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+import type { Id } from "@/lib/convexGenerated";
+
 import { api, convexServerClient } from "@/lib/convexServerClient";
 import { getRolePermissions } from "@/lib/rbac";
 import type { UserRole } from "@/lib/rbac";
@@ -8,9 +10,9 @@ import type { UserRole } from "@/lib/rbac";
 const SESSION_COOKIE = "churchcoin-session";
 
 type SessionUser = {
-  _id: string;
+  _id: Id<"users">;
   role: UserRole;
-  churchId?: string | null;
+  churchId?: Id<"churches"> | null;
 };
 
 async function requireSession(): Promise<SessionUser | null> {
@@ -79,7 +81,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     { token }
   );
 
-  if (!invitation || invitation.churchId !== user.churchId) {
+  if (!invitation || !user.churchId || invitation.churchId !== user.churchId) {
     return NextResponse.json(
       { error: "Invitation not found" },
       { status: 404 }
