@@ -11,6 +11,19 @@ type CategoriesQuery = FunctionReference<
   Doc<"categories">[]
 >;
 
+type SubcategoriesWithParentsQuery = FunctionReference<
+  "query",
+  "public",
+  { churchId: Id<"churches">; type?: "income" | "expense" },
+  Array<{
+    _id: Id<"categories">;
+    name: string;
+    type: "income" | "expense";
+    parentName?: string;
+    displayName: string;
+  }>
+>;
+
 type BaseApi = typeof generatedApi;
 
 type AugmentedAuthModule = BaseApi["auth"] & {
@@ -68,6 +81,7 @@ type AugmentedAuthModule = BaseApi["auth"] & {
 type AugmentedApi = Omit<BaseApi, "categories" | "auth"> & {
   categories: {
     getCategories: CategoriesQuery;
+    getSubcategoriesWithParents: SubcategoriesWithParentsQuery;
   };
   auth: AugmentedAuthModule;
 };
