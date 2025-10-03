@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { api, type Doc, type Id } from "@/lib/convexGenerated";
 import { useSession } from "@/components/auth/session-provider";
+import { getRolePermissions } from "@/lib/rbac";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -50,6 +51,14 @@ export default function TransactionsPage() {
   const [editingTransaction, setEditingTransaction] = useState<Doc<"transactions"> | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { user } = useSession();
+  const permissions = useMemo(
+    () => getRolePermissions(user?.role),
+    [user?.role]
+  );
+  const canManageTransactions = permissions.canManageFinancialData;
+  const canRecordManualTransactions = permissions.canRecordManualTransactions;
+  const canViewFinancialData = permissions.canViewFinancialData;
+  const showLedger = canViewFinancialData && !permissions.restrictedToManualEntry;
 
   const funds = useQuery(
     api.funds.getFunds,
@@ -80,6 +89,14 @@ export default function TransactionsPage() {
   }, [churches, churchId]);
 
   const handleCreateTransactions = async (transactions: TransactionCreateValues[]) => {
+    if (!canRecordManualTransactions) {
+      setFeedback({
+        type: "error",
+        message: "You do not have permission to record transactions.",
+      });
+      setTimeout(() => setFeedback(null), 5000);
+      return;
+    }
     for (const transaction of transactions) {
       await createTransaction(transaction);
     }
@@ -103,6 +120,15 @@ export default function TransactionsPage() {
     giftAid?: boolean;
     notes?: string;
   }) => {
+    if (!canManageTransactions) {
+      setFeedback({
+        type: "error",
+        message: "You do not have permission to update transactions.",
+      });
+      setTimeout(() => setFeedback(null), 5000);
+      return;
+    }
+
     const previousCategory = editingTransaction?.categoryId;
     const nextCategory = updates.categoryId;
 
@@ -140,6 +166,14 @@ export default function TransactionsPage() {
   };
 
   const handleDelete = async (transactionId: Id<"transactions">) => {
+    if (!canManageTransactions) {
+      setFeedback({
+        type: "error",
+        message: "You do not have permission to delete transactions.",
+      });
+      setTimeout(() => setFeedback(null), 5000);
+      return;
+    }
     await deleteTransactionMutation({ transactionId });
     if (editingTransaction?._id === transactionId) {
       setEditingTransaction(null);
@@ -148,6 +182,14 @@ export default function TransactionsPage() {
   };
 
   const handleToggleReconciled = async (transactionId: Id<"transactions">, reconciled: boolean) => {
+    if (!canManageTransactions) {
+      setFeedback({
+        type: "error",
+        message: "You do not have permission to reconcile transactions.",
+      });
+      setTimeout(() => setFeedback(null), 5000);
+      return;
+    }
     await reconcileTransaction({ transactionId, reconciled });
     setFeedback({
       type: "success",
@@ -156,6 +198,15 @@ export default function TransactionsPage() {
   };
 
   const handleRequestReceipt = async (transaction: Doc<"transactions">) => {
+    if (!canViewFinancialData) {
+      setFeedback({
+        type: "error",
+        message: "You do not have permission to view receipts.",
+      });
+      setTimeout(() => setFeedback(null), 5000);
+      return;
+    }
+
     if (!transaction.receiptStorageId) {
       return;
     }
@@ -172,6 +223,15 @@ export default function TransactionsPage() {
   };
 
   const handleSuggestCategory = async (transaction: Doc<"transactions">) => {
+    if (!canManageTransactions) {
+      setFeedback({
+        type: "error",
+        message: "You do not have permission to categorise transactions.",
+      });
+      setTimeout(() => setFeedback(null), 5000);
+      return;
+    }
+
     if (!categories || !churchId) {
       return;
     }
@@ -297,66 +357,70 @@ export default function TransactionsPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button
-                className="font-primary"
-                onClick={() => {
-                  setEditingTransaction(null);
-                  setIsDialogOpen(true);
-                }}
-                disabled={!churchId}
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                New transaction
-              </Button>
+              {canRecordManualTransactions ? (
+                <Button
+                  className="font-primary"
+                  onClick={() => {
+                    setEditingTransaction(null);
+                    setIsDialogOpen(true);
+                  }}
+                  disabled={!churchId}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  New transaction
+                </Button>
+              ) : null}
             </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-4">
-            <Card className="border-ledger">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
-                  <Banknote className="h-4 w-4 text-grey-mid" />
-                  Total income
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-2xl font-semibold text-success">
-                +{currency.format(totals.income)}
-              </CardContent>
-            </Card>
-            <Card className="border-ledger">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
-                  <LineChart className="h-4 w-4 text-grey-mid" />
-                  Total expenses
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-2xl font-semibold text-error">
-                -{currency.format(totals.expense)}
-              </CardContent>
-            </Card>
-            <Card className="border-ledger">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
-                  <NotebookPen className="h-4 w-4 text-grey-mid" />
-                  Transactions
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-2xl font-semibold text-ink">
-                {totals.count}
-              </CardContent>
-            </Card>
-            <Card className="border-ledger">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
-                  <Banknote className="h-4 w-4 text-grey-mid" />
-                  Unreconciled
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-semibold text-ink">{totals.unreconciled}</div>
-                <p className="text-xs text-grey-mid">Need bank matching</p>
-              </CardContent>
-            </Card>
-          </div>
+          {canViewFinancialData ? (
+            <div className="grid gap-4 md:grid-cols-4">
+              <Card className="border-ledger">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
+                    <Banknote className="h-4 w-4 text-grey-mid" />
+                    Total income
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-2xl font-semibold text-success">
+                  +{currency.format(totals.income)}
+                </CardContent>
+              </Card>
+              <Card className="border-ledger">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
+                    <LineChart className="h-4 w-4 text-grey-mid" />
+                    Total expenses
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-2xl font-semibold text-error">
+                  -{currency.format(totals.expense)}
+                </CardContent>
+              </Card>
+              <Card className="border-ledger">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
+                    <NotebookPen className="h-4 w-4 text-grey-mid" />
+                    Transactions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-2xl font-semibold text-ink">
+                  {totals.count}
+                </CardContent>
+              </Card>
+              <Card className="border-ledger">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
+                    <Banknote className="h-4 w-4 text-grey-mid" />
+                    Unreconciled
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-semibold text-ink">{totals.unreconciled}</div>
+                  <p className="text-xs text-grey-mid">Need bank matching</p>
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
         </div>
       </div>
       <div className="mx-auto max-w-6xl px-6 py-10">
@@ -365,12 +429,17 @@ export default function TransactionsPage() {
             Add a church to Convex and select it to begin tracking transactions.
           </div>
         ) : null}
-        {churchId && ledger === undefined ? (
+        {!showLedger && canRecordManualTransactions ? (
+          <div className="rounded-lg border border-ledger bg-paper px-6 py-10 text-center text-grey-mid">
+            You can record transactions using the manual entry form. Financial ledgers are hidden for this access level.
+          </div>
+        ) : null}
+        {churchId && showLedger && ledger === undefined ? (
           <div className="rounded-lg border border-ledger bg-paper px-6 py-10 text-center text-grey-mid">
             Loading transactions…
           </div>
         ) : null}
-        {churchId && ledger ? (
+        {churchId && showLedger && ledger ? (
           <div className="space-y-6">
             {feedback ? (
               <div
@@ -396,21 +465,21 @@ export default function TransactionsPage() {
               <TransactionLedger
                 rows={(ledger ?? []) as TransactionLedgerRow[]}
                 loading={!ledger}
-                onEdit={(transaction) => {
+                onEdit={canManageTransactions ? (transaction) => {
                   setEditingTransaction(transaction);
                   setIsEditDialogOpen(true);
-                }}
-                onDelete={handleDelete}
-                onToggleReconciled={handleToggleReconciled}
-                onRequestReceipt={handleRequestReceipt}
-                onSuggestCategory={handleSuggestCategory}
+                } : undefined}
+                onDelete={canManageTransactions ? handleDelete : undefined}
+                onToggleReconciled={canManageTransactions ? handleToggleReconciled : undefined}
+                onRequestReceipt={canViewFinancialData ? handleRequestReceipt : undefined}
+                onSuggestCategory={canManageTransactions ? handleSuggestCategory : undefined}
               />
             </div>
           </div>
         ) : null}
       </div>
 
-      {churchId && funds && categories && donors ? (
+      {canRecordManualTransactions && churchId && funds && categories && donors ? (
         <>
           <ManualTransactionDialog
             open={isDialogOpen}
@@ -422,7 +491,7 @@ export default function TransactionsPage() {
             onSubmit={handleCreateTransactions}
           />
 
-          {editingTransaction && (editingTransaction.source === "csv" || editingTransaction.source === "api") ? (
+          {canManageTransactions && editingTransaction && (editingTransaction.source === "csv" || editingTransaction.source === "api") ? (
             <EditTransactionDialog
               open={isEditDialogOpen}
               onOpenChange={setIsEditDialogOpen}
@@ -432,7 +501,9 @@ export default function TransactionsPage() {
               donors={donors as Doc<"donors">[]}
               onSubmit={handleQuickUpdateTransaction}
             />
-          ) : (
+          ) : null}
+
+          {canManageTransactions ? (
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
               <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                 <DialogHeader>
@@ -485,7 +556,7 @@ export default function TransactionsPage() {
                 ) : null}
               </DialogContent>
             </Dialog>
-          )}
+          ) : null}
         </>
       ) : null}
     </div>

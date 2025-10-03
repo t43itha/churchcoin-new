@@ -33,9 +33,9 @@ type FilterType = "all" | "income" | "expense" | "in-person" | "unreconciled";
 
 type TransactionLedgerProps = {
   rows: TransactionLedgerRow[];
-  onEdit: (transaction: Doc<"transactions">) => void;
-  onDelete: (id: Id<"transactions">) => Promise<void>;
-  onToggleReconciled: (id: Id<"transactions">, next: boolean) => Promise<void>;
+  onEdit?: (transaction: Doc<"transactions">) => void;
+  onDelete?: (id: Id<"transactions">) => Promise<void>;
+  onToggleReconciled?: (id: Id<"transactions">, next: boolean) => Promise<void>;
   onRequestReceipt?: (transaction: Doc<"transactions">) => Promise<void>;
   onSuggestCategory?: (transaction: Doc<"transactions">) => Promise<void>;
   loading?: boolean;
@@ -118,6 +118,10 @@ export function TransactionLedger({
       </div>
     );
   }
+
+  const hasActions = Boolean(
+    onEdit || onDelete || onToggleReconciled || onRequestReceipt || onSuggestCategory
+  );
 
   return (
     <div className="space-y-4">
@@ -213,7 +217,9 @@ export function TransactionLedger({
               <TableHead className="whitespace-nowrap">Category</TableHead>
               <TableHead className="whitespace-nowrap">Donor</TableHead>
               <TableHead className="whitespace-nowrap text-right">Amount</TableHead>
-              <TableHead className="whitespace-nowrap text-right">Actions</TableHead>
+              {hasActions ? (
+                <TableHead className="whitespace-nowrap text-right">Actions</TableHead>
+              ) : null}
             </TableRow>
           </TableHeader>
         <TableBody>
@@ -248,69 +254,77 @@ export function TransactionLedger({
                   {transaction.type === "income" ? "" : "-"}
                   {currency.format(transaction.amount)}
                 </TableCell>
-                <TableCell>
-                  <div className="flex items-center justify-end gap-1 whitespace-nowrap">
-                  {!category && onSuggestCategory ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-xs"
-                      onClick={() => onSuggestCategory(transaction)}
-                    >
-                      <Sparkles className="mr-1 h-3.5 w-3.5" /> Suggest
-                    </Button>
-                  ) : null}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2 text-xs"
-                    onClick={() => onEdit(transaction)}
-                  >
-                    <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2 text-xs"
-                    disabled={togglingId === transaction._id}
-                    onClick={async () => {
-                      setTogglingId(transaction._id);
-                      await onToggleReconciled(transaction._id, !reconciled);
-                      setTogglingId(null);
-                    }}
-                  >
-                    {reconciled ? (
-                      <Undo2 className="mr-1 h-3.5 w-3.5" />
-                    ) : (
-                      <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
-                    )}
-                    {reconciled ? "Unreconcile" : "Reconcile"}
-                  </Button>
-                  {transaction.receiptStorageId && onRequestReceipt ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-xs"
-                      onClick={() => onRequestReceipt(transaction)}
-                    >
-                      <FileText className="mr-1 h-3.5 w-3.5" /> Receipt
-                    </Button>
-                  ) : null}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2 text-xs text-error"
-                    disabled={deletingId === transaction._id}
-                    onClick={async () => {
-                      setDeletingId(transaction._id);
-                      await onDelete(transaction._id);
-                      setDeletingId(null);
-                    }}
-                  >
-                    <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
-                  </Button>
-                  </div>
-                </TableCell>
+                {hasActions ? (
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+                      {!category && onSuggestCategory ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-xs"
+                          onClick={() => onSuggestCategory(transaction)}
+                        >
+                          <Sparkles className="mr-1 h-3.5 w-3.5" /> Suggest
+                        </Button>
+                      ) : null}
+                      {onEdit ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-xs"
+                          onClick={() => onEdit(transaction)}
+                        >
+                          <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
+                        </Button>
+                      ) : null}
+                      {onToggleReconciled ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-xs"
+                          disabled={togglingId === transaction._id}
+                          onClick={async () => {
+                            setTogglingId(transaction._id);
+                            await onToggleReconciled(transaction._id, !reconciled);
+                            setTogglingId(null);
+                          }}
+                        >
+                          {reconciled ? (
+                            <Undo2 className="mr-1 h-3.5 w-3.5" />
+                          ) : (
+                            <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                          )}
+                          {reconciled ? "Unreconcile" : "Reconcile"}
+                        </Button>
+                      ) : null}
+                      {transaction.receiptStorageId && onRequestReceipt ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-xs"
+                          onClick={() => onRequestReceipt(transaction)}
+                        >
+                          <FileText className="mr-1 h-3.5 w-3.5" /> Receipt
+                        </Button>
+                      ) : null}
+                      {onDelete ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-xs text-error"
+                          disabled={deletingId === transaction._id}
+                          onClick={async () => {
+                            setDeletingId(transaction._id);
+                            await onDelete(transaction._id);
+                            setDeletingId(null);
+                          }}
+                        >
+                          <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
+                        </Button>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                ) : null}
               </TableRow>
             );
           })}

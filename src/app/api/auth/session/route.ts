@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { api, convexServerClient } from "@/lib/convexServerClient";
+import { resolveUserRole } from "@/lib/rbac";
 
 const SESSION_COOKIE = "churchcoin-session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
@@ -24,6 +25,10 @@ export async function GET() {
     return NextResponse.json({ session: null });
   }
 
+  const normalizedUser = session.user
+    ? { ...session.user, role: resolveUserRole(session.user.role) }
+    : null;
+
   const expiresInSeconds = Math.floor((session.session.expires - Date.now()) / 1000);
   if (expiresInSeconds < REFRESH_THRESHOLD) {
     try {
@@ -43,12 +48,12 @@ export async function GET() {
 
       return NextResponse.json({
         session: { ...session.session, expires: extended.expires },
-        user: session.user,
+        user: normalizedUser,
       });
     } catch (error) {
       console.error("Failed to extend session", error);
     }
   }
 
-  return NextResponse.json({ session: session.session, user: session.user });
+  return NextResponse.json({ session: session.session, user: normalizedUser });
 }
