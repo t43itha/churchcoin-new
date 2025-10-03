@@ -55,7 +55,8 @@ export default function ManageUsersPage() {
 
   const [invites, setInvites] = useState<Invite[]>([]);
   const [invitesLoading, setInvitesLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>("finance");
   const [submitting, setSubmitting] = useState(false);
@@ -63,7 +64,7 @@ export default function ManageUsersPage() {
 
   const fetchInvites = useCallback(async () => {
     setInvitesLoading(true);
-    setError(null);
+    setListError(null);
 
     try {
       const response = await fetch("/api/users/invites", {
@@ -78,9 +79,10 @@ export default function ManageUsersPage() {
 
       const data = (await response.json()) as { invites: Invite[] };
       setInvites(data.invites);
+      setListError(null);
     } catch (fetchError) {
       console.error("Failed to load invites", fetchError);
-      setError(
+      setListError(
         fetchError instanceof Error
           ? fetchError.message
           : "Unable to load invitations"
@@ -102,7 +104,7 @@ export default function ManageUsersPage() {
     event.preventDefault();
     setSubmitting(true);
     setFeedback(null);
-    setError(null);
+    setFormError(null);
 
     try {
       const response = await fetch("/api/users/invites", {
@@ -118,11 +120,13 @@ export default function ManageUsersPage() {
       }
 
       setEmail("");
+      setFormError(null);
+      setListError(null);
       await fetchInvites();
       setFeedback("Invitation created. Share the invite link below.");
     } catch (submitError) {
       console.error("Failed to create invite", submitError);
-      setError(
+      setFormError(
         submitError instanceof Error
           ? submitError.message
           : "Could not create invite"
@@ -133,7 +137,8 @@ export default function ManageUsersPage() {
   };
 
   const handleRevoke = async (token: string) => {
-    setError(null);
+    setFormError(null);
+    setListError(null);
     setFeedback(null);
     try {
       const response = await fetch(`/api/users/invites/${token}`, {
@@ -150,7 +155,7 @@ export default function ManageUsersPage() {
       setFeedback("Invitation revoked");
     } catch (revokeError) {
       console.error("Failed to revoke invite", revokeError);
-      setError(
+      setListError(
         revokeError instanceof Error
           ? revokeError.message
           : "Unable to revoke invite"
@@ -159,14 +164,14 @@ export default function ManageUsersPage() {
   };
 
   const copyInviteLink = async (token: string) => {
-    setError(null);
+    setFormError(null);
     setFeedback(null);
     try {
       await navigator.clipboard.writeText(buildInviteUrl(token));
       setFeedback("Invite link copied to clipboard");
     } catch (copyError) {
       console.error("Failed to copy invite link", copyError);
-      setError("Could not copy invite link to clipboard");
+      setFormError("Could not copy invite link to clipboard");
     }
   };
 
@@ -274,9 +279,9 @@ export default function ManageUsersPage() {
                 {feedback}
               </p>
             ) : null}
-            {error ? (
+            {formError ? (
               <p className="mt-4 rounded-md border border-error/40 bg-error/10 px-3 py-2 text-sm text-error">
-                {error}
+                {formError}
               </p>
             ) : null}
           </CardContent>
@@ -289,7 +294,11 @@ export default function ManageUsersPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {invitesLoading ? (
+            {listError ? (
+              <p className="rounded-md border border-error/40 bg-error/10 px-3 py-2 text-sm text-error">
+                {listError}
+              </p>
+            ) : invitesLoading ? (
               <p className="text-sm text-grey-mid">Loading invitations...</p>
             ) : sortedInvites.length === 0 ? (
               <p className="text-sm text-grey-mid">

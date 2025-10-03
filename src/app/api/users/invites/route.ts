@@ -35,6 +35,41 @@ async function requireSession(): Promise<SessionUser | null> {
   return session.user as SessionUser;
 }
 
+function normalizeError(error: unknown, fallback: string) {
+  let status = 500;
+  let message = fallback;
+
+  if (error && typeof error === "object") {
+    const maybeData = (error as { data?: unknown }).data;
+    if (typeof maybeData === "string" && maybeData.trim().length > 0) {
+      return { message: maybeData, status: 400 } as const;
+    }
+
+    const maybeStatus = (error as { status?: number }).status;
+    if (typeof maybeStatus === "number" && Number.isFinite(maybeStatus)) {
+      status = maybeStatus;
+    }
+  }
+
+  if (error instanceof Error) {
+    const raw = error.message ?? "";
+    const cleaned = raw
+      .replace(/^ConvexError:\s*/i, "")
+      .replace(/^Error calling mutation ['\"][^'\"]+['\"]:\s*/i, "")
+      .trim();
+
+    if (cleaned.length > 0) {
+      message = cleaned;
+    }
+
+    if (raw.includes("ConvexError")) {
+      status = 400;
+    }
+  }
+
+  return { message, status } as const;
+}
+
 export async function GET() {
   const user = await requireSession();
 
@@ -144,9 +179,11 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Failed to create invitation", error);
-    return NextResponse.json(
-      { error: "Unable to create invite for this email" },
-      { status: 400 }
+    const { message, status } = normalizeError(
+      error,
+      "Unable to create invite for this email"
     );
+
+    return NextResponse.json({ error: message }, { status });
   }
 }
