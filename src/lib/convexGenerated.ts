@@ -11,61 +11,65 @@ type CategoriesQuery = FunctionReference<
   Doc<"categories">[]
 >;
 
-type AugmentedApi = typeof generatedApi & {
-  categories: {
-    getCategories: CategoriesQuery;
-  };
-  users: {
-    createInvitation: FunctionReference<
-      "mutation",
-      "public",
-      {
-        email: string;
-        role: UserRole;
-        churchId: Id<"churches">;
-        invitedBy: Id<"users">;
-      },
-      { invitationId: string; token: string; expiresAt: number }
-    >;
-    listInvitations: FunctionReference<
-      "query",
-      "public",
-      { churchId: Id<"churches"> },
-      Array<{
+type BaseApi = typeof generatedApi;
+
+type AugmentedAuthModule = BaseApi["auth"] & {
+  createInvitation: FunctionReference<
+    "mutation",
+    "public",
+    {
+      email: string;
+      role: UserRole;
+      churchId: Id<"churches">;
+      invitedBy: Id<"users">;
+    },
+    { invitationId: string; token: string; expiresAt: number }
+  >;
+  listInvitations: FunctionReference<
+    "query",
+    "public",
+    { churchId: Id<"churches"> },
+    Array<{
+      _id: string;
+      email: string;
+      role: UserRole;
+      token: string;
+      createdAt: number;
+      expiresAt: number;
+      acceptedAt?: number;
+      revokedAt?: number;
+      invitedByUser?: { _id: string; name: string } | null;
+    }>
+  >;
+  getInvitationByToken: FunctionReference<
+    "query",
+    "public",
+    { token: string },
+    | ({
         _id: string;
         email: string;
         role: UserRole;
-        token: string;
-        createdAt: number;
+        churchId: Id<"churches">;
+        churchName: string | null;
         expiresAt: number;
         acceptedAt?: number;
         revokedAt?: number;
-        invitedByUser?: { _id: string; name: string } | null;
-      }>
-    >;
-    getInvitationByToken: FunctionReference<
-      "query",
-      "public",
-      { token: string },
-      | ({
-          _id: string;
-          email: string;
-          role: UserRole;
-          churchId: Id<"churches">;
-          churchName: string | null;
-          expiresAt: number;
-          acceptedAt?: number;
-          revokedAt?: number;
-        })
-      | null
-    >;
-    revokeInvitation: FunctionReference<
-      "mutation",
-      "public",
-      { invitationId: string },
-      void
-    >;
+      })
+    | null
+  >;
+  revokeInvitation: FunctionReference<
+    "mutation",
+    "public",
+    { invitationId: string },
+    void
+  >;
+};
+
+type AugmentedApi = Omit<BaseApi, "categories" | "auth"> & {
+  categories: {
+    getCategories: CategoriesQuery;
   };
+  auth: AugmentedAuthModule;
 };
 
 export const api = generatedApi as AugmentedApi;

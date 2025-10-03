@@ -38,7 +38,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const { token } = await context.params;
 
   const invitation = await convexServerClient.query(
-    api.users.getInvitationByToken,
+    api.auth.getInvitationByToken,
     { token }
   );
 
@@ -75,7 +75,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const { token } = await context.params;
 
   const invitation = await convexServerClient.query(
-    api.users.getInvitationByToken,
+    api.auth.getInvitationByToken,
     { token }
   );
 
@@ -86,7 +86,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     );
   }
 
-  await convexServerClient.mutation(api.users.revokeInvitation, {
+  await convexServerClient.mutation(api.auth.revokeInvitation, {
     invitationId: invitation._id,
   });
 

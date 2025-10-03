@@ -90,7 +90,7 @@ export async function GET() {
     );
   }
 
-  const invites = await convexServerClient.query(api.users.listInvitations, {
+  const invites = await convexServerClient.query(api.auth.listInvitations, {
     churchId: user.churchId,
   });
 
@@ -154,7 +154,7 @@ export async function POST(request: Request) {
 
   try {
     const created = await convexServerClient.mutation(
-      api.users.createInvitation,
+      api.auth.createInvitation,
       {
         email,
         role: role as UserRole,
