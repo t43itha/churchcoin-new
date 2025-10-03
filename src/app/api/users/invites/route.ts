@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+import type { Id } from "convex/values";
+
 import { api, convexServerClient } from "@/lib/convexServerClient";
 import { ALL_ROLES, getRolePermissions } from "@/lib/rbac";
 import type { UserRole } from "@/lib/rbac";
@@ -8,10 +10,10 @@ import type { UserRole } from "@/lib/rbac";
 const SESSION_COOKIE = "churchcoin-session";
 
 type SessionUser = {
-  _id: string;
+  _id: Id<"users">;
   name: string;
   role: UserRole;
-  churchId?: string | null;
+  churchId?: Id<"churches"> | null;
 };
 
 async function requireSession(): Promise<SessionUser | null> {
