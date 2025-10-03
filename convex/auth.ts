@@ -1,6 +1,7 @@
 import { ConvexError } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import type { Doc, Id } from "./_generated/dataModel";
 
 type PasswordParts = {
   salt: string;
@@ -60,6 +61,7 @@ export const register = mutation({
     password: v.string(),
     churchName: v.optional(v.string()),
     churchId: v.optional(v.id("churches")),
+    inviteToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const email = normaliseEmail(args.email);
@@ -77,7 +79,46 @@ export const register = mutation({
 
     const passwordHash = await hashPassword(args.password);
 
-    let churchId = args.churchId ?? null;
+    let churchId: Id<"churches"> | null = args.churchId ?? null;
+    let role: "administrator" | "finance" | "pastorate" | "secured_guest" =
+      "administrator";
+    type InvitationDoc = Doc<"userInvites">;
+
+    let invitation: InvitationDoc | null = null;
+
+    if (args.inviteToken) {
+      const inviteToken = args.inviteToken;
+      invitation = await ctx.db
+        .query("userInvites")
+        .withIndex("by_token", (q) => q.eq("token", inviteToken))
+        .first();
+
+      if (!invitation) {
+        throw new ConvexError("This invitation is no longer valid");
+      }
+
+      if (invitation.revokedAt) {
+        throw new ConvexError("This invitation has been revoked");
+      }
+
+      if (invitation.acceptedAt) {
+        throw new ConvexError("This invitation has already been used");
+      }
+
+      if (invitation.expiresAt <= Date.now()) {
+        throw new ConvexError("This invitation has expired");
+      }
+
+      if (normaliseEmail(invitation.email) !== email) {
+        throw new ConvexError(
+          "This invitation was issued for a different email address"
+        );
+      }
+
+      churchId = invitation.churchId;
+      role = invitation.role;
+    }
+
     if (!churchId) {
       const existingChurch = await ctx.db.query("churches").first();
       if (existingChurch) {
@@ -101,9 +142,16 @@ export const register = mutation({
     const userId = await ctx.db.insert("users", {
       name: args.name,
       email,
-      role: "admin",
+      role,
       churchId,
     });
+
+    if (invitation) {
+      await ctx.db.patch(invitation._id, {
+        acceptedAt: Date.now(),
+        acceptedBy: userId,
+      });
+    }
 
     await ctx.db.insert("authAccounts", {
       userId,
