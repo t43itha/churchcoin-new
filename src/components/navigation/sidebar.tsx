@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "convex/react";
@@ -14,16 +14,18 @@ import {
   FileText,
   Settings,
   LogOut,
-  Sparkles
+  Sparkles,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getRoleDisplayName, getRolePermissions } from "@/lib/rbac";
 import { useSession } from "@/components/auth/session-provider";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ChatDialog } from "@/components/ai/chat-dialog";
 import { api } from "@/lib/convexGenerated";
 
-const navigation = [
+const baseNavigation = [
   {
     name: "Dashboard",
     href: "/dashboard",
@@ -61,6 +63,14 @@ const navigation = [
   },
 ];
 
+const adminNavigation = [
+  {
+    name: "Team",
+    href: "/settings/users",
+    icon: ShieldCheck,
+  },
+];
+
 interface SidebarProps {
   className?: string;
 }
@@ -71,6 +81,21 @@ export function Sidebar({ className }: SidebarProps) {
   const [chatOpen, setChatOpen] = useState(false);
   const churches = useQuery(api.churches.listChurches, {});
   const churchId = churches?.[0]?._id;
+
+  const permissions = useMemo(
+    () => getRolePermissions(user?.role),
+    [user?.role]
+  );
+
+  const visibleNavigation = useMemo(() => {
+    if (permissions.restrictedToManualEntry) {
+      return baseNavigation.filter((item) => item.href === "/transactions");
+    }
+
+    return permissions.canManageUsers
+      ? [...baseNavigation, ...adminNavigation]
+      : baseNavigation;
+  }, [permissions.canManageUsers, permissions.restrictedToManualEntry]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -104,7 +129,7 @@ export function Sidebar({ className }: SidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 px-4 pb-6">
         <ul className="space-y-2">
-          {navigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const isActive = pathname === item.href ||
               (item.href !== "/" && pathname.startsWith(item.href));
 
@@ -153,27 +178,32 @@ export function Sidebar({ className }: SidebarProps) {
               <p className="text-sm font-medium text-ink font-primary truncate">
                 {user.name}
               </p>
-              <p className="text-xs text-grey-mid font-primary capitalize">
-                {user.role}
+              <p className="text-xs text-grey-mid font-primary">
+                {getRoleDisplayName(user.role)}
               </p>
             </div>
           </div>
         )}
 
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1 font-primary border-ledger text-grey-mid hover:text-ink"
-          >
-            <Settings className="h-3 w-3 mr-1" />
-            Settings
-          </Button>
+          {permissions.canManageUsers ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 font-primary border-ledger text-grey-mid hover:text-ink"
+              asChild
+            >
+              <Link href="/settings/users" className="flex items-center justify-center gap-1">
+                <Settings className="h-3 w-3" />
+                Settings
+              </Link>
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             size="sm"
             onClick={handleSignOut}
-            className="font-primary border-ledger text-grey-mid hover:text-ink"
+            className="flex-1 font-primary border-ledger text-grey-mid hover:text-ink"
           >
             <LogOut className="h-3 w-3" />
           </Button>

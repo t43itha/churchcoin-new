@@ -12,6 +12,7 @@ export async function POST(request: Request) {
   const email = String(body.email ?? "").trim();
   const password = String(body.password ?? "");
   const churchName = body.churchName ? String(body.churchName) : undefined;
+  const inviteToken = body.inviteToken ? String(body.inviteToken) : undefined;
 
   if (!name || !email || !password) {
     return NextResponse.json(
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
       email,
       password,
       churchName,
+      inviteToken,
     });
 
     const cookieStore = await cookies();

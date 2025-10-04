@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 import type { Doc } from "@/lib/convexGenerated";
+import { resolveUserRole } from "@/lib/rbac";
 
 export type SessionUser = Doc<"users"> | null;
 
@@ -46,7 +47,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       const data = await fetchSession();
-      setUser(data.user ?? null);
+      const normalizedUser = data.user
+        ? ({ ...data.user, role: resolveUserRole(data.user.role) } as SessionUser)
+        : null;
+      setUser(normalizedUser);
     } catch (error) {
       console.error("Failed to refresh session", error);
       setUser(null);
