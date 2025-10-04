@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { userRoleValidator } from "./roles";
 
 export default defineSchema({
   // Churches/Organizations
@@ -249,12 +250,7 @@ export default defineSchema({
     phoneVerified: v.optional(v.number()),
     isAnonymous: v.optional(v.boolean()),
     churchId: v.optional(v.id("churches")),
-    role: v.union(
-      v.literal("administrator"),
-      v.literal("finance"),
-      v.literal("pastorate"),
-      v.literal("secured_guest")
-    ),
+    role: userRoleValidator,
   })
     .index("by_email", ["email"])
     .index("by_church", ["churchId"]),
@@ -262,12 +258,7 @@ export default defineSchema({
   userInvites: defineTable({
     email: v.string(),
     churchId: v.id("churches"),
-    role: v.union(
-      v.literal("administrator"),
-      v.literal("finance"),
-      v.literal("pastorate"),
-      v.literal("secured_guest")
-    ),
+    role: userRoleValidator,
     token: v.string(),
     invitedBy: v.id("users"),
     createdAt: v.number(),

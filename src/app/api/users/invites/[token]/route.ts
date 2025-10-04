@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import type { Id } from "@/lib/convexGenerated";
 
 import { api, convexServerClient } from "@/lib/convexServerClient";
-import { getRolePermissions } from "@/lib/rbac";
+import { getRolePermissions, resolveUserRole } from "@/lib/rbac";
 import type { UserRole } from "@/lib/rbac";
 
 const SESSION_COOKIE = "churchcoin-session";
@@ -54,7 +54,7 @@ export async function GET(_request: Request, context: RouteContext) {
   return NextResponse.json({
     invite: {
       email: invitation.email,
-      role: invitation.role,
+      role: resolveUserRole(invitation.role),
       churchName: invitation.churchName,
       churchId: invitation.churchId,
     },

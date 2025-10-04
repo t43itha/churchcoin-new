@@ -1,6 +1,6 @@
 import { api as generatedApi } from "../../convex/_generated/api";
 import type { FunctionReference } from "convex/server";
-import type { UserRole } from "@/lib/rbac";
+import type { StoredUserRole, UserRole } from "@/lib/rbac";
 
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 
@@ -50,7 +50,7 @@ type AugmentedAuthModule = Omit<
     Array<{
       _id: Id<"userInvites">;
       email: string;
-      role: UserRole;
+      role: StoredUserRole;
       token: string;
       createdAt: number;
       expiresAt: number;
@@ -66,7 +66,7 @@ type AugmentedAuthModule = Omit<
     | ({
         _id: Id<"userInvites">;
         email: string;
-        role: UserRole;
+        role: StoredUserRole;
         churchId: Id<"churches">;
         churchName: string | null;
         expiresAt: number;

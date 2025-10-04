@@ -7,6 +7,13 @@ export const ALL_ROLES = [
 
 export type UserRole = (typeof ALL_ROLES)[number];
 
+const LEGACY_ROLE_MAP = {
+  admin: "administrator",
+} as const;
+
+export type LegacyUserRole = keyof typeof LEGACY_ROLE_MAP;
+export type StoredUserRole = UserRole | LegacyUserRole;
+
 export type RolePermissions = {
   /** Ability to view financial dashboards and ledgers */
   canViewFinancialData: boolean;
@@ -66,18 +73,25 @@ const DEFAULT_PERMISSIONS: RolePermissions = {
   restrictedToManualEntry: false,
 };
 
-const ROLE_LOOKUP = new Set<UserRole>(ALL_ROLES);
+const ROLE_LOOKUP = new Set<string>(ALL_ROLES);
 
 export const DEFAULT_ROLE: UserRole = "administrator";
 
 export function isUserRole(value: unknown): value is UserRole {
-  return typeof value === "string" && ROLE_LOOKUP.has(value as UserRole);
+  return typeof value === "string" && ROLE_LOOKUP.has(value);
 }
 
 export function resolveUserRole(role: unknown): UserRole {
-  if (isUserRole(role)) {
-    return role;
+  if (typeof role === "string") {
+    if (ROLE_LOOKUP.has(role)) {
+      return role as UserRole;
+    }
+
+    if (role in LEGACY_ROLE_MAP) {
+      return LEGACY_ROLE_MAP[role as LegacyUserRole];
+    }
   }
+
   return DEFAULT_ROLE;
 }
 

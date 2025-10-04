@@ -1,6 +1,7 @@
 import { ConvexError } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { normalizeRole, type CanonicalRole } from "./roles";
 import type { Doc, Id } from "./_generated/dataModel";
 
 type PasswordParts = {
@@ -87,8 +88,7 @@ export const register = mutation({
     const passwordHash = await hashPassword(args.password);
 
     let churchId: Id<"churches"> | null = args.churchId ?? null;
-    let role: "administrator" | "finance" | "pastorate" | "secured_guest" =
-      "administrator";
+    let role: CanonicalRole = "administrator";
     type InvitationDoc = Doc<"userInvites">;
 
     let invitation: InvitationDoc | null = null;
@@ -123,7 +123,7 @@ export const register = mutation({
       }
 
       churchId = invitation.churchId;
-      role = invitation.role;
+      role = normalizeRole(invitation.role);
     }
 
     if (!churchId) {
@@ -177,10 +177,15 @@ export const register = mutation({
       expires,
     });
 
+    const userDoc = await ctx.db.get(userId);
+    if (!userDoc) {
+      throw new ConvexError("Unable to load newly created user");
+    }
+
     return {
       sessionToken,
       expires,
-      user: await ctx.db.get(userId),
+      user: { ...userDoc, role: normalizeRole(userDoc.role) },
     };
   },
 });
@@ -223,7 +228,7 @@ export const login = mutation({
       expires,
     });
 
-    return { sessionToken, expires, user };
+    return { sessionToken, expires, user: { ...user, role: normalizeRole(user.role) } };
   },
 });
 
@@ -262,7 +267,7 @@ export const getSession = query({
       return null;
     }
 
-    return { session, user };
+    return { session, user: { ...user, role: normalizeRole(user.role) } };
   },
 });
 
@@ -344,6 +349,7 @@ export const createInvitation = mutation({
     if (activeInvite) {
       await ctx.db.patch(activeInvite._id, {
         token,
+        role: normalizeRole(args.role),
         invitedBy: args.invitedBy,
         createdAt: now,
         expiresAt,
@@ -359,7 +365,7 @@ export const createInvitation = mutation({
     const invitationId = await ctx.db.insert(invitesTable, {
       email,
       churchId: args.churchId,
-      role: args.role,
+      role: normalizeRole(args.role),
       token,
       invitedBy: args.invitedBy,
       createdAt: now,
@@ -399,6 +405,7 @@ export const listInvitations = query({
 
     return invites.map((invite) => ({
       ...invite,
+      role: normalizeRole(invite.role),
       invitedByUser: invitersMap.get(invite.invitedBy) ?? null,
     }));
   },
@@ -430,6 +437,7 @@ export const getInvitationByToken = query({
 
     return {
       ...invitation,
+      role: normalizeRole(invitation.role),
       churchName: church?.name ?? null,
     };
   },

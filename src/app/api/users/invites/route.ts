@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import type { Id } from "@/convex/_generated/dataModel";
 
 import { api, convexServerClient } from "@/lib/convexServerClient";
-import { ALL_ROLES, getRolePermissions } from "@/lib/rbac";
+import { ALL_ROLES, getRolePermissions, resolveUserRole } from "@/lib/rbac";
 import type { UserRole } from "@/lib/rbac";
 
 const SESSION_COOKIE = "churchcoin-session";
@@ -97,7 +97,7 @@ export async function GET() {
   const formatted = invites.map((invite) => ({
     id: invite._id,
     email: invite.email,
-    role: invite.role,
+    role: resolveUserRole(invite.role),
     token: invite.token,
     createdAt: invite.createdAt,
     expiresAt: invite.expiresAt,
