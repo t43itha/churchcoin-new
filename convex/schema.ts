@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { userRoleValidator } from "./roles";
 
 export default defineSchema({
   // Churches/Organizations
@@ -249,13 +250,25 @@ export default defineSchema({
     phoneVerified: v.optional(v.number()),
     isAnonymous: v.optional(v.boolean()),
     churchId: v.optional(v.id("churches")),
-    role: v.union(
-      v.literal("admin"),
-      v.literal("treasurer"),
-      v.literal("user")
-    ),
+    role: userRoleValidator,
   })
     .index("by_email", ["email"])
+    .index("by_church", ["churchId"]),
+
+  userInvites: defineTable({
+    email: v.string(),
+    churchId: v.id("churches"),
+    role: userRoleValidator,
+    token: v.string(),
+    invitedBy: v.id("users"),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    acceptedAt: v.optional(v.number()),
+    acceptedBy: v.optional(v.id("users")),
+    revokedAt: v.optional(v.number()),
+  })
+    .index("by_token", ["token"])
+    .index("by_email_church", ["email", "churchId"])
     .index("by_church", ["churchId"]),
 
   // Auth sessions and accounts (for Convex Auth)

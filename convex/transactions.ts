@@ -90,7 +90,7 @@ const insertTransaction = async (
         userId = await ctx.db.insert("users", {
           name: enteredByName ?? "Manual Entry",
           email: placeholderEmail,
-          role: "admin",
+          role: "secured_guest",
           churchId: transactionValues.churchId,
         } satisfies Omit<Doc<"users">, "_id" | "_creationTime">);
       }
@@ -299,7 +299,7 @@ export const updateTransaction = mutation({
           userId = await ctx.db.insert("users", {
             name: transaction.enteredByName ?? "Manual Entry",
             email: placeholderEmail,
-            role: "admin",
+            role: "secured_guest",
             churchId: transaction.churchId,
           } satisfies Omit<Doc<"users">, "_id" | "_creationTime">);
         }
@@ -459,7 +459,7 @@ export const deleteTransaction = mutation({
           userId = await ctx.db.insert("users", {
             name: transaction.enteredByName ?? "Manual Entry",
             email: placeholderEmail,
-            role: "admin",
+            role: "secured_guest",
             churchId: transaction.churchId,
           } satisfies Omit<Doc<"users">, "_id" | "_creationTime">);
         }
