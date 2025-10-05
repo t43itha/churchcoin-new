@@ -21,10 +21,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, X } from "lucide-react";
+import { Search, X, Sparkles } from "lucide-react";
 import type { Doc, Id } from "@/lib/convexGenerated";
 import { BulkActionsBar } from "./bulk-actions-bar";
 import { BulkAssignmentDialog } from "./bulk-assignment-dialog";
+import { ConfidenceBadge, AutoDetectedIndicator } from "./confidence-badge";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -55,6 +56,7 @@ type DuplicateReviewProps = {
     }[]
   ) => void;
   onSkipSelection: (rowIds: Id<"csvRows">[]) => void;
+  onAutoApprove?: () => Promise<{approvedCount: number; skippedCount: number}>;
 };
 
 type BulkAssignmentType = "fund" | "category" | "donor";
@@ -66,6 +68,7 @@ export function DuplicateReview({
   donors,
   onApproveSelection,
   onSkipSelection,
+  onAutoApprove,
 }: DuplicateReviewProps) {
   const [checkedRows, setCheckedRows] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Record<string, { fundId: string; categoryId?: string; donorId?: string }>>({});
@@ -81,6 +84,8 @@ export function DuplicateReview({
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [confidenceFilter, setConfidenceFilter] = useState("");
+  const [autoApproving, setAutoApproving] = useState(false);
 
   // Filter rows based on search and filter criteria
   const filteredRows = useMemo(() => {
@@ -108,9 +113,25 @@ export function DuplicateReview({
         return false;
       }
 
+      // Confidence filter
+      if (confidenceFilter && confidenceFilter !== "__all_confidence") {
+        const confidences: number[] = [];
+        if (row.donorConfidence !== undefined) confidences.push(row.donorConfidence);
+        if (row.categoryConfidence !== undefined) confidences.push(row.categoryConfidence);
+
+        const avgConfidence = confidences.length > 0
+          ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length
+          : 0;
+
+        if (confidenceFilter === "high" && avgConfidence < 0.95) return false;
+        if (confidenceFilter === "medium" && (avgConfidence < 0.7 || avgConfidence >= 0.95)) return false;
+        if (confidenceFilter === "low" && avgConfidence >= 0.7) return false;
+        if (confidenceFilter === "needs_review" && avgConfidence >= 0.95) return false;
+      }
+
       return true;
     });
-  }, [rows, searchQuery, categoryFilter, statusFilter, selected]);
+  }, [rows, searchQuery, categoryFilter, statusFilter, confidenceFilter, selected]);
 
   const readyRows = useMemo(
     () =>
@@ -231,14 +252,50 @@ export function DuplicateReview({
     });
   };
 
+  // Calculate high-confidence rows for auto-approval
+  const highConfidenceRows = useMemo(() => {
+    return filteredRows.filter(row => {
+      if (row.status !== "pending") return false;
+      if (!row.detectedFundId) return false;
+
+      const confidences: number[] = [];
+      if (row.donorConfidence !== undefined) confidences.push(row.donorConfidence);
+      if (row.categoryConfidence !== undefined) confidences.push(row.categoryConfidence);
+
+      if (confidences.length === 0) return false;
+
+      const avgConfidence = confidences.reduce((sum, c) => sum + c, 0) / confidences.length;
+      return avgConfidence >= 0.95;
+    });
+  }, [filteredRows]);
+
   // Helper functions for filters
   const clearFilters = () => {
     setSearchQuery("");
     setCategoryFilter("__all_categories");
     setStatusFilter("__all_status");
+    setConfidenceFilter("__all_confidence");
   };
 
-  const hasActiveFilters = searchQuery.trim() || (categoryFilter && categoryFilter !== "__all_categories") || (statusFilter && statusFilter !== "__all_status");
+  const hasActiveFilters = searchQuery.trim() ||
+    (categoryFilter && categoryFilter !== "__all_categories") ||
+    (statusFilter && statusFilter !== "__all_status") ||
+    (confidenceFilter && confidenceFilter !== "__all_confidence");
+
+  const handleAutoApprove = async () => {
+    if (!onAutoApprove) return;
+
+    setAutoApproving(true);
+    try {
+      const result = await onAutoApprove();
+      // Optionally show success message via parent component
+      console.log(`Auto-approved ${result.approvedCount} rows, ${result.skippedCount} require review`);
+    } catch (error) {
+      console.error("Auto-approve failed:", error);
+    } finally {
+      setAutoApproving(false);
+    }
+  };
 
   const allAvailableRows = filteredRows.filter((row) => row.status !== "skipped" && row.status !== "approved");
   const isAllSelected = allAvailableRows.length > 0 && allAvailableRows.every((row) => checkedRows.has(row._id));
@@ -302,6 +359,22 @@ export function DuplicateReview({
                 <SelectItem value="ready">Ready</SelectItem>
                 <SelectItem value="approved">Approved</SelectItem>
                 <SelectItem value="skipped">Skipped</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Confidence Filter */}
+          <div className="min-w-44">
+            <Select value={confidenceFilter} onValueChange={setConfidenceFilter}>
+              <SelectTrigger className="font-primary border-ledger bg-paper text-ink">
+                <SelectValue placeholder="All confidence" />
+              </SelectTrigger>
+              <SelectContent className="font-primary">
+                <SelectItem value="__all_confidence">All confidence</SelectItem>
+                <SelectItem value="high">High (≥95%)</SelectItem>
+                <SelectItem value="medium">Medium (70-94%)</SelectItem>
+                <SelectItem value="low">Low (&lt;70%)</SelectItem>
+                <SelectItem value="needs_review">Needs Review</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -407,22 +480,27 @@ export function DuplicateReview({
                 <TableCell>
                   <div className="flex flex-col gap-1">
                     {funds.length > 0 ? (
-                      <select
-                        value={config.fundId}
-                        className={`h-8 rounded-md border px-2 text-sm ${
-                          bulkAssignments.fund.has(row._id)
-                            ? "border-ink bg-highlight font-medium"
-                            : "border-ledger bg-paper"
-                        }`}
-                        onChange={(event) => updateSelection(row._id, "fundId", event.target.value)}
-                        disabled={isProcessed}
-                      >
-                        {funds.map((fund) => (
-                          <option key={fund._id} value={fund._id}>
-                            {fund.name}
-                          </option>
-                        ))}
-                      </select>
+                      <>
+                        <select
+                          value={config.fundId}
+                          className={`h-8 rounded-md border px-2 text-sm ${
+                            bulkAssignments.fund.has(row._id)
+                              ? "border-ink bg-highlight font-medium"
+                              : "border-ledger bg-paper"
+                          }`}
+                          onChange={(event) => updateSelection(row._id, "fundId", event.target.value)}
+                          disabled={isProcessed}
+                        >
+                          {funds.map((fund) => (
+                            <option key={fund._id} value={fund._id}>
+                              {fund.name}
+                            </option>
+                          ))}
+                        </select>
+                        {row.detectedFundId && (
+                          <AutoDetectedIndicator detected={true} />
+                        )}
+                      </>
                     ) : (
                       <span className="text-sm text-error">No funds available</span>
                     )}
@@ -452,6 +530,13 @@ export function DuplicateReview({
                         </option>
                       ))}
                     </select>
+                    {row.detectedCategoryId && row.categoryConfidence !== undefined && (
+                      <ConfidenceBadge
+                        confidence={row.categoryConfidence}
+                        source={row.categorySource as "keyword" | "ai" | "feedback" | "manual"}
+                        showPercentage={true}
+                      />
+                    )}
                     {bulkAssignments.category.has(row._id) && (
                       <Badge variant="outline" className="border-ink text-xs text-ink w-fit">
                         Bulk assigned
@@ -478,6 +563,13 @@ export function DuplicateReview({
                         </option>
                       ))}
                     </select>
+                    {row.detectedDonorId && row.donorConfidence !== undefined && (
+                      <ConfidenceBadge
+                        confidence={row.donorConfidence}
+                        source="keyword"
+                        showPercentage={true}
+                      />
+                    )}
                     {bulkAssignments.donor.has(row._id) && (
                       <Badge variant="outline" className="border-ink text-xs text-ink w-fit">
                         Bulk assigned
@@ -514,8 +606,24 @@ export function DuplicateReview({
         <div className="text-sm text-grey-mid">
           {checkedRowsArray.length} row{checkedRowsArray.length !== 1 ? "s" : ""} selected
           {hasActiveFilters && ` (from ${filteredRows.length} filtered)`}
+          {highConfidenceRows.length > 0 && (
+            <span className="ml-2 text-success">
+              • {highConfidenceRows.length} high confidence
+            </span>
+          )}
         </div>
         <div className="flex gap-2">
+          {onAutoApprove && highConfidenceRows.length > 0 && (
+            <Button
+              variant="outline"
+              className="border-success text-success hover:bg-success/10"
+              disabled={autoApproving || funds.length === 0}
+              onClick={handleAutoApprove}
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              {autoApproving ? "Auto-approving..." : `Auto-Approve High Confidence (${highConfidenceRows.length})`}
+            </Button>
+          )}
           <Button
             variant="outline"
             className="border-ledger"

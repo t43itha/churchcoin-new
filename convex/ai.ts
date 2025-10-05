@@ -1,10 +1,13 @@
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 
-const MODEL_NAME = "gpt-4o-mini";
-const MODEL_UNIT_COST = 0.0005; // estimated cost per 1K tokens in GBP equivalent
+const MODEL_NAME = "deepseek-chat";
+// DeepSeek pricing: $0.55/1M input tokens, $2.19/1M output tokens
+// Average: ~$1.37/1M tokens = £0.0011/1K tokens (99% cheaper than OpenAI)
+const MODEL_INPUT_COST = 0.00044; // £0.44 per 1M input tokens
+const MODEL_OUTPUT_COST = 0.00175; // £1.75 per 1M output tokens
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 
 const clampConfidence = (value: number) => {
@@ -125,6 +128,128 @@ const upsertCache = async (
   }
 };
 
+// Internal version for calling from other mutations
+export const suggestCategoryInternal = internalMutation({
+  args: {
+    churchId: v.id("churches"),
+    description: v.string(),
+    amount: v.number(),
+    categories: v.array(
+      v.object({
+        id: v.string(),
+        name: v.string(),
+        type: v.string(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const cacheKey = buildCacheKey(
+      args.churchId,
+      args.description,
+      args.amount
+    );
+
+    const learned = await ctx.db
+      .query("aiFeedback")
+      .withIndex("by_church_input", (q) =>
+        q.eq("churchId", args.churchId).eq("inputHash", cacheKey)
+      )
+      .first();
+
+    if (learned) {
+      const payload: SuggestionPayload = {
+        categoryId: learned.chosenCategoryId,
+        confidence: clampConfidence(learned.confidence),
+        source: "feedback",
+        reason: "Learnt from previous correction",
+      };
+      await upsertCache(ctx, cacheKey, payload, args.churchId);
+      return payload;
+    }
+
+    const cached = await ctx.db
+      .query("aiCache")
+      .withIndex("by_key", (q) => q.eq("key", cacheKey))
+      .first();
+
+    if (cached && cached.expiresAt > Date.now()) {
+      const payload = parseSuggestion(JSON.parse(cached.value));
+      if (payload) {
+        return { ...payload, source: "cache" } satisfies SuggestionPayload;
+      }
+    }
+
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) {
+      throw new ConvexError("DEEPSEEK_API_KEY not configured");
+    }
+
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: MODEL_NAME,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You classify church ledger transactions. Return JSON with categoryId (string) and confidence (0-1).",
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              description: args.description,
+              amount: args.amount,
+              categories: args.categories,
+            }),
+          },
+        ],
+        temperature: 0.2,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new ConvexError("Failed to get AI suggestion");
+    }
+
+    const json = await response.json();
+    const content = json.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new ConvexError("No suggestion returned");
+    }
+
+    const suggestion = parseResponseContent(content);
+    await upsertCache(ctx, cacheKey, suggestion, args.churchId);
+
+    const usage = json.usage ?? {};
+    const promptTokens = Number(usage.prompt_tokens ?? 0);
+    const completionTokens = Number(usage.completion_tokens ?? 0);
+    const totalTokens = Number(usage.total_tokens ?? promptTokens + completionTokens);
+
+    // Calculate cost using DeepSeek pricing
+    const inputCost = (promptTokens / 1_000_000) * MODEL_INPUT_COST;
+    const outputCost = (completionTokens / 1_000_000) * MODEL_OUTPUT_COST;
+    const cost = inputCost + outputCost;
+
+    await ctx.db.insert("aiUsage", {
+      churchId: args.churchId,
+      model: MODEL_NAME,
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      cost,
+      createdAt: Date.now(),
+    });
+
+    return suggestion satisfies SuggestionPayload;
+  },
+});
+
+// Public version for calling from frontend
 export const suggestCategory = mutation({
   args: {
     churchId: v.id("churches"),
@@ -176,12 +301,12 @@ export const suggestCategory = mutation({
       }
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.DEEPSEEK_API_KEY;
     if (!apiKey) {
-      throw new ConvexError("OPENAI_API_KEY not configured");
+      throw new ConvexError("DEEPSEEK_API_KEY not configured");
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -226,7 +351,11 @@ export const suggestCategory = mutation({
     const promptTokens = Number(usage.prompt_tokens ?? 0);
     const completionTokens = Number(usage.completion_tokens ?? 0);
     const totalTokens = Number(usage.total_tokens ?? promptTokens + completionTokens);
-    const cost = totalTokens > 0 ? (totalTokens / 1000) * MODEL_UNIT_COST : 0;
+
+    // Calculate cost using DeepSeek pricing
+    const inputCost = (promptTokens / 1_000_000) * MODEL_INPUT_COST;
+    const outputCost = (completionTokens / 1_000_000) * MODEL_OUTPUT_COST;
+    const cost = inputCost + outputCost;
 
     await ctx.db.insert("aiUsage", {
       churchId: args.churchId,

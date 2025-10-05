@@ -1,0 +1,337 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { Settings2, Sparkles, Target } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { api, type Id } from "@/lib/convexGenerated";
+
+const currency = new Intl.NumberFormat("en-GB", {
+  style: "currency",
+  currency: "GBP",
+});
+
+export default function AutomationSettingsPage() {
+  const churches = useQuery(api.churches.listChurches, {});
+  const [churchId, setChurchId] = useState<Id<"churches"> | null>(null);
+
+  const church = useQuery(api.churches.getChurch, churchId ? { churchId } : "skip");
+  const funds = useQuery(api.funds.getFunds, churchId ? { churchId } : "skip");
+  const aiUsage = useQuery(
+    api.ai.getUsageSummary,
+    churchId
+      ? {
+          churchId,
+          since: Date.now() - 30 * 24 * 60 * 60 * 1000, // Last 30 days
+        }
+      : "skip"
+  );
+
+  const setDefaultFund = useMutation(api.churches.setDefaultFund);
+  const updateAutoApproveThreshold = useMutation(api.churches.setAutoApproveThreshold);
+  const updateEnableAiCategorization = useMutation(api.churches.setEnableAiCategorization);
+
+  const [selectedFundId, setSelectedFundId] = useState<string>("");
+  const [autoApproveThreshold, setAutoApproveThreshold] = useState(95);
+  const [enableAI, setEnableAI] = useState(true);
+  const [saving, setSaving] = useState<"fund" | "threshold" | "ai" | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!churchId && churches && churches.length > 0) {
+      setChurchId(churches[0]._id);
+    }
+  }, [churches, churchId]);
+
+  useEffect(() => {
+    if (church) {
+      setSelectedFundId(church.settings.defaultFundId || "");
+      setAutoApproveThreshold((church.settings.autoApproveThreshold || 0.95) * 100);
+      setEnableAI(church.settings.enableAiCategorization ?? true);
+    }
+  }, [church]);
+
+  const handleSaveDefaultFund = async () => {
+    if (!churchId || !selectedFundId) return;
+
+    setSaving("fund");
+    setFeedback(null);
+
+    try {
+      await setDefaultFund({
+        churchId,
+        fundId: selectedFundId as Id<"funds">,
+      });
+      setFeedback("Default fund saved successfully");
+    } catch (error) {
+      console.error("Failed to save default fund:", error);
+      setFeedback("Failed to save default fund");
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleSaveThreshold = async () => {
+    if (!churchId || !church) return;
+
+    setSaving("threshold");
+    setFeedback(null);
+
+    try {
+      await updateAutoApproveThreshold({
+        churchId,
+        threshold: autoApproveThreshold / 100,
+      });
+      setFeedback(`Auto-approve threshold updated to ${autoApproveThreshold}%`);
+    } catch (error) {
+      console.error("Failed to save threshold:", error);
+      setFeedback("Failed to save threshold");
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleToggleAI = async () => {
+    if (!churchId || !church) return;
+
+    setSaving("ai");
+    setFeedback(null);
+
+    try {
+      const newValue = !enableAI;
+      await updateEnableAiCategorization({
+        churchId,
+        enabled: newValue,
+      });
+      setEnableAI(newValue);
+      setFeedback(`AI categorization ${newValue ? "enabled" : "disabled"}`);
+    } catch (error) {
+      console.error("Failed to toggle AI:", error);
+      setFeedback("Failed to update AI settings");
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const defaultFund = funds?.find((f) => f._id === church?.settings.defaultFundId);
+
+  return (
+    <div className="min-h-screen bg-paper pb-12">
+      <div className="border-b border-ledger bg-paper">
+        <div className="mx-auto flex max-w-5xl flex-col gap-3 px-6 py-8">
+          <div className="flex items-center gap-2 text-grey-mid">
+            <Settings2 className="h-5 w-5 text-grey-mid" />
+            <span className="text-sm uppercase tracking-wide">Settings</span>
+          </div>
+          <h1 className="text-3xl font-semibold text-ink">Import Automation</h1>
+          <p className="text-sm text-grey-mid">
+            Configure automatic fund assignment, confidence thresholds, and AI categorization for CSV imports.
+          </p>
+        </div>
+      </div>
+
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8">
+        {/* Church Selector */}
+        <div className="flex items-center gap-4">
+          <label className="text-sm font-medium text-grey-mid">Active church:</label>
+          <Select
+            value={churchId ?? undefined}
+            onValueChange={(value) => setChurchId(value as Id<"churches">)}
+          >
+            <SelectTrigger className="w-[280px] font-primary border-ledger">
+              <SelectValue placeholder="Select church" />
+            </SelectTrigger>
+            <SelectContent className="font-primary">
+              {churches?.map((church) => (
+                <SelectItem key={church._id} value={church._id}>
+                  {church.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {feedback && (
+          <div className="rounded-md border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
+            {feedback}
+          </div>
+        )}
+
+        {/* Default Fund Assignment */}
+        <Card className="border-ledger bg-paper shadow-none">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-ink flex items-center gap-2">
+              <Target className="h-5 w-5" />
+              Default Fund Assignment
+            </CardTitle>
+            <CardDescription className="text-grey-mid">
+              Automatically assign all imported transactions to this fund. You can override individual
+              transactions during review.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-grey-mid">Default fund</label>
+              <Select value={selectedFundId} onValueChange={setSelectedFundId}>
+                <SelectTrigger className="font-primary border-ledger">
+                  <SelectValue placeholder="Select a fund" />
+                </SelectTrigger>
+                <SelectContent className="font-primary">
+                  {funds?.map((fund) => (
+                    <SelectItem key={fund._id} value={fund._id}>
+                      {fund.name} ({fund.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {defaultFund && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-grey-mid">Current default:</span>
+                <Badge variant="outline" className="border-success/40 bg-success/10 text-success">
+                  {defaultFund.name}
+                </Badge>
+              </div>
+            )}
+
+            <Button
+              onClick={handleSaveDefaultFund}
+              disabled={!selectedFundId || saving === "fund"}
+              className="bg-ink text-paper hover:bg-ink/90"
+            >
+              {saving === "fund" ? "Saving..." : "Save Default Fund"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Auto-Approval Threshold */}
+        <Card className="border-ledger bg-paper shadow-none">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-ink flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              Auto-Approval Threshold
+            </CardTitle>
+            <CardDescription className="text-grey-mid">
+              Automatically approve transactions with confidence scores above this threshold. Higher values
+              mean stricter approval criteria.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-grey-mid">Confidence threshold</label>
+                <span className="text-2xl font-bold text-ink font-mono">{autoApproveThreshold}%</span>
+              </div>
+
+              <input
+                type="range"
+                min="70"
+                max="100"
+                step="5"
+                value={autoApproveThreshold}
+                onChange={(e) => setAutoApproveThreshold(Number(e.target.value))}
+                className="w-full h-2 bg-ledger rounded-lg appearance-none cursor-pointer accent-ink"
+              />
+
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="space-y-1">
+                  <div className="font-medium text-ink">95-100%</div>
+                  <div className="text-grey-mid">Only perfect matches</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="font-medium text-ink">80-94%</div>
+                  <div className="text-grey-mid">Most keyword matches</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="font-medium text-ink">70-79%</div>
+                  <div className="text-grey-mid">Include AI suggestions</div>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              onClick={handleSaveThreshold}
+              disabled={saving === "threshold"}
+              className="bg-ink text-paper hover:bg-ink/90"
+            >
+              {saving === "threshold" ? "Saving..." : "Save Threshold"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* AI Categorization */}
+        <Card className="border-ledger bg-paper shadow-none">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-ink flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              AI Categorization
+            </CardTitle>
+            <CardDescription className="text-grey-mid">
+              Use DeepSeek AI to automatically categorize transactions when keyword matching fails.
+              This service costs approximately £0.001 per transaction.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-md border border-ledger bg-paper p-4">
+              <div className="space-y-1">
+                <div className="font-medium text-ink">AI categorization</div>
+                <div className="text-sm text-grey-mid">
+                  {enableAI
+                    ? "Enabled - transactions use AI when keywords don't match"
+                    : "Disabled - only keyword matching will be used"}
+                </div>
+              </div>
+              <Button
+                variant={enableAI ? "default" : "outline"}
+                onClick={handleToggleAI}
+                disabled={saving === "ai"}
+                className={
+                  enableAI
+                    ? "bg-success text-white hover:bg-success/90"
+                    : "border-ledger text-ink hover:bg-highlight"
+                }
+              >
+                {saving === "ai" ? "Updating..." : enableAI ? "Enabled" : "Disabled"}
+              </Button>
+            </div>
+
+            {aiUsage && (
+              <div className="rounded-md border border-ledger bg-highlight/20 p-4 space-y-2">
+                <div className="font-medium text-ink">Usage this month</div>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <div className="text-grey-mid">AI calls</div>
+                    <div className="text-lg font-bold text-ink font-mono">{aiUsage.calls}</div>
+                  </div>
+                  <div>
+                    <div className="text-grey-mid">Tokens used</div>
+                    <div className="text-lg font-bold text-ink font-mono">
+                      {aiUsage.totalTokens.toLocaleString()}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-grey-mid">Cost</div>
+                    <div className="text-lg font-bold text-ink font-mono">
+                      {currency.format(aiUsage.cost)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

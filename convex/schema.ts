@@ -12,6 +12,10 @@ export default defineSchema({
       fiscalYearEnd: v.string(),
       giftAidEnabled: v.boolean(),
       defaultCurrency: v.string(),
+      // Import automation settings
+      defaultFundId: v.optional(v.id("funds")),
+      autoApproveThreshold: v.optional(v.number()), // 0-1, default 0.95
+      enableAiCategorization: v.optional(v.boolean()), // default true
     }),
   }),
 
@@ -136,8 +140,13 @@ export default defineSchema({
       reference: v.optional(v.string()),
       type: v.optional(v.string()),
     }),
-    detectedDonorId: v.optional(v.id("donors")),
+    // Auto-detection fields
     detectedFundId: v.optional(v.id("funds")),
+    detectedDonorId: v.optional(v.id("donors")),
+    donorConfidence: v.optional(v.number()),
+    detectedCategoryId: v.optional(v.id("categories")),
+    categoryConfidence: v.optional(v.number()),
+    categorySource: v.optional(v.string()), // "keyword" | "ai" | "feedback" | "manual"
     duplicateOf: v.optional(v.id("transactions")),
     status: v.union(
       v.literal("pending"),
