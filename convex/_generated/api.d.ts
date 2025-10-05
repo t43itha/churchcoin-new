@@ -18,6 +18,7 @@ import type * as aiInsights from "../aiInsights.js";
 import type * as auth from "../auth.js";
 import type * as categories from "../categories.js";
 import type * as churches from "../churches.js";
+import type * as crons from "../crons.js";
 import type * as donors from "../donors.js";
 import type * as files from "../files.js";
 import type * as fundraising from "../fundraising.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   categories: typeof categories;
   churches: typeof churches;
+  crons: typeof crons;
   donors: typeof donors;
   files: typeof files;
   fundraising: typeof fundraising;
