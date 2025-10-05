@@ -180,15 +180,25 @@ export const normalizeCsvDate = (value: unknown) => {
 
 export function detectBankFormat(headers: string[]): "barclays" | "hsbc" | "metrobank" | "generic" {
   const lowered = headers.map((header) => header.toLowerCase());
-  if (lowered.includes("type") && lowered.includes("balance")) {
+
+  const includesAny = (keywords: string[]) =>
+    lowered.some((header) => keywords.some((keyword) => header.includes(keyword)));
+
+  if (includesAny(["type"]) && includesAny(["balance"])) {
     return "barclays";
   }
-  if (lowered.includes("transaction type") && lowered.includes("account name")) {
+
+  if (includesAny(["transaction type"]) && includesAny(["account name"])) {
     return "hsbc";
   }
-  if (lowered.includes("in") && lowered.includes("out") && lowered.includes("details")) {
+
+  const hasPaidIn = includesAny(["paid in", "amount in"]);
+  const hasPaidOut = includesAny(["paid out", "amount out"]);
+
+  if (hasPaidIn && hasPaidOut && includesAny(["details", "description"])) {
     return "metrobank";
   }
+
   return "generic";
 }
 
@@ -212,31 +222,30 @@ export function deriveMapping(
   type?: string;
 } {
   const lower = headers.map((header) => header.toLowerCase());
-  const findHeader = (candidates: string[], fallback: string) => {
-    for (const candidate of candidates) {
-      const index = lower.indexOf(candidate);
-      if (index !== -1) {
-        return headers[index];
-      }
+
+  const findIndex = (candidates: string[]) =>
+    lower.findIndex((value) => candidates.some((candidate) => value.includes(candidate)));
+
+  const getHeader = (candidates: string[], fallback?: string) => {
+    const index = findIndex(candidates);
+    if (index !== -1) {
+      return headers[index];
     }
     return fallback;
   };
 
-  // Check if this is Metro Bank format (has separate In/Out columns)
-  const hasInOut = lower.includes("in") && lower.includes("out");
+  const inIndex = findIndex(["paid in", "amount in", "credit", "in"]);
+  const outIndex = findIndex(["paid out", "amount out", "debit", "out"]);
+  const hasInOut = inIndex !== -1 && outIndex !== -1;
 
   return {
-    date: findHeader(["date", "transaction date"], headers[0] ?? "Date"),
-    description: findHeader(["description", "narrative", "details"], headers[1] ?? "Description"),
-    amount: hasInOut ? "" : findHeader(["amount", "credit", "debit"], headers[2] ?? "Amount"),
-    amountIn: hasInOut ? headers[lower.indexOf("in")] : undefined,
-    amountOut: hasInOut ? headers[lower.indexOf("out")] : undefined,
-    reference: lower.includes("reference")
-      ? headers[lower.indexOf("reference")]
-      : undefined,
-    type: lower.includes("type") || lower.includes("transaction type")
-      ? headers[lower.indexOf("transaction type") !== -1 ? lower.indexOf("transaction type") : lower.indexOf("type")]
-      : undefined,
+    date: getHeader(["date", "transaction date"], headers[0] ?? "Date")!,
+    description: getHeader(["description", "narrative", "details"], headers[1] ?? "Description")!,
+    amount: hasInOut ? "" : getHeader(["amount", "credit", "debit"], headers[2] ?? "Amount")!,
+    amountIn: hasInOut ? headers[inIndex] : undefined,
+    amountOut: hasInOut ? headers[outIndex] : undefined,
+    reference: getHeader(["reference", "bank reference", "transaction reference", "ref"], undefined),
+    type: getHeader(["transaction type", "type"], undefined),
   };
 }
 
