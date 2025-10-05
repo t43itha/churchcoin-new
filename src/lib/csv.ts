@@ -184,19 +184,19 @@ export function detectBankFormat(headers: string[]): "barclays" | "hsbc" | "metr
   const includesAny = (keywords: string[]) =>
     lowered.some((header) => keywords.some((keyword) => header.includes(keyword)));
 
+  const hasPaidIn = includesAny(["paid in", "amount in"]);
+  const hasPaidOut = includesAny(["paid out", "amount out"]);
+
+  if (hasPaidIn && hasPaidOut && includesAny(["details", "description"])) {
+    return "metrobank";
+  }
+
   if (includesAny(["type"]) && includesAny(["balance"])) {
     return "barclays";
   }
 
   if (includesAny(["transaction type"]) && includesAny(["account name"])) {
     return "hsbc";
-  }
-
-  const hasPaidIn = includesAny(["paid in", "amount in"]);
-  const hasPaidOut = includesAny(["paid out", "amount out"]);
-
-  if (hasPaidIn && hasPaidOut && includesAny(["details", "description"])) {
-    return "metrobank";
   }
 
   return "generic";

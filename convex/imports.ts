@@ -1,7 +1,7 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { MutationCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import Fuse from "fuse.js";
 import {
   createTransactionInternal,
@@ -11,21 +11,45 @@ import {
 import { internal } from "./_generated/api";
 
 // Donor matching function - matches by bank reference or fuzzy name search
+type ImportDetectionCache = {
+  donors?: Doc<"donors">[];
+  keywords?: Doc<"categoryKeywords">[];
+  categories?: Doc<"categories">[];
+};
+
 async function matchDonor(
   ctx: MutationCtx,
   churchId: Id<"churches">,
   description: string,
-  reference?: string
+  reference?: string,
+  cache?: ImportDetectionCache
 ): Promise<{ donorId?: Id<"donors">; confidence: number }> {
+  const trimmedReference = reference?.trim();
+
+  // Lazily load donor cache if needed
+  if (!cache?.donors) {
+    const donors = await ctx.db
+      .query("donors")
+      .withIndex("by_church", (q) => q.eq("churchId", churchId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    if (cache) {
+      cache.donors = donors;
+    }
+  }
+
+  const donors = cache?.donors ?? [];
+
+  if (donors.length === 0) {
+    return { confidence: 0 };
+  }
 
   // 1. Exact bank reference match (highest confidence)
-  if (reference && reference.trim().length > 0) {
-    const exactMatch = await ctx.db
-      .query("donors")
-      .withIndex("by_reference", (q) =>
-        q.eq("churchId", churchId).eq("bankReference", reference.trim())
-      )
-      .first();
+  if (trimmedReference && trimmedReference.length > 0) {
+    const exactMatch = donors.find(
+      (donor) => donor.bankReference?.trim() === trimmedReference
+    );
 
     if (exactMatch) {
       return { donorId: exactMatch._id, confidence: 1.0 };
@@ -33,16 +57,6 @@ async function matchDonor(
   }
 
   // 2. Fuzzy name match in description
-  const donors = await ctx.db
-    .query("donors")
-    .withIndex("by_church", (q) => q.eq("churchId", churchId))
-    .filter((q) => q.eq(q.field("isActive"), true))
-    .collect();
-
-  if (donors.length === 0) {
-    return { confidence: 0 };
-  }
-
   const fuse = new Fuse(donors, {
     keys: ["name", "email"],
     threshold: 0.3,
@@ -65,18 +79,27 @@ async function matchDonor(
 async function detectSubcategory(
   ctx: MutationCtx,
   churchId: Id<"churches">,
-  description: string
+  description: string,
+  cache?: ImportDetectionCache
 ): Promise<{ categoryId: Id<"categories"> | null; confidence: number; source: string }> {
   if (!description || description.trim().length === 0) {
     return { categoryId: null, confidence: 0, source: "none" };
   }
 
   // Get all active keywords for subcategories in this church
-  const keywords = await ctx.db
-    .query("categoryKeywords")
-    .withIndex("by_church", (q) => q.eq("churchId", churchId))
-    .filter((q) => q.eq(q.field("isActive"), true))
-    .collect();
+  if (!cache?.keywords) {
+    const keywords = await ctx.db
+      .query("categoryKeywords")
+      .withIndex("by_church", (q) => q.eq("churchId", churchId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    if (cache) {
+      cache.keywords = keywords;
+    }
+  }
+
+  const keywords = cache?.keywords ?? [];
 
   if (keywords.length === 0) {
     return { categoryId: null, confidence: 0, source: "none" };
@@ -136,14 +159,25 @@ async function detectSubcategory(
   matches.sort((a, b) => b.confidence - a.confidence);
 
   // Verify the category still exists and is a subcategory
-  const category = await ctx.db
-    .query("categories")
-    .withIndex("by_church", (q) => q.eq("churchId", churchId))
-    .filter((q) => q.eq(q.field("_id"), matches[0].categoryId as Id<"categories">))
-    .filter((q) => q.eq(q.field("isSubcategory"), true))
-    .first();
+  if (!cache?.categories) {
+    const categories = await ctx.db
+      .query("categories")
+      .withIndex("by_church", (q) => q.eq("churchId", churchId))
+      .collect();
 
-  if (category) {
+    if (cache) {
+      cache.categories = categories;
+    }
+  }
+
+  const categories = cache?.categories ?? [];
+  const matchedCategory = categories.find(
+    (category) =>
+      category._id === (matches[0].categoryId as Id<"categories">) &&
+      category.isSubcategory === true
+  );
+
+  if (matchedCategory) {
     return {
       categoryId: matches[0].categoryId as Id<"categories">,
       confidence: 1.0, // Keyword matches are high confidence
@@ -160,10 +194,11 @@ async function detectCategoryWithAI(
   churchId: Id<"churches">,
   description: string,
   amount: number,
-  enableAI: boolean = true
+  enableAI: boolean = true,
+  cache?: ImportDetectionCache
 ): Promise<{ categoryId: Id<"categories"> | null; confidence: number; source: string }> {
   // Tier 1: Keyword matching (free, fast)
-  const keywordResult = await detectSubcategory(ctx, churchId, description);
+  const keywordResult = await detectSubcategory(ctx, churchId, description, cache);
   if (keywordResult.categoryId) {
     return keywordResult;
   }
@@ -174,11 +209,19 @@ async function detectCategoryWithAI(
   }
 
   // Get all categories for this church
-  const categories = await ctx.db
-    .query("categories")
-    .withIndex("by_church", (q) => q.eq("churchId", churchId))
-    .filter((q) => q.eq(q.field("isSubcategory"), true))
-    .collect();
+  if (!cache?.categories) {
+    const categories = await ctx.db
+      .query("categories")
+      .withIndex("by_church", (q) => q.eq("churchId", churchId))
+      .filter((q) => q.eq(q.field("isSubcategory"), true))
+      .collect();
+
+    if (cache) {
+      cache.categories = categories;
+    }
+  }
+
+  const categories = cache?.categories?.filter((category) => category.isSubcategory) ?? [];
 
   if (categories.length === 0) {
     return { categoryId: null, confidence: 0, source: "none" };
@@ -265,6 +308,8 @@ export const createImportWithRows = mutation({
         .first();
     }
 
+    const detectionCache: ImportDetectionCache = {};
+
     // Create import record first (but we'll set status to processing immediately)
     const importId = await ctx.db.insert("csvImports", {
       churchId: args.churchId,
@@ -297,7 +342,8 @@ export const createImportWithRows = mutation({
           ctx,
           args.churchId,
           row.description,
-          row.reference
+          row.reference,
+          detectionCache
         );
         donorConfidence = donorMatch.confidence;
       }
@@ -309,7 +355,8 @@ export const createImportWithRows = mutation({
         args.churchId,
         row.description,
         Math.abs(row.amount),
-        enableAI
+        enableAI,
+        detectionCache
       );
 
       await ctx.db.insert("csvRows", {
