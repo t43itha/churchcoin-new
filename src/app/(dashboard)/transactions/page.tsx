@@ -8,10 +8,6 @@ import {
   ManualTransactionDialog,
   type TransactionCreateValues,
 } from "@/components/transactions/manual-transaction-dialog";
-import {
-  TransactionForm,
-  type TransactionFormValues,
-} from "@/components/transactions/transaction-form";
 import { EditTransactionDialog } from "@/components/transactions/edit-transaction-dialog";
 import {
   TransactionLedger,
@@ -158,6 +154,7 @@ export default function TransactionsPage() {
   };
 
   const handleQuickUpdateTransaction = async (updates: {
+    fundId?: Id<"funds">;
     categoryId?: Id<"categories">;
     donorId?: Id<"donors">;
   }) => {
@@ -491,71 +488,16 @@ export default function TransactionsPage() {
             onSubmit={handleCreateTransactions}
           />
 
-          {canManageTransactions && editingTransaction && (editingTransaction.source === "csv" || editingTransaction.source === "api") ? (
+          {canManageTransactions && editingTransaction ? (
             <EditTransactionDialog
               open={isEditDialogOpen}
               onOpenChange={setIsEditDialogOpen}
               transaction={editingTransaction}
-              fund={(ledger ?? []).find(row => row.transaction._id === editingTransaction._id)?.fund ?? null}
+              funds={funds as Doc<"funds">[]}
               categories={categories as Doc<"categories">[]}
               donors={donors as Doc<"donors">[]}
               onSubmit={handleQuickUpdateTransaction}
             />
-          ) : null}
-
-          {canManageTransactions ? (
-            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-              <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Edit transaction</DialogTitle>
-                </DialogHeader>
-                {editingTransaction ? (
-                  <TransactionForm
-                    churchId={churchId}
-                    funds={funds as Doc<"funds">[]}
-                    categories={categories as Doc<"categories">[]}
-                    donors={donors as Doc<"donors">[]}
-                    defaultValues={{
-                      date: editingTransaction.date,
-                      type: editingTransaction.type,
-                      description: editingTransaction.description,
-                      amount: editingTransaction.amount,
-                      fundId: editingTransaction.fundId,
-                      categoryId: editingTransaction.categoryId ?? "",
-                      donorId: editingTransaction.donorId ?? "",
-                      method: editingTransaction.method ?? "",
-                      reference: editingTransaction.reference ?? "",
-                      giftAid: editingTransaction.giftAid,
-                      notes: editingTransaction.notes ?? "",
-                      enteredByName: editingTransaction.enteredByName ?? "",
-                      receiptStorageId: editingTransaction.receiptStorageId ?? undefined,
-                      receiptFilename: editingTransaction.receiptFilename ?? undefined,
-                    }}
-                    heading="Edit transaction"
-                    subheading="Update transaction details. Changes are tracked in the audit log."
-                    submitLabel="Save changes"
-                    onSubmit={async (values: TransactionFormValues) => {
-                      await handleUpdateTransaction(editingTransaction._id, {
-                        date: values.date,
-                        description: values.description.trim(),
-                        amount: values.amount,
-                        type: values.type,
-                        fundId: values.fundId as Id<"funds">,
-                        categoryId: values.categoryId ? (values.categoryId as Id<"categories">) : undefined,
-                        donorId: values.donorId ? (values.donorId as Id<"donors">) : undefined,
-                        method: values.method,
-                        reference: values.reference,
-                        giftAid: values.giftAid,
-                        notes: values.notes,
-                      });
-                    }}
-                    onSubmitSuccess={() => {
-                      // Already handled in handleUpdateTransaction
-                    }}
-                  />
-                ) : null}
-              </DialogContent>
-            </Dialog>
           ) : null}
         </>
       ) : null}

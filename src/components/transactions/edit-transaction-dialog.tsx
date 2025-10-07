@@ -19,6 +19,7 @@ import type { Doc, Id } from "@/lib/convexGenerated";
 import { formatUkDateNumeric } from "@/lib/dates";
 
 const editSchema = z.object({
+  fundId: z.string().min(1, "Fund is required"),
   categoryId: z.string().optional(),
   donorId: z.string().optional(),
 });
@@ -29,10 +30,10 @@ type EditTransactionDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction: Doc<"transactions"> | null;
-  fund: Doc<"funds"> | null;
+  funds: Doc<"funds">[];
   categories: Doc<"categories">[];
   donors: Doc<"donors">[];
-  onSubmit: (values: { categoryId?: Id<"categories">; donorId?: Id<"donors"> }) => Promise<void>;
+  onSubmit: (values: { fundId?: Id<"funds">; categoryId?: Id<"categories">; donorId?: Id<"donors"> }) => Promise<void>;
 };
 
 const currency = new Intl.NumberFormat("en-GB", {
@@ -45,7 +46,7 @@ export function EditTransactionDialog({
   open,
   onOpenChange,
   transaction,
-  fund,
+  funds,
   categories,
   donors,
   onSubmit,
@@ -56,6 +57,7 @@ export function EditTransactionDialog({
   const form = useForm<EditFormValues>({
     resolver: zodResolver(editSchema),
     values: {
+      fundId: transaction?.fundId ?? "",
       categoryId: transaction?.categoryId ?? "",
       donorId: transaction?.donorId ?? "",
     },
@@ -64,8 +66,12 @@ export function EditTransactionDialog({
   const {
     handleSubmit,
     register,
+    watch,
     formState: { errors },
   } = form;
+
+  const selectedFundId = watch("fundId");
+  const selectedFund = funds.find((f) => f._id === selectedFundId);
 
   const submit = handleSubmit(async (values) => {
     setSubmitting(true);
@@ -73,6 +79,7 @@ export function EditTransactionDialog({
 
     try {
       await onSubmit({
+        fundId: values.fundId ? (values.fundId as Id<"funds">) : undefined,
         categoryId: values.categoryId ? (values.categoryId as Id<"categories">) : undefined,
         donorId: values.donorId ? (values.donorId as Id<"donors">) : undefined,
       });
@@ -100,9 +107,7 @@ export function EditTransactionDialog({
         <DialogHeader>
           <DialogTitle>Edit transaction</DialogTitle>
           <DialogDescription>
-            {isImported 
-              ? "Assign category and donor. Imported transaction details cannot be modified."
-              : "Update transaction details. Changes are tracked in the audit log."}
+            Update fund, category, and donor. Transaction details cannot be modified.
           </DialogDescription>
         </DialogHeader>
         
@@ -140,18 +145,12 @@ export function EditTransactionDialog({
               <p className="font-medium text-ink">{transaction.description}</p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            {transaction.method ? (
               <div>
-                <span className="text-xs text-grey-mid">Fund</span>
-                <p className="text-ink">{fund?.name ?? "—"}</p>
+                <span className="text-xs text-grey-mid">Method</span>
+                <p className="text-ink">{transaction.method.toUpperCase()}</p>
               </div>
-              {transaction.method ? (
-                <div>
-                  <span className="text-xs text-grey-mid">Method</span>
-                  <p className="text-ink">{transaction.method.toUpperCase()}</p>
-                </div>
-              ) : null}
-            </div>
+            ) : null}
 
             {transaction.reference ? (
               <div>
@@ -159,6 +158,30 @@ export function EditTransactionDialog({
                 <p className="text-ink">{transaction.reference}</p>
               </div>
             ) : null}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="fundId">Fund</Label>
+            <select
+              id="fundId"
+              className="h-9 w-full rounded-md border border-ledger bg-paper px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-grey-mid"
+              {...register("fundId")}
+            >
+              <option value="" disabled>
+                Select fund
+              </option>
+              {funds.map((fund) => (
+                <option key={fund._id} value={fund._id}>
+                  {fund.name}
+                </option>
+              ))}
+            </select>
+            {errors.fundId ? (
+              <p className="text-sm text-error">{errors.fundId.message}</p>
+            ) : null}
+            <p className="text-xs text-grey-mid">
+              Balance: {selectedFund ? currency.format(selectedFund.balance) : "—"}
+            </p>
           </div>
 
           <div className="space-y-2">

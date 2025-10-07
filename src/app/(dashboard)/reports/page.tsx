@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { FilePieChart, Sparkles } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { useQuery } from "convex/react";
+import { AlertCircle, ChevronDown, ChevronRight, FileDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -15,7 +14,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { api, type Id } from "@/lib/convexGenerated";
+import { cn } from "@/lib/utils";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -25,69 +26,6 @@ const currency = new Intl.NumberFormat("en-GB", {
 export default function ReportsPage() {
   const churches = useQuery(api.churches.listChurches, {});
   const [churchId, setChurchId] = useState<Id<"churches"> | null>(null);
-  const [currentYear] = useState(() => new Date().getFullYear().toString());
-  
-  const [incomeStart, setIncomeStart] = useState(`${currentYear}-01-01`);
-  const [incomeEnd, setIncomeEnd] = useState(() => new Date().toISOString().slice(0, 10));
-  
-  const [giftAidStart, setGiftAidStart] = useState(`${currentYear}-01-01`);
-  const [giftAidEnd, setGiftAidEnd] = useState(() => new Date().toISOString().slice(0, 10));
-  
-  const [monthlyStart, setMonthlyStart] = useState(`${currentYear}-01-01`);
-  const [monthlyEnd, setMonthlyEnd] = useState(() => new Date().toISOString().slice(0, 10));
-  
-  const [statementStart, setStatementStart] = useState(`${currentYear}-01-01`);
-  const [statementEnd, setStatementEnd] = useState(() => new Date().toISOString().slice(0, 10));
-  
-  const [reportError, setReportError] = useState<string | null>(null);
-  const [loadingStates, setLoadingStates] = useState({
-    fund: false,
-    income: false,
-    giftAid: false,
-    annual: false,
-    monthly: false,
-    statements: false,
-  });
-  
-  const [narratives, setNarratives] = useState<Record<string, string>>({});
-  const [generatingNarrative, setGeneratingNarrative] = useState<string | null>(null);
-  
-  const generateNarrative = useMutation(api.ai.generateReportNarrative);
-
-  const fundSummary = useQuery(
-    api.reports.getFundBalanceSummary,
-    churchId ? { churchId } : "skip"
-  );
-  
-  const incomeExpense = useQuery(
-    api.reports.getIncomeExpenseReport,
-    churchId ? { churchId, startDate: incomeStart, endDate: incomeEnd } : "skip"
-  );
-  
-  const giftAidReport = useQuery(
-    api.reports.getGiftAidClaimReport,
-    churchId ? { churchId, startDate: giftAidStart, endDate: giftAidEnd } : "skip"
-  );
-  
-  const annualSummary = useQuery(
-    api.reports.getAnnualSummaryReport,
-    churchId ? { churchId, year: currentYear } : "skip"
-  );
-  
-  const monthlyReport = useQuery(
-    api.reports.getMonthlyIncomeExpenseReport,
-    churchId ? { churchId, startDate: monthlyStart, endDate: monthlyEnd } : "skip"
-  );
-  
-  const tithesStatements = useQuery(
-    api.reports.getDonorStatementBatch,
-    churchId ? { churchId, fromDate: statementStart, toDate: statementEnd, fundType: "general" } : "skip"
-  );
-  
-  const buildingFundStatements = useQuery(
-    api.reports.getDonorStatementBatch,
-    churchId ? { churchId, fromDate: statementStart, toDate: statementEnd, fundType: "restricted" } : "skip"
-  );
 
   useEffect(() => {
     if (!churchId && churches && churches.length > 0) {
@@ -95,89 +33,159 @@ export default function ReportsPage() {
     }
   }, [churches, churchId]);
 
-  const handleGenerateNarrative = async (reportType: string, reportData: unknown) => {
-    if (!churchId) return;
-    
-    setGeneratingNarrative(reportType);
-    try {
-      const result = await generateNarrative({
-        churchId,
-        reportType: reportType as "fund-balance" | "income-expense" | "gift-aid" | "annual-summary" | "monthly",
-        reportData,
-      });
-      setNarratives((prev) => ({ ...prev, [reportType]: result.narrative }));
-    } catch (error) {
-      console.error("Failed to generate narrative:", error);
-      setReportError("Unable to generate AI narrative");
-    } finally {
-      setGeneratingNarrative(null);
+  const currentPeriod = useQuery(
+    api.financialPeriods.getCurrentPeriod,
+    churchId ? { churchId } : "skip"
+  );
+
+  const periods = useQuery(
+    api.financialPeriods.listPeriods,
+    churchId ? { churchId } : "skip"
+  );
+
+  const [selectedPeriodId, setSelectedPeriodId] = useState<Id<"financialPeriods"> | null>(null);
+
+  useEffect(() => {
+    if (!selectedPeriodId && currentPeriod) {
+      setSelectedPeriodId(currentPeriod._id);
     }
-  };
+  }, [currentPeriod, selectedPeriodId]);
 
-  const triggerDownload = async (response: Response, filename: string) => {
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-  };
+  const period = useQuery(
+    api.financialPeriods.getPeriod,
+    selectedPeriodId ? { periodId: selectedPeriodId } : "skip"
+  );
 
-  const handleExportReport = async (type: string, params: Record<string, unknown>, filename: string) => {
-    if (!churchId) return;
-    
-    setLoadingStates((prev) => ({ ...prev, [type]: true }));
-    setReportError(null);
-    
-    try {
-      const response = await fetch(`/api/reports/${type}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ churchId, ...params }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error(`API Error (${type}):`, errorData);
-        const errorMessage = errorData.details || errorData.error || `Failed to export ${type} report`;
-        throw new Error(errorMessage);
+  const metrics = useQuery(
+    api.financialPeriods.getPeriodMetrics,
+    selectedPeriodId ? { periodId: selectedPeriodId } : "skip"
+  );
+
+  const overview = useQuery(
+    api.reports.getPeriodOverview,
+    selectedPeriodId ? { periodId: selectedPeriodId } : "skip"
+  );
+
+  const incomeReport = useQuery(
+    api.reports.getHierarchicalIncomeReport,
+    selectedPeriodId ? { periodId: selectedPeriodId } : "skip"
+  );
+
+  const expenditureReport = useQuery(
+    api.reports.getHierarchicalExpenditureReport,
+    selectedPeriodId ? { periodId: selectedPeriodId } : "skip"
+  );
+
+  const weeklyReport = useQuery(
+    api.reports.getWeeklySummaryReport,
+    selectedPeriodId ? { periodId: selectedPeriodId } : "skip"
+  );
+
+  const reviewQueue = useQuery(
+    api.reports.getReviewQueue,
+    selectedPeriodId ? { periodId: selectedPeriodId } : "skip"
+  );
+
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
+
+  const toggleCategory = (id: string) => {
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
       }
-      
-      await triggerDownload(response, filename);
-    } catch (error) {
-      console.error(error);
-      const errorMessage = error instanceof Error ? error.message : `Unable to export ${type} report`;
-      setReportError(errorMessage);
-    } finally {
-      setLoadingStates((prev) => ({ ...prev, [type]: false }));
+      return next;
+    });
+  };
+
+  const toggleWeek = (weekEnding: string) => {
+    setExpandedWeeks((prev) => {
+      const next = new Set(prev);
+      if (next.has(weekEnding)) {
+        next.delete(weekEnding);
+      } else {
+        next.add(weekEnding);
+      }
+      return next;
+    });
+  };
+
+  const getStatusBadge = () => {
+    if (!period) return null;
+
+    if (period.status === "overdue") {
+      const overdueDays = currentPeriod?.overdueDays ?? 0;
+      return (
+        <Badge className="bg-error/10 text-error border-error/20 font-primary">
+          <AlertCircle className="h-4 w-4 mr-1" />
+          OVERDUE ({overdueDays} days)
+        </Badge>
+      );
     }
+
+    if (period.status === "processing") {
+      return (
+        <Badge className="bg-highlight text-ink border-ledger font-primary">
+          Processing
+        </Badge>
+      );
+    }
+
+    if (period.status === "completed") {
+      return (
+        <Badge className="bg-success/10 text-success border-success/20 font-primary">
+          Completed
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge className="bg-grey-light text-grey-dark border-ledger font-primary">
+        Draft
+      </Badge>
+    );
   };
 
   return (
     <div className="min-h-screen bg-paper pb-12">
+      {/* Header with Period Selector */}
       <div className="border-b border-ledger bg-paper">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="mx-auto max-w-6xl px-6 py-8">
+          <div className="flex items-center justify-between mb-4">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-grey-mid">
-                <FilePieChart className="h-5 w-5 text-grey-mid" />
-                <span className="text-sm uppercase tracking-wide">Statements</span>
+              <h1 className="text-3xl font-semibold text-ink font-primary">
+                Financial Reports
+              </h1>
+              <div className="flex items-center gap-4">
+                <Select
+                  value={selectedPeriodId ?? undefined}
+                  onValueChange={(value) => setSelectedPeriodId(value as Id<"financialPeriods">)}
+                >
+                  <SelectTrigger className="w-[240px] font-primary border-ledger">
+                    <SelectValue placeholder="Select period" />
+                  </SelectTrigger>
+                  <SelectContent className="font-primary">
+                    {periods?.map((p) => (
+                      <SelectItem key={p._id} value={p._id}>
+                        {p.periodName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {getStatusBadge()}
               </div>
-              <h1 className="text-3xl font-semibold text-ink">Reports & Compliance</h1>
-              <p className="text-sm text-grey-mid">
-                Generate trustee-ready summaries with AI-powered insights and Gift Aid claims
-              </p>
             </div>
+
             <div className="flex flex-col gap-2 md:items-end">
               <span className="text-xs uppercase tracking-wide text-grey-mid">Active church</span>
               <Select
                 value={churchId ?? undefined}
                 onValueChange={(value) => setChurchId(value as Id<"churches">)}
               >
-                <SelectTrigger className="w-[240px] font-primary">
+                <SelectTrigger className="w-[240px] font-primary border-ledger">
                   <SelectValue placeholder="Select church" />
                 </SelectTrigger>
                 <SelectContent className="font-primary">
@@ -190,537 +198,415 @@ export default function ReportsPage() {
               </Select>
             </div>
           </div>
-          
-          {reportError && (
-            <p className="rounded-md border border-error/40 bg-error/5 px-3 py-2 text-sm text-error">
-              {reportError}
-            </p>
+
+          {/* Progress Bar */}
+          {metrics && period && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm font-primary text-grey-mid">
+                <span>
+                  Progress: {metrics.categorized}/{metrics.total} categorized
+                </span>
+                <span>{metrics.percentComplete}%</span>
+              </div>
+              <div className="h-2 bg-grey-light rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-success transition-all"
+                  style={{ width: `${metrics.percentComplete}%` }}
+                />
+              </div>
+              {metrics.needsReview > 0 && (
+                <p className="text-sm text-grey-mid font-primary">
+                  {metrics.needsReview} transactions need review
+                </p>
+              )}
+            </div>
           )}
         </div>
       </div>
 
       <div className="mx-auto max-w-6xl px-6 py-10">
-        <Tabs defaultValue="financial" className="space-y-6">
+        <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="font-primary">
-            <TabsTrigger value="financial">Financial Reports</TabsTrigger>
-            <TabsTrigger value="compliance">Compliance & Gift Aid</TabsTrigger>
-            <TabsTrigger value="donors">Donor Statements</TabsTrigger>
+            <TabsTrigger value="overview">Overview & Reconciliation</TabsTrigger>
+            <TabsTrigger value="income">Income & Weekly</TabsTrigger>
+            <TabsTrigger value="expenditure">Expenditure</TabsTrigger>
+            <TabsTrigger value="review">Review Queue</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="financial" className="space-y-6">
-            {/* Fund Balance Summary */}
+          {/* Tab 1: Overview & Reconciliation */}
+          <TabsContent value="overview" className="space-y-6">
+            {/* Section 1: Period Overview */}
             <Card className="border-ledger bg-paper shadow-none">
               <CardHeader>
-                <CardTitle className="text-ink">Fund Balance Snapshot</CardTitle>
-                <CardDescription className="text-grey-mid">
-                  Current balances grouped by fund type
-                </CardDescription>
+                <CardTitle className="text-ink font-primary">Period Overview</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {fundSummary && (
+              <CardContent className="space-y-6">
+                {overview && (
                   <>
-                    <p className="font-medium text-ink">Total: {currency.format(fundSummary.total)}</p>
-                    <div className="space-y-2">
-                      {fundSummary.funds.map((fund) => (
-                        <div key={fund.id} className="flex justify-between rounded-md border border-ledger px-3 py-2">
-                          <span className="font-medium text-ink">{fund.name}</span>
-                          <span className="text-xs text-grey-mid">
-                            {fund.type.toUpperCase()} · {currency.format(fund.balance)}
+                    {/* Metrics Grid */}
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="p-4 border border-ledger rounded-lg">
+                        <div className="text-sm text-grey-mid font-primary">Total Income</div>
+                        <div className="text-2xl font-bold text-success font-primary">
+                          {currency.format(overview.totalIncome)}
+                        </div>
+                      </div>
+                      <div className="p-4 border border-ledger rounded-lg">
+                        <div className="text-sm text-grey-mid font-primary">Total Expenditure</div>
+                        <div className="text-2xl font-bold text-error font-primary">
+                          {currency.format(overview.totalExpenditure)}
+                        </div>
+                      </div>
+                      <div className="p-4 border border-ledger rounded-lg">
+                        <div className="text-sm text-grey-mid font-primary">Net Position</div>
+                        <div className="text-2xl font-bold text-ink font-primary">
+                          {currency.format(overview.netPosition)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Fund Segregation */}
+                    <div className="border-t border-ledger pt-4">
+                      <h3 className="text-sm font-medium text-grey-mid font-primary mb-3">
+                        Fund Segregation
+                      </h3>
+                      <div className="space-y-2">
+                        <div className="flex justify-between font-primary">
+                          <span className="text-ink">General/Unrestricted</span>
+                          <span className="text-ink font-medium">
+                            {currency.format(overview.fundSegregation.general)}
                           </span>
                         </div>
-                      ))}
-                    </div>
-                    
-                    <div className="flex gap-2 pt-3">
-                      <Button
-                        variant="outline"
-                        className="border-ledger font-primary"
-                        onClick={() => handleExportReport("export", { type: "fund-balance" }, `fund-balance.pdf`)}
-                        disabled={loadingStates.fund}
-                      >
-                        {loadingStates.fund ? "Preparing..." : "Export PDF"}
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        className="border-ledger font-primary gap-2"
-                        onClick={() => handleGenerateNarrative("fund-balance", fundSummary)}
-                        disabled={generatingNarrative === "fund-balance"}
-                      >
-                        <Sparkles className="h-4 w-4" />
-                        {generatingNarrative === "fund-balance" ? "Generating..." : "AI Insights"}
-                      </Button>
-                    </div>
-                    
-                    {narratives["fund-balance"] && (
-                      <div className="mt-4 rounded-md border border-ledger bg-highlight p-4">
-                        <p className="text-sm text-grey-dark whitespace-pre-wrap">{narratives["fund-balance"]}</p>
+                        <div className="flex justify-between font-primary">
+                          <span className="text-ink font-bold">Restricted Funds (Total)</span>
+                          <span className="text-ink font-bold">
+                            {currency.format(overview.fundSegregation.restricted)}
+                          </span>
+                        </div>
+
+                        {/* Individual Restricted Funds Breakdown */}
+                        {overview.restrictedFunds && overview.restrictedFunds.length > 0 && (
+                          <div className="pl-4 space-y-1 border-l-2 border-ledger ml-2">
+                            {overview.restrictedFunds.map((fund) => (
+                              <div key={fund.fundId} className="flex justify-between font-primary text-sm">
+                                <span className="text-grey-dark">{fund.fundName}</span>
+                                <span className="text-ink font-medium">
+                                  {currency.format(fund.amount)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex justify-between font-primary text-grey-mid text-sm pt-2 border-t border-ledger">
+                          <span>Uncategorised (excluded)</span>
+                          <span>{currency.format(overview.fundSegregation.uncategorised)}</span>
+                        </div>
                       </div>
-                    )}
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 pt-4">
+                      <Button variant="outline" className="border-ledger font-primary gap-2">
+                        <FileDown className="h-4 w-4" />
+                        Export All Reports (ZIP)
+                      </Button>
+                      <Button className="bg-ink text-paper font-primary">
+                        Mark Period Complete
+                      </Button>
+                    </div>
                   </>
                 )}
               </CardContent>
             </Card>
 
-            {/* Income & Expenditure */}
+            {/* Section 2: Reconciliation */}
             <Card className="border-ledger bg-paper shadow-none">
               <CardHeader>
-                <CardTitle className="text-ink">Income & Expenditure</CardTitle>
-                <CardDescription className="text-grey-mid">
-                  Period-based income and expense analysis
-                </CardDescription>
+                <CardTitle className="text-ink font-primary">Bank vs Cash Reconciliation</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs uppercase tracking-wide text-grey-mid">Start Date</span>
-                    <Input
-                      type="date"
-                      value={incomeStart}
-                      onChange={(e) => setIncomeStart(e.target.value)}
-                      className="font-primary"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs uppercase tracking-wide text-grey-mid">End Date</span>
-                    <Input
-                      type="date"
-                      value={incomeEnd}
-                      onChange={(e) => setIncomeEnd(e.target.value)}
-                      className="font-primary"
-                    />
-                  </label>
-                </div>
+              <CardContent>
+                <p className="text-sm text-grey-mid font-primary mb-4">
+                  Reconciliation view coming soon. This will show Bank vs Cash breakdown with General and Restricted fund segregation.
+                </p>
+                <Button variant="outline" className="w-full border-ledger font-primary gap-2">
+                  <FileDown className="h-4 w-4" />
+                  Export Reconciliation Report
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-                {incomeExpense && (
-                  <>
-                    <div className="space-y-2">
-                      <p className="text-sm">Income: {currency.format(incomeExpense.income)}</p>
-                      <p className="text-sm">Expense: {currency.format(incomeExpense.expense)}</p>
-                      <p className="font-medium text-ink">Net: {currency.format(incomeExpense.net)}</p>
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        className="border-ledger font-primary"
-                        onClick={() => handleExportReport("export", {
-                          type: "income-expense",
-                          startDate: incomeStart,
-                          endDate: incomeEnd
-                        }, `income-expense-${incomeStart}-${incomeEnd}.pdf`)}
-                        disabled={loadingStates.income}
-                      >
-                        {loadingStates.income ? "Preparing..." : "Export PDF"}
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        className="border-ledger font-primary gap-2"
-                        onClick={() => handleGenerateNarrative("income-expense", incomeExpense)}
-                        disabled={generatingNarrative === "income-expense"}
-                      >
-                        <Sparkles className="h-4 w-4" />
-                        {generatingNarrative === "income-expense" ? "Generating..." : "AI Insights"}
-                      </Button>
-                    </div>
-                    
-                    {narratives["income-expense"] && (
-                      <div className="mt-4 rounded-md border border-ledger bg-highlight p-4">
-                        <p className="text-sm text-grey-dark whitespace-pre-wrap">{narratives["income-expense"]}</p>
+          {/* Tab 2: Income & Weekly */}
+          <TabsContent value="income" className="space-y-6">
+            {/* Section 1: Hierarchical Income */}
+            <Card className="border-ledger bg-paper shadow-none">
+              <CardHeader>
+                <CardTitle className="text-ink font-primary">Income by Category</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {incomeReport && incomeReport.mainCategories.length > 0 ? (
+                  <div className="space-y-3">
+                    {incomeReport.mainCategories.map((mainCat) => (
+                      <div key={mainCat.id} className="border border-ledger rounded-lg">
+                        <button
+                          onClick={() => toggleCategory(mainCat.id)}
+                          className="w-full flex items-center justify-between p-4 hover:bg-highlight transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            {expandedCategories.has(mainCat.id) ? (
+                              <ChevronDown className="h-4 w-4 text-grey-mid" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-grey-mid" />
+                            )}
+                            <span className="font-medium text-ink font-primary">
+                              {mainCat.name}
+                              {mainCat.isRestricted && (
+                                <Badge className="ml-2 text-xs bg-error/10 text-error border-error/20">
+                                  R
+                                </Badge>
+                              )}
+                            </span>
+                          </div>
+                          <span className="text-lg font-bold text-ink font-primary">
+                            {currency.format(mainCat.total)}
+                          </span>
+                        </button>
+
+                        {expandedCategories.has(mainCat.id) && mainCat.subcategories.length > 0 && (
+                          <div className="border-t border-ledger bg-highlight">
+                            {mainCat.subcategories.map((sub) => (
+                              <div
+                                key={sub.id}
+                                className="flex justify-between px-4 py-2 pl-12 border-b border-ledger/50 last:border-b-0"
+                              >
+                                <span className="text-sm text-grey-dark font-primary">{sub.name}</span>
+                                <span className="text-sm text-ink font-primary">
+                                  {currency.format(sub.amount)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </>
+                    ))}
+
+                    <div className="flex justify-between items-center pt-4 border-t border-ledger">
+                      <span className="text-lg font-bold text-ink font-primary">Total Income</span>
+                      <span className="text-2xl font-bold text-success font-primary">
+                        {currency.format(incomeReport.totalIncome)}
+                      </span>
+                    </div>
+
+                    <Button variant="outline" className="w-full mt-4 border-ledger font-primary gap-2">
+                      <FileDown className="h-4 w-4" />
+                      Export Income Report
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-grey-mid font-primary text-center py-6">
+                    No income transactions for this period
+                  </p>
                 )}
               </CardContent>
             </Card>
 
-            {/* Monthly Breakdown */}
+            {/* Section 2: Weekly Breakdown */}
             <Card className="border-ledger bg-paper shadow-none">
               <CardHeader>
-                <CardTitle className="text-ink">Monthly Breakdown</CardTitle>
-                <CardDescription className="text-grey-mid">
-                  Month-by-month income and expense trends
-                </CardDescription>
+                <CardTitle className="text-ink font-primary">Weekly Breakdown</CardTitle>
+                <p className="text-sm text-grey-mid font-primary">
+                  Sunday week-endings with fund segregation
+                </p>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs uppercase tracking-wide text-grey-mid">Start Date</span>
-                    <Input
-                      type="date"
-                      value={monthlyStart}
-                      onChange={(e) => setMonthlyStart(e.target.value)}
-                      className="font-primary"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs uppercase tracking-wide text-grey-mid">End Date</span>
-                    <Input
-                      type="date"
-                      value={monthlyEnd}
-                      onChange={(e) => setMonthlyEnd(e.target.value)}
-                      className="font-primary"
-                    />
-                  </label>
-                </div>
-
-                {monthlyReport && (
-                  <>
-                    <div className="space-y-2">
-                      <p className="text-sm">Total Income: {currency.format(monthlyReport.totalIncome)}</p>
-                      <p className="text-sm">Total Expense: {currency.format(monthlyReport.totalExpense)}</p>
-                      <p className="text-sm">Average Monthly Income: {currency.format(monthlyReport.averageMonthlyIncome)}</p>
-                      <p className="text-sm">Average Monthly Expense: {currency.format(monthlyReport.averageMonthlyExpense)}</p>
-                    </div>
-                    
-                    <div className="max-h-48 overflow-y-auto border border-ledger rounded-md">
-                      <table className="w-full text-sm">
-                        <thead className="bg-highlight sticky top-0">
+              <CardContent>
+                {weeklyReport && weeklyReport.weeklyData.length > 0 ? (
+                  <div>
+                    <div className="bg-paper border border-ledger rounded-lg overflow-hidden">
+                      <table className="w-full font-primary text-sm">
+                        <thead className="bg-ledger">
                           <tr>
-                            <th className="px-3 py-2 text-left font-medium">Month</th>
-                            <th className="px-3 py-2 text-right font-medium">Income</th>
-                            <th className="px-3 py-2 text-right font-medium">Expense</th>
-                            <th className="px-3 py-2 text-right font-medium">Net</th>
+                            <th className="px-4 py-3 text-left text-grey-dark">Week Ending</th>
+                            <th className="px-4 py-3 text-right text-grey-dark">General (G)</th>
+                            <th className="px-4 py-3 text-right text-grey-dark">Restricted (R)</th>
+                            <th className="px-4 py-3 text-right text-grey-dark">Total</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {monthlyReport.monthlyBreakdown.map((month) => (
-                            <tr key={month.month} className="border-t border-ledger">
-                              <td className="px-3 py-2">{month.month}</td>
-                              <td className="px-3 py-2 text-right">{currency.format(month.income)}</td>
-                              <td className="px-3 py-2 text-right">{currency.format(month.expense)}</td>
-                              <td className="px-3 py-2 text-right font-medium">{currency.format(month.net)}</td>
-                            </tr>
+                          {weeklyReport.weeklyData.map((week) => (
+                            <React.Fragment key={week.weekEnding}>
+                              <tr
+                                className="border-b border-ledger hover:bg-highlight cursor-pointer"
+                                onClick={() => toggleWeek(week.weekEnding)}
+                              >
+                                <td className="px-4 py-2 text-ink">{week.weekEnding}</td>
+                                <td className="px-4 py-2 text-right text-ink">
+                                  {currency.format(week.general)}
+                                </td>
+                                <td className="px-4 py-2 text-right text-ink">
+                                  {currency.format(week.restricted)}
+                                </td>
+                                <td className="px-4 py-2 text-right text-ink font-medium">
+                                  {currency.format(week.total)}
+                                </td>
+                              </tr>
+
+                              {expandedWeeks.has(week.weekEnding) && week.breakdown.length > 0 && (
+                                <tr className="bg-highlight">
+                                  <td colSpan={4} className="px-4 py-3">
+                                    <div className="space-y-1 text-xs pl-6">
+                                      {week.breakdown.map((item, idx) => (
+                                        <div key={idx} className="flex justify-between">
+                                          <span className="text-grey-dark">
+                                            {item.category} ({item.fundType})
+                                          </span>
+                                          <span className="text-ink">{currency.format(item.amount)}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
                           ))}
+                          <tr className="bg-ledger border-t-2 border-ink">
+                            <td className="px-4 py-3 text-ink font-bold">TOTAL</td>
+                            <td className="px-4 py-3 text-right text-ink font-bold">
+                              {currency.format(weeklyReport.totals.general)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-ink font-bold">
+                              {currency.format(weeklyReport.totals.restricted)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-ink font-bold">
+                              {currency.format(weeklyReport.totals.total)}
+                            </td>
+                          </tr>
                         </tbody>
                       </table>
                     </div>
 
-                    <div className="space-y-3">
-                      {monthlyReport.monthlyBreakdown.map((month) => (
-                        <div
-                          key={`${month.month}-subcategory`}
-                          className="rounded-md border border-ledger"
+                    <div className="flex gap-2 mt-4">
+                      <Button variant="outline" className="flex-1 border-ledger font-primary gap-2">
+                        <FileDown className="h-4 w-4" />
+                        Export Weekly Summary
+                      </Button>
+                      <Button variant="outline" className="flex-1 border-ledger font-primary gap-2">
+                        <FileDown className="h-4 w-4" />
+                        Export All CSV Reports
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-grey-mid font-primary text-center py-6">
+                    No weekly data for this period
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Tab 3: Expenditure */}
+          <TabsContent value="expenditure" className="space-y-6">
+            <Card className="border-ledger bg-paper shadow-none">
+              <CardHeader>
+                <CardTitle className="text-ink font-primary">Expenditure by Category</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {expenditureReport && expenditureReport.mainCategories.length > 0 ? (
+                  <div className="space-y-3">
+                    {expenditureReport.mainCategories.map((mainCat) => (
+                      <div key={mainCat.id} className="border border-ledger rounded-lg">
+                        <button
+                          onClick={() => toggleCategory(mainCat.id)}
+                          className="w-full flex items-center justify-between p-4 hover:bg-highlight transition-colors"
                         >
-                          <div className="flex items-center justify-between bg-highlight px-3 py-2">
-                            <span className="text-sm font-medium text-ink">{month.month}</span>
-                            <span className="text-xs uppercase tracking-wide text-grey-mid">
-                              Subcategory breakdown
-                            </span>
+                          <div className="flex items-center gap-2">
+                            {expandedCategories.has(mainCat.id) ? (
+                              <ChevronDown className="h-4 w-4 text-grey-mid" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-grey-mid" />
+                            )}
+                            <span className="font-medium text-ink font-primary">{mainCat.name}</span>
                           </div>
+                          <span className="text-lg font-bold text-error font-primary">
+                            {currency.format(mainCat.total)}
+                          </span>
+                        </button>
 
-                          {month.subcategoryBreakdown && month.subcategoryBreakdown.length > 0 ? (
-                            <div className="max-h-56 overflow-y-auto">
-                              <table className="w-full text-xs md:text-sm">
-                                <thead className="bg-paper">
-                                  <tr className="border-b border-ledger">
-                                    <th className="px-3 py-2 text-left font-medium">Subcategory</th>
-                                    <th className="px-3 py-2 text-left font-medium">Parent</th>
-                                    <th className="px-3 py-2 text-left font-medium">Type</th>
-                                    <th className="px-3 py-2 text-right font-medium">Income</th>
-                                    <th className="px-3 py-2 text-right font-medium">Expense</th>
-                                    <th className="px-3 py-2 text-right font-medium">Net</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {month.subcategoryBreakdown.map((subcategory) => (
-                                    <tr key={`${month.month}-${subcategory.categoryId}`} className="border-b border-ledger/60 last:border-b-0">
-                                      <td className="px-3 py-2 text-ink">
-                                        {subcategory.categoryName}
-                                      </td>
-                                      <td className="px-3 py-2 text-grey-mid">
-                                        {subcategory.parentCategoryName ?? "—"}
-                                      </td>
-                                      <td className="px-3 py-2 capitalize text-grey-mid">
-                                        {subcategory.type}
-                                      </td>
-                                      <td className="px-3 py-2 text-right text-ink">
-                                        {currency.format(subcategory.income)}
-                                      </td>
-                                      <td className="px-3 py-2 text-right text-grey-mid">
-                                        {currency.format(subcategory.expense)}
-                                      </td>
-                                      <td className="px-3 py-2 text-right font-medium text-ink">
-                                        {currency.format(subcategory.net)}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          ) : (
-                            <p className="px-3 py-3 text-xs text-grey-mid">
-                              No categorized transactions recorded for this month.
-                            </p>
-                          )}
-                        </div>
-                      ))}
+                        {expandedCategories.has(mainCat.id) && mainCat.subcategories.length > 0 && (
+                          <div className="border-t border-ledger bg-highlight">
+                            {mainCat.subcategories.map((sub) => (
+                              <div
+                                key={sub.id}
+                                className="flex justify-between px-4 py-2 pl-12 border-b border-ledger/50 last:border-b-0"
+                              >
+                                <span className="text-sm text-grey-dark font-primary">{sub.name}</span>
+                                <span className="text-sm text-ink font-primary">
+                                  {currency.format(sub.amount)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    <div className="flex justify-between items-center pt-4 border-t border-ledger">
+                      <span className="text-lg font-bold text-ink font-primary">Total Expenditure</span>
+                      <span className="text-2xl font-bold text-error font-primary">
+                        {currency.format(expenditureReport.totalExpenditure)}
+                      </span>
                     </div>
-                    
-                    <Button
-                      variant="outline"
-                      className="border-ledger font-primary gap-2"
-                      onClick={() => handleGenerateNarrative("monthly", monthlyReport)}
-                      disabled={generatingNarrative === "monthly"}
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      {generatingNarrative === "monthly" ? "Generating..." : "AI Insights"}
+
+                    <Button variant="outline" className="w-full mt-4 border-ledger font-primary gap-2">
+                      <FileDown className="h-4 w-4" />
+                      Export Expenditure Report
                     </Button>
-                    
-                    {narratives["monthly"] && (
-                      <div className="mt-4 rounded-md border border-ledger bg-highlight p-4">
-                        <p className="text-sm text-grey-dark whitespace-pre-wrap">{narratives["monthly"]}</p>
-                      </div>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Annual Summary */}
-            <Card className="border-ledger bg-paper shadow-none">
-              <CardHeader>
-                <CardTitle className="text-ink">Annual Summary {currentYear}</CardTitle>
-                <CardDescription className="text-grey-mid">
-                  Year-end summary with fund movements and category breakdown
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {annualSummary && (
-                  <>
-                    <div className="space-y-2">
-                      <p className="text-sm">Total Income: {currency.format(annualSummary.totalIncome)}</p>
-                      <p className="text-sm">Total Expense: {currency.format(annualSummary.totalExpense)}</p>
-                      <p className="font-medium text-ink">Net Surplus: {currency.format(annualSummary.netSurplus)}</p>
-                      <p className="text-xs text-grey-mid">{annualSummary.transactionCount} transactions</p>
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        className="border-ledger font-primary gap-2"
-                        onClick={() => handleGenerateNarrative("annual-summary", annualSummary)}
-                        disabled={generatingNarrative === "annual-summary"}
-                      >
-                        <Sparkles className="h-4 w-4" />
-                        {generatingNarrative === "annual-summary" ? "Generating..." : "AI Insights"}
-                      </Button>
-                    </div>
-                    
-                    {narratives["annual-summary"] && (
-                      <div className="mt-4 rounded-md border border-ledger bg-highlight p-4">
-                        <p className="text-sm text-grey-dark whitespace-pre-wrap">{narratives["annual-summary"]}</p>
-                      </div>
-                    )}
-                  </>
+                  </div>
+                ) : (
+                  <p className="text-sm text-grey-mid font-primary text-center py-6">
+                    No expenditure transactions for this period
+                  </p>
                 )}
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="compliance" className="space-y-6">
-            {/* Gift Aid Report */}
+          {/* Tab 4: Review Queue */}
+          <TabsContent value="review" className="space-y-6">
             <Card className="border-ledger bg-paper shadow-none">
               <CardHeader>
-                <CardTitle className="text-ink">Gift Aid Claim Report</CardTitle>
-                <CardDescription className="text-grey-mid">
-                  Calculate eligible Gift Aid claims with donor breakdown
-                </CardDescription>
+                <CardTitle className="text-ink font-primary">Transactions Needing Review</CardTitle>
+                <p className="text-sm text-grey-mid font-primary">
+                  {reviewQueue?.length ?? 0} transactions require your attention
+                </p>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs uppercase tracking-wide text-grey-mid">Start Date</span>
-                    <Input
-                      type="date"
-                      value={giftAidStart}
-                      onChange={(e) => setGiftAidStart(e.target.value)}
-                      className="font-primary"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs uppercase tracking-wide text-grey-mid">End Date</span>
-                    <Input
-                      type="date"
-                      value={giftAidEnd}
-                      onChange={(e) => setGiftAidEnd(e.target.value)}
-                      className="font-primary"
-                    />
-                  </label>
-                </div>
-
-                {giftAidReport && (
-                  <>
-                    <div className="space-y-2">
-                      <p className="text-sm">Claimable Donations: {currency.format(giftAidReport.claimableAmount)}</p>
-                      <p className="font-medium text-ink text-lg">Gift Aid Value (25%): {currency.format(giftAidReport.giftAidValue)}</p>
-                      <p className="text-xs text-grey-mid">
-                        {giftAidReport.transactionCount} transactions from {giftAidReport.donorBreakdown.length} donors
-                      </p>
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        className="border-ledger font-primary"
-                        onClick={() => handleExportReport("gift-aid", {
-                          startDate: giftAidStart,
-                          endDate: giftAidEnd
-                        }, `gift-aid-${giftAidStart}-${giftAidEnd}.pdf`)}
-                        disabled={loadingStates.giftAid}
-                      >
-                        {loadingStates.giftAid ? "Preparing..." : "Export PDF"}
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        className="border-ledger font-primary gap-2"
-                        onClick={() => handleGenerateNarrative("gift-aid", giftAidReport)}
-                        disabled={generatingNarrative === "gift-aid"}
-                      >
-                        <Sparkles className="h-4 w-4" />
-                        {generatingNarrative === "gift-aid" ? "Generating..." : "AI Insights"}
-                      </Button>
-                    </div>
-                    
-                    {narratives["gift-aid"] && (
-                      <div className="mt-4 rounded-md border border-ledger bg-highlight p-4">
-                        <p className="text-sm text-grey-dark whitespace-pre-wrap">{narratives["gift-aid"]}</p>
-                      </div>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="donors" className="space-y-6">
-            {/* Tithes Statements */}
-            <Card className="border-ledger bg-paper shadow-none">
-              <CardHeader>
-                <CardTitle className="text-ink">Tithes Statements (General Fund)</CardTitle>
-                <CardDescription className="text-grey-mid">
-                  Generate donor statements for tithes and general fund donations
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs uppercase tracking-wide text-grey-mid">From Date</span>
-                    <Input
-                      type="date"
-                      value={statementStart}
-                      onChange={(e) => setStatementStart(e.target.value)}
-                      className="font-primary"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs uppercase tracking-wide text-grey-mid">To Date</span>
-                    <Input
-                      type="date"
-                      value={statementEnd}
-                      onChange={(e) => setStatementEnd(e.target.value)}
-                      className="font-primary"
-                    />
-                  </label>
-                </div>
-
-                <Button
-                  variant="outline"
-                  className="border-ledger font-primary"
-                  onClick={() => handleExportReport("donor-statements", {
-                    fromDate: statementStart,
-                    toDate: statementEnd,
-                    fundType: "general"
-                  }, `tithes-statements-${statementStart}-${statementEnd}.pdf`)}
-                  disabled={loadingStates.statements}
-                >
-                  {loadingStates.statements ? "Preparing..." : "Export Tithes Statements"}
-                </Button>
-
-                {tithesStatements && tithesStatements.length > 0 ? (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {tithesStatements.slice(0, 5).map((statement) => (
-                      <div key={statement.donor._id} className="flex justify-between rounded-md border border-ledger px-3 py-2">
-                        <div>
-                          <p className="font-medium text-ink text-sm">{statement.donor.name}</p>
-                          <p className="text-xs text-grey-mid">
-                            {statement.transactions.length} gifts · {currency.format(statement.total)}
-                          </p>
+              <CardContent>
+                {reviewQueue && reviewQueue.length > 0 ? (
+                  <div className="space-y-3">
+                    {reviewQueue.map((tx) => (
+                      <div key={tx._id} className="border border-ledger rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <div className="font-medium text-ink font-primary">{tx.description}</div>
+                            <div className="text-sm text-grey-mid font-primary">
+                              {tx.date} • {currency.format(tx.amount)}
+                            </div>
+                          </div>
+                          <Badge className="bg-error/10 text-error border-error/20 font-primary text-xs">
+                            Uncategorised
+                          </Badge>
                         </div>
-                      </div>
-                    ))}
-                    {tithesStatements.length > 5 && (
-                      <p className="text-xs text-grey-mid text-center py-1">
-                        +{tithesStatements.length - 5} more donors
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-sm text-grey-mid">No donor statements for this period</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Building Fund Statements */}
-            <Card className="border-ledger bg-paper shadow-none">
-              <CardHeader>
-                <CardTitle className="text-ink">Building Fund Statements</CardTitle>
-                <CardDescription className="text-grey-mid">
-                  Generate donor statements for building fund (restricted) donations
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs uppercase tracking-wide text-grey-mid">From Date</span>
-                    <Input
-                      type="date"
-                      value={statementStart}
-                      onChange={(e) => setStatementStart(e.target.value)}
-                      className="font-primary"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs uppercase tracking-wide text-grey-mid">To Date</span>
-                    <Input
-                      type="date"
-                      value={statementEnd}
-                      onChange={(e) => setStatementEnd(e.target.value)}
-                      className="font-primary"
-                    />
-                  </label>
-                </div>
-
-                <Button
-                  variant="outline"
-                  className="border-ledger font-primary"
-                  onClick={() => handleExportReport("donor-statements", {
-                    fromDate: statementStart,
-                    toDate: statementEnd,
-                    fundType: "restricted"
-                  }, `building-fund-statements-${statementStart}-${statementEnd}.pdf`)}
-                  disabled={loadingStates.statements}
-                >
-                  {loadingStates.statements ? "Preparing..." : "Export Building Fund Statements"}
-                </Button>
-
-                {buildingFundStatements && buildingFundStatements.length > 0 ? (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {buildingFundStatements.slice(0, 5).map((statement) => (
-                      <div key={statement.donor._id} className="flex justify-between rounded-md border border-ledger px-3 py-2">
-                        <div>
-                          <p className="font-medium text-ink text-sm">{statement.donor.name}</p>
-                          <p className="text-xs text-grey-mid">
-                            Building fund donations
-                          </p>
-                        </div>
+                        <p className="text-xs text-grey-mid font-primary">
+                          Transaction categorization interface coming soon
+                        </p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-grey-mid">No building fund donations for this period</p>
+                  <p className="text-sm text-grey-mid font-primary text-center py-6">
+                    All transactions are categorized! 🎉
+                  </p>
                 )}
               </CardContent>
             </Card>

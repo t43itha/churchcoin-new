@@ -184,19 +184,35 @@ export function detectBankFormat(headers: string[]): "barclays" | "hsbc" | "metr
   const includesAny = (keywords: string[]) =>
     lowered.some((header) => keywords.some((keyword) => header.includes(keyword)));
 
-  if (includesAny(["type"]) && includesAny(["balance"])) {
-    return "barclays";
+  // Check Metro Bank first (most specific pattern)
+  // Metro format: separate "In"/"Out" columns (or "Paid In"/"Paid Out")
+  const hasPaidIn = includesAny(["paid in", "amount in", "in"]);
+  const hasPaidOut = includesAny(["paid out", "amount out", "out"]);
+  const hasDetails = includesAny(["details", "description"]);
+
+  // Metro Bank has separate In/Out columns AND details/description
+  if (hasPaidIn && hasPaidOut && hasDetails) {
+    // Additional check: ensure we have actual separate In/Out columns, not just words containing "in"/"out"
+    const inColumn = lowered.find(h => h === "in" || h === "paid in" || h === "amount in");
+    const outColumn = lowered.find(h => h === "out" || h === "paid out" || h === "amount out");
+    if (inColumn && outColumn) {
+      return "metrobank";
+    }
   }
 
+  // HSBC has "Transaction Type" and "Account Name"
   if (includesAny(["transaction type"]) && includesAny(["account name"])) {
     return "hsbc";
   }
 
-  const hasPaidIn = includesAny(["paid in", "amount in"]);
-  const hasPaidOut = includesAny(["paid out", "amount out"]);
+  // Barclays has single "Amount" column with "Type" and "Balance"
+  // Must NOT have separate In/Out columns (to avoid matching Metro)
+  const hasType = includesAny(["type"]);
+  const hasBalance = includesAny(["balance"]);
+  const hasSeparateInOut = hasPaidIn && hasPaidOut;
 
-  if (hasPaidIn && hasPaidOut && includesAny(["details", "description"])) {
-    return "metrobank";
+  if (hasType && hasBalance && !hasSeparateInOut) {
+    return "barclays";
   }
 
   return "generic";

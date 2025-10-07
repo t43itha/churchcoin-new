@@ -2,6 +2,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { api } from "./_generated/api";
 
 export type CreateTransactionInput = {
   churchId: Id<"churches">;
@@ -33,6 +34,44 @@ type DuplicateSearchArgs = {
   amount: number;
   reference?: string;
 };
+
+// Helper functions for period calculation
+function parseDateToUTC(dateString: string): Date {
+  // Parse DD/MM/YYYY or ISO format to UTC date
+  if (dateString.includes('/')) {
+    const [day, month, year] = dateString.split('/').map(Number);
+    return new Date(Date.UTC(year, month - 1, day));
+  }
+  return new Date(dateString);
+}
+
+function calculatePeriodFields(dateString: string): {
+  periodMonth: number;
+  periodYear: number;
+  weekEnding: string;
+} {
+  const date = parseDateToUTC(dateString);
+  const month = date.getUTCMonth() + 1; // 1-12
+  const year = date.getUTCFullYear();
+
+  // Calculate week ending (Sunday)
+  const dayOfWeek = date.getUTCDay(); // 0 = Sunday, 6 = Saturday
+  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+  const sunday = new Date(date);
+  sunday.setUTCDate(date.getUTCDate() + daysUntilSunday);
+
+  // Format as DD/MM/YYYY
+  const day = String(sunday.getUTCDate()).padStart(2, '0');
+  const sundayMonth = String(sunday.getUTCMonth() + 1).padStart(2, '0');
+  const sundayYear = sunday.getUTCFullYear();
+  const weekEnding = `${day}/${sundayMonth}/${sundayYear}`;
+
+  return {
+    periodMonth: month,
+    periodYear: year,
+    weekEnding,
+  };
+}
 
 const toDuplicateMatches = async (
   ctx: QueryCtx | MutationCtx,
@@ -101,6 +140,16 @@ const insertTransaction = async (
     throw new Error("Unable to determine user for manual transaction");
   }
 
+  // Calculate period fields from transaction date
+  const periodFields = calculatePeriodFields(transactionValues.date);
+
+  // Create or get the financial period
+  await ctx.runMutation(api.financialPeriods.createOrGetPeriod, {
+    churchId: transactionValues.churchId,
+    month: periodFields.periodMonth,
+    year: periodFields.periodYear,
+  });
+
   const transactionId = await ctx.db.insert("transactions", {
     ...transactionValues,
     source,
@@ -113,6 +162,10 @@ const insertTransaction = async (
     pendingReason,
     expectedClearDate,
     clearedAt: pendingStatus === "cleared" ? Date.now() : undefined,
+    // Add period tracking fields
+    periodMonth: periodFields.periodMonth,
+    periodYear: periodFields.periodYear,
+    weekEnding: periodFields.weekEnding,
   });
 
   if (pendingStatus === "pending") {

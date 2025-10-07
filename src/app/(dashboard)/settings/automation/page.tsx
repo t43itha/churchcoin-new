@@ -40,11 +40,12 @@ export default function AutomationSettingsPage() {
   const setDefaultFund = useMutation(api.churches.setDefaultFund);
   const updateAutoApproveThreshold = useMutation(api.churches.setAutoApproveThreshold);
   const updateEnableAiCategorization = useMutation(api.churches.setEnableAiCategorization);
+  const seedAllCategories = useMutation(api.seedCategories.seedAllCategories);
 
   const [selectedFundId, setSelectedFundId] = useState<string>("");
   const [autoApproveThreshold, setAutoApproveThreshold] = useState(95);
   const [enableAI, setEnableAI] = useState(true);
-  const [saving, setSaving] = useState<"fund" | "threshold" | "ai" | null>(null);
+  const [saving, setSaving] = useState<"fund" | "threshold" | "ai" | "categories" | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
@@ -118,6 +119,28 @@ export default function AutomationSettingsPage() {
     } catch (error) {
       console.error("Failed to toggle AI:", error);
       setFeedback("Failed to update AI settings");
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleSeedCategories = async () => {
+    if (!churchId) return;
+
+    setSaving("categories");
+    setFeedback(null);
+
+    try {
+      const result = await seedAllCategories({ churchId });
+      setFeedback(
+        `Successfully loaded ${result.income.mainCategories + result.expense.mainCategories} main categories, ` +
+        `${result.income.subcategories + result.expense.subcategories} subcategories, and ` +
+        `${result.income.keywords + result.expense.keywords} keywords.`
+      );
+    } catch (error) {
+      console.error("Failed to seed categories:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      setFeedback(`Failed to load categories: ${errorMessage}`);
     } finally {
       setSaving(null);
     }
@@ -329,6 +352,63 @@ export default function AutomationSettingsPage() {
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Category Setup */}
+        <Card className="border-ledger bg-paper shadow-none">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-ink flex items-center gap-2">
+              <Settings2 className="h-5 w-5" />
+              Category Setup
+            </CardTitle>
+            <CardDescription className="text-grey-mid">
+              Load pre-configured income and expense categories with keywords for automatic
+              transaction categorization. This is a one-time setup for new churches.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-md border border-ledger bg-highlight/20 p-4 space-y-3">
+              <div className="font-medium text-ink">What will be loaded:</div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="space-y-2">
+                  <div className="font-medium text-success">Income Categories (4)</div>
+                  <ul className="text-grey-mid space-y-1 pl-4">
+                    <li>• Donations (Tithe, Offering, Thanksgiving)</li>
+                    <li>• Building Fund</li>
+                    <li>• Charitable Activities</li>
+                    <li>• Other Income</li>
+                  </ul>
+                </div>
+                <div className="space-y-2">
+                  <div className="font-medium text-error">Expense Categories (6)</div>
+                  <ul className="text-grey-mid space-y-1 pl-4">
+                    <li>• Major Programs</li>
+                    <li>• Ministry Costs</li>
+                    <li>• Staff & Volunteer Costs</li>
+                    <li>• Premises Costs</li>
+                    <li>• Mission Costs</li>
+                    <li>• Admin & Governance</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="text-xs text-grey-mid pt-2 border-t border-ledger">
+                Includes 8 income and 12 expense subcategories with automatic keyword matching.
+              </div>
+            </div>
+
+            <Button
+              onClick={handleSeedCategories}
+              disabled={saving === "categories"}
+              className="bg-ink text-paper hover:bg-ink/90"
+            >
+              {saving === "categories" ? "Loading Categories..." : "Load Categories"}
+            </Button>
+
+            <div className="text-xs text-grey-mid">
+              Note: This will create system categories that cannot be deleted. You can add custom
+              categories later in the Categories section.
+            </div>
           </CardContent>
         </Card>
       </div>

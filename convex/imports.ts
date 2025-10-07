@@ -1,49 +1,41 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { MutationCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Id, Doc } from "./_generated/dataModel";
 import Fuse from "fuse.js";
 import {
   createTransactionInternal,
   findDuplicateTransactions,
   type CreateTransactionInput,
 } from "./transactions";
-import { internal } from "./_generated/api";
+import { internal, api } from "./_generated/api";
 
 // Donor matching function - matches by bank reference or fuzzy name search
 async function matchDonor(
   ctx: MutationCtx,
   churchId: Id<"churches">,
   description: string,
+  cachedDonors: Doc<"donors">[], // Pre-fetched active donors for this church
   reference?: string
 ): Promise<{ donorId?: Id<"donors">; confidence: number }> {
 
   // 1. Exact bank reference match (highest confidence)
   if (reference && reference.trim().length > 0) {
-    const exactMatch = await ctx.db
-      .query("donors")
-      .withIndex("by_reference", (q) =>
-        q.eq("churchId", churchId).eq("bankReference", reference.trim())
-      )
-      .first();
+    const exactMatch = cachedDonors.find(
+      d => d.bankReference?.toLowerCase() === reference.trim().toLowerCase()
+    );
 
     if (exactMatch) {
       return { donorId: exactMatch._id, confidence: 1.0 };
     }
   }
 
-  // 2. Fuzzy name match in description
-  const donors = await ctx.db
-    .query("donors")
-    .withIndex("by_church", (q) => q.eq("churchId", churchId))
-    .filter((q) => q.eq(q.field("isActive"), true))
-    .collect();
-
-  if (donors.length === 0) {
+  // 2. Fuzzy name match in description using cached donors
+  if (cachedDonors.length === 0) {
     return { confidence: 0 };
   }
 
-  const fuse = new Fuse(donors, {
+  const fuse = new Fuse(cachedDonors, {
     keys: ["name", "email"],
     threshold: 0.3,
     includeScore: true,
@@ -61,24 +53,42 @@ async function matchDonor(
   return { confidence: 0 };
 }
 
+// In-memory duplicate detection using cached transactions
+function findDuplicatesInCache(
+  cachedTransactions: Doc<"transactions">[],
+  date: string,
+  amount: number,
+  reference?: string
+): Doc<"transactions">[] {
+  // Filter cached transactions by date first
+  const sameDate = cachedTransactions.filter(tx => tx.date === date);
+
+  // Then check amount and optional reference match
+  return sameDate.filter(transaction => {
+    const referenceMatch = reference
+      ? transaction.reference?.toLowerCase() === reference.toLowerCase()
+      : true;
+    return referenceMatch && Math.abs(transaction.amount - amount) < 0.01;
+  });
+}
+
 // Category detection function for subcategories only
 async function detectSubcategory(
   ctx: MutationCtx,
   churchId: Id<"churches">,
-  description: string
+  description: string,
+  transactionType: "income" | "expense",
+  keywords: Doc<"categoryKeywords">[], // Pre-fetched keywords for this transaction type
+  cachedCategories: Doc<"categories">[] // Pre-fetched categories for verification
 ): Promise<{ categoryId: Id<"categories"> | null; confidence: number; source: string }> {
   if (!description || description.trim().length === 0) {
     return { categoryId: null, confidence: 0, source: "none" };
   }
 
-  // Get all active keywords for subcategories in this church
-  const keywords = await ctx.db
-    .query("categoryKeywords")
-    .withIndex("by_church", (q) => q.eq("churchId", churchId))
-    .filter((q) => q.eq(q.field("isActive"), true))
-    .collect();
+  // Use pre-fetched keywords (cached for performance)
+  const keywordsForType = keywords;
 
-  if (keywords.length === 0) {
+  if (keywordsForType.length === 0) {
     return { categoryId: null, confidence: 0, source: "none" };
   }
 
@@ -89,7 +99,7 @@ async function detectSubcategory(
   // Track matches with confidence scores
   const matches: { categoryId: string; confidence: number; matchedKeyword: string }[] = [];
 
-  for (const keywordRecord of keywords) {
+  for (const keywordRecord of keywordsForType) {
     const keyword = keywordRecord.keyword.toLowerCase().trim();
 
     // Exact phrase match (highest confidence)
@@ -135,13 +145,10 @@ async function detectSubcategory(
   // Sort by confidence and return the best match
   matches.sort((a, b) => b.confidence - a.confidence);
 
-  // Verify the category still exists and is a subcategory
-  const category = await ctx.db
-    .query("categories")
-    .withIndex("by_church", (q) => q.eq("churchId", churchId))
-    .filter((q) => q.eq(q.field("_id"), matches[0].categoryId as Id<"categories">))
-    .filter((q) => q.eq(q.field("isSubcategory"), true))
-    .first();
+  // Verify the category still exists and is a subcategory using cached data
+  const category = cachedCategories.find(
+    cat => cat._id === matches[0].categoryId && cat.isSubcategory === true
+  );
 
   if (category) {
     return {
@@ -160,10 +167,13 @@ async function detectCategoryWithAI(
   churchId: Id<"churches">,
   description: string,
   amount: number,
-  enableAI: boolean = true
+  transactionType: "income" | "expense",
+  enableAI: boolean = true,
+  keywords: Doc<"categoryKeywords">[], // Pre-fetched keywords for this transaction type
+  cachedCategories: Doc<"categories">[] // Pre-fetched categories for verification
 ): Promise<{ categoryId: Id<"categories"> | null; confidence: number; source: string }> {
   // Tier 1: Keyword matching (free, fast)
-  const keywordResult = await detectSubcategory(ctx, churchId, description);
+  const keywordResult = await detectSubcategory(ctx, churchId, description, transactionType, keywords, cachedCategories);
   if (keywordResult.categoryId) {
     return keywordResult;
   }
@@ -173,12 +183,10 @@ async function detectCategoryWithAI(
     return { categoryId: null, confidence: 0, source: "none" };
   }
 
-  // Get all categories for this church
-  const categories = await ctx.db
-    .query("categories")
-    .withIndex("by_church", (q) => q.eq("churchId", churchId))
-    .filter((q) => q.eq(q.field("isSubcategory"), true))
-    .collect();
+  // Get all subcategories for this church and transaction type from cached data
+  const categories = cachedCategories.filter(
+    cat => cat.type === transactionType && cat.isSubcategory === true
+  );
 
   if (categories.length === 0) {
     return { categoryId: null, confidence: 0, source: "none" };
@@ -278,38 +286,93 @@ export const createImportWithRows = mutation({
       duplicateCount: 0,
     });
 
+    // Fetch all categories first to build categoryId-to-type map
+    // This eliminates per-match category queries
+    const cachedCategories = await ctx.db
+      .query("categories")
+      .withIndex("by_church", (q) => q.eq("churchId", args.churchId))
+      .collect();
+
+    // Build categoryId-to-type map for keyword filtering
+    const categoryTypeMap = new Map<Id<"categories">, "income" | "expense">();
+    for (const category of cachedCategories) {
+      categoryTypeMap.set(category._id, category.type);
+    }
+
+    // Fetch ALL keywords once for caching (performance optimization)
+    // This reduces reads from O(rows × keywords) to O(keywords)
+    const allKeywords = await ctx.db
+      .query("categoryKeywords")
+      .withIndex("by_church", (q) => q.eq("churchId", args.churchId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    // Separate keywords by transaction type using category map
+    // This handles keywords that don't have the denormalized categoryType field
+    const incomeKeywords = allKeywords.filter(kw => categoryTypeMap.get(kw.categoryId) === "income");
+    const expenseKeywords = allKeywords.filter(kw => categoryTypeMap.get(kw.categoryId) === "expense");
+
+    // Fetch recent transactions for duplicate detection (last 30 days)
+    // This reduces reads from O(rows × transactions) to O(transactions)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+    const cachedTransactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_church_date", (q) => q.eq("churchId", args.churchId))
+      .filter((q) => q.gte(q.field("date"), thirtyDaysAgoStr))
+      .collect();
+
+    // Fetch all donors for donor matching (only active donors)
+    // This reduces reads from O(income_rows × donors) to O(donors)
+    const cachedDonors = await ctx.db
+      .query("donors")
+      .withIndex("by_church", (q) => q.eq("churchId", args.churchId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
     // Save all rows with auto-detection
     let duplicateCount = 0;
     for (const row of args.rows) {
-      // 1. Check for duplicates
-      const duplicates = await findDuplicateTransactions(ctx, {
-        churchId: args.churchId,
-        date: row.date,
-        amount: row.amount,
-        reference: row.reference,
-      });
+      // 1. Detect transaction type based on amount sign
+      const transactionType: "income" | "expense" = row.amount >= 0 ? "income" : "expense";
+      const absAmount = Math.abs(row.amount);
 
-      // 2. Auto-detect donor (only for income transactions)
+      // 2. Check for duplicates using cached transactions
+      const duplicates = findDuplicatesInCache(
+        cachedTransactions,
+        row.date,
+        row.amount,
+        row.reference
+      );
+
+      // 3. Auto-detect donor (only for income transactions) using cached donors
       let donorMatch = null;
       let donorConfidence = 0;
-      if (row.amount >= 0) {
+      if (transactionType === "income") {
         donorMatch = await matchDonor(
           ctx,
           args.churchId,
           row.description,
+          cachedDonors,
           row.reference
         );
         donorConfidence = donorMatch.confidence;
       }
 
-      // 3. Auto-detect category using multi-tier detection (keyword → AI)
+      // 4. Auto-detect category using multi-tier detection (keyword → AI) with cached data
       const enableAI = church.settings.enableAiCategorization ?? true;
+      const keywordsForType = transactionType === "income" ? incomeKeywords : expenseKeywords;
       const categoryResult = await detectCategoryWithAI(
         ctx,
         args.churchId,
         row.description,
-        Math.abs(row.amount),
-        enableAI
+        absAmount,
+        transactionType,
+        enableAI,
+        keywordsForType,
+        cachedCategories
       );
 
       await ctx.db.insert("csvRows", {
@@ -321,6 +384,7 @@ export const createImportWithRows = mutation({
         detectedCategoryId: categoryResult.categoryId || undefined,
         categoryConfidence: categoryResult.confidence > 0 ? categoryResult.confidence : undefined,
         categorySource: categoryResult.source !== "none" ? categoryResult.source : undefined,
+        transactionType,
         duplicateOf: duplicates[0]?._id,
         status: duplicates.length > 0 ? "duplicate" : "pending",
       });
@@ -499,6 +563,9 @@ export const approveRows = mutation({
 
     let processedCount = importRecord.processedCount;
 
+    // Track unique periods affected by these approvals
+    const affectedPeriods = new Set<string>();
+
     for (const rowSelection of args.rows) {
       const row = await ctx.db.get(rowSelection.rowId);
       if (!row) continue;
@@ -530,12 +597,54 @@ export const approveRows = mutation({
         status: "approved",
       });
       processedCount += 1;
+
+      // Track the period for this transaction (format: "year-month")
+      const date = new Date(row.raw.date);
+      const year = date.getUTCFullYear();
+      const month = date.getUTCMonth() + 1; // 1-12
+      affectedPeriods.add(`${year}-${month}`);
     }
 
     await ctx.db.patch(args.importId, {
       processedCount,
       status: processedCount >= importRecord.rowCount ? "completed" : "processing",
     });
+
+    // Update metrics for all affected periods
+    // Only triggers report generation if a period becomes "completed"
+    for (const periodKey of affectedPeriods) {
+      const [year, month] = periodKey.split('-').map(Number);
+
+      // Find the period for this month
+      const period = await ctx.db
+        .query("financialPeriods")
+        .withIndex("by_church_period", (q) =>
+          q.eq("churchId", args.churchId).eq("year", year).eq("month", month)
+        )
+        .first();
+
+      if (period) {
+        // Update metrics - this will auto-transition to "completed" if no pending transactions
+        const result: {
+          statusChanged: boolean;
+          newStatus: "draft" | "processing" | "completed" | "overdue";
+          needsReviewCount: number;
+        } = await ctx.runMutation(api.financialPeriods.updatePeriodMetrics, {
+          periodId: period._id,
+        });
+
+        // If period just became completed, this is where we'd trigger report generation
+        if (result.statusChanged && result.newStatus === "completed") {
+          console.log(
+            `Period ${period.periodName} completed! Ready for report generation.`
+          );
+          // TODO: Trigger CSV report generation here when implemented
+          // await ctx.runAction(api.reportGeneration.generatePeriodReports, {
+          //   periodId: period._id,
+          // });
+        }
+      }
+    }
   },
 });
 

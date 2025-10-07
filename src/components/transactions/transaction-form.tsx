@@ -47,6 +47,7 @@ type TransactionFormProps = {
   subheading?: string;
   submitLabel?: string;
   showReceiptHint?: boolean;
+  restrictedEdit?: boolean;
 };
 
 const methodOptions = [
@@ -70,6 +71,7 @@ export function TransactionForm({
   subheading = "Capture one-off income or expenses with full audit detail.",
   submitLabel = "Record transaction",
   showReceiptHint = true,
+  restrictedEdit = false,
 }: TransactionFormProps) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -203,6 +205,12 @@ export function TransactionForm({
     }
   });
 
+  const currency = useMemo(() => new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+    minimumFractionDigits: 2,
+  }), []);
+
   return (
     <Card className="border-ledger bg-paper shadow-none">
       <CardHeader>
@@ -216,43 +224,131 @@ export function TransactionForm({
               {submitError}
             </div>
           ) : null}
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-ink">Transaction date</label>
-              <Input
-                type="date"
-                max={new Date().toISOString().slice(0, 10)}
-                className="font-primary"
-                {...register("date")}
-              />
-              {errors.date ? (
-                <p className="text-sm text-error">{errors.date.message}</p>
+
+          {restrictedEdit ? (
+            <div className="space-y-4 rounded-lg border border-ledger bg-highlight/30 p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <span className="text-xs text-grey-mid">Date</span>
+                  <p className="font-medium text-ink">{defaultValues?.date || watch("date")}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-grey-mid">Type</span>
+                  <p className="font-medium text-ink capitalize">{defaultValues?.type || watch("type")}</p>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-xs text-grey-mid">Description</span>
+                <p className="font-medium text-ink">{defaultValues?.description || watch("description")}</p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <span className="text-xs text-grey-mid">Amount</span>
+                  <p className={`font-medium font-mono ${(defaultValues?.type || watch("type")) === "income" ? "text-success" : "text-error"}`}>
+                    {(defaultValues?.type || watch("type")) === "expense" ? "-" : ""}
+                    {currency.format(defaultValues?.amount || watch("amount") || 0)}
+                  </p>
+                </div>
+                {(defaultValues?.method || watch("method")) ? (
+                  <div>
+                    <span className="text-xs text-grey-mid">Method</span>
+                    <p className="text-ink">{(defaultValues?.method || watch("method") || "").toUpperCase()}</p>
+                  </div>
+                ) : null}
+              </div>
+
+              {(defaultValues?.reference || watch("reference")) ? (
+                <div>
+                  <span className="text-xs text-grey-mid">Reference</span>
+                  <p className="text-ink">{defaultValues?.reference || watch("reference")}</p>
+                </div>
               ) : null}
             </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-ink">Type</label>
-              <select
-                {...register("type")}
-                className="h-9 w-full rounded-md border border-ledger bg-paper px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-grey-mid"
-              >
-                <option value="income">Income</option>
-                <option value="expense">Expense</option>
-              </select>
-              {errors.type ? <p className="text-sm text-error">{errors.type.message}</p> : null}
+          ) : null}
+
+          {!restrictedEdit ? (
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-ink">Transaction date</label>
+                <Input
+                  type="date"
+                  max={new Date().toISOString().slice(0, 10)}
+                  className="font-primary"
+                  {...register("date")}
+                />
+                {errors.date ? (
+                  <p className="text-sm text-error">{errors.date.message}</p>
+                ) : null}
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-ink">Type</label>
+                <select
+                  {...register("type")}
+                  className="h-9 w-full rounded-md border border-ledger bg-paper px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-grey-mid"
+                >
+                  <option value="income">Income</option>
+                  <option value="expense">Expense</option>
+                </select>
+                {errors.type ? <p className="text-sm text-error">{errors.type.message}</p> : null}
+              </div>
             </div>
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-ink">Description</label>
-            <Input
-              placeholder="e.g. Sunday service collection"
-              className="font-primary"
-              {...register("description")}
-            />
-            {errors.description ? (
-              <p className="text-sm text-error">{errors.description.message}</p>
-            ) : null}
-          </div>
-          <div className="grid gap-6 md:grid-cols-2">
+          ) : null}
+
+          {!restrictedEdit ? (
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-ink">Description</label>
+              <Input
+                placeholder="e.g. Sunday service collection"
+                className="font-primary"
+                {...register("description")}
+              />
+              {errors.description ? (
+                <p className="text-sm text-error">{errors.description.message}</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {!restrictedEdit ? (
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-ink">Fund</label>
+                <select
+                  {...register("fundId")}
+                  className="h-9 w-full rounded-md border border-ledger bg-paper px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-grey-mid"
+                >
+                  <option value="" disabled>
+                    Select fund
+                  </option>
+                  {funds.map((fund) => (
+                    <option key={fund._id} value={fund._id}>
+                      {fund.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.fundId ? <p className="text-sm text-error">{errors.fundId.message}</p> : null}
+                <p className="text-xs text-grey-mid">
+                  Balance: {selectedFund ? new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(selectedFund.balance) : "—"}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-ink">Amount</label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  className="font-primary"
+                  {...register("amount")}
+                />
+                {errors.amount ? <p className="text-sm text-error">{errors.amount.message}</p> : null}
+                <p className="text-xs text-grey-mid">Always enter positive amounts.</p>
+              </div>
+            </div>
+          ) : null}
+
+          {restrictedEdit ? (
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-ink">Fund</label>
               <select
@@ -270,23 +366,10 @@ export function TransactionForm({
               </select>
               {errors.fundId ? <p className="text-sm text-error">{errors.fundId.message}</p> : null}
               <p className="text-xs text-grey-mid">
-                Balance: {selectedFund ? new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(selectedFund.balance) : "—"}
+                Balance: {selectedFund ? currency.format(selectedFund.balance) : "—"}
               </p>
             </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-ink">Amount</label>
-              <Input
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                className="font-primary"
-                {...register("amount")}
-              />
-              {errors.amount ? <p className="text-sm text-error">{errors.amount.message}</p> : null}
-              <p className="text-xs text-grey-mid">Always enter positive amounts.</p>
-            </div>
-          </div>
+          ) : null}
           <div className="grid gap-6 md:grid-cols-2">
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-ink">Category</label>
@@ -317,107 +400,112 @@ export function TransactionForm({
               </select>
             </div>
           </div>
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-ink">Method</label>
-              <select
-                {...register("method")}
-                className="h-9 w-full rounded-md border border-ledger bg-paper px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-grey-mid"
-              >
-                {methodOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-ink">Reference</label>
-              <Input
-                placeholder="e.g. HSBC REF 1234"
-                className="font-primary"
-                {...register("reference")}
-              />
-            </div>
-          </div>
-          {type === "income" ? (
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-ink">Gift Aid eligible?</label>
-              <label className="flex items-center gap-2 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-ledger accent-ink"
-                  {...register("giftAid")}
-                />
-                Gift Aid declaration recorded for this donation
-              </label>
-            </div>
-          ) : null}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-ink">Notes (optional)</label>
-            <textarea
-              rows={4}
-              className="w-full rounded-md border border-ledger bg-paper px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-grey-mid"
-              placeholder="Add any contextual details or split explanations"
-              {...register("notes")}
-            />
-          </div>
-          {type === "expense" ? (
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-ink">Receipt attachment</label>
-              <Input
-                type="file"
-                accept="image/*,.pdf"
-                onChange={(event) => {
-                  const file = event.target.files?.[0] ?? null;
-                  setReceiptFile(file);
-                  if (file) {
-                    setValue("receiptFilename", file.name);
-                    setValue("receiptStorageId", undefined);
-                  } else {
-                    setValue("receiptFilename", undefined);
-                    setValue("receiptStorageId", undefined);
-                  }
-                }}
-              />
-              {form.watch("receiptFilename") ? (
-                <div className="flex items-center gap-2 text-xs text-grey-mid">
-                  <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
-                    {form.watch("receiptFilename")}
-                  </Badge>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs text-error"
-                    onClick={() => {
-                      setReceiptFile(null);
-                      setValue("receiptFilename", undefined);
-                      setValue("receiptStorageId", undefined);
-                    }}
+
+          {!restrictedEdit ? (
+            <>
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-ink">Method</label>
+                  <select
+                    {...register("method")}
+                    className="h-9 w-full rounded-md border border-ledger bg-paper px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-grey-mid"
                   >
-                    Remove
-                  </Button>
+                    {methodOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-ink">Reference</label>
+                  <Input
+                    placeholder="e.g. HSBC REF 1234"
+                    className="font-primary"
+                    {...register("reference")}
+                  />
+                </div>
+              </div>
+              {type === "income" ? (
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-ink">Gift Aid eligible?</label>
+                  <label className="flex items-center gap-2 text-sm text-ink">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-ledger accent-ink"
+                      {...register("giftAid")}
+                    />
+                    Gift Aid declaration recorded for this donation
+                  </label>
                 </div>
               ) : null}
-              {showReceiptHint ? (
-                <p className="text-xs text-grey-mid">
-                  Upload PDFs or images. Receipts live alongside the ledger entry for audits.
-                </p>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-ink">Notes (optional)</label>
+                <textarea
+                  rows={4}
+                  className="w-full rounded-md border border-ledger bg-paper px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-grey-mid"
+                  placeholder="Add any contextual details or split explanations"
+                  {...register("notes")}
+                />
+              </div>
+              {type === "expense" ? (
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-ink">Receipt attachment</label>
+                  <Input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      setReceiptFile(file);
+                      if (file) {
+                        setValue("receiptFilename", file.name);
+                        setValue("receiptStorageId", undefined);
+                      } else {
+                        setValue("receiptFilename", undefined);
+                        setValue("receiptStorageId", undefined);
+                      }
+                    }}
+                  />
+                  {form.watch("receiptFilename") ? (
+                    <div className="flex items-center gap-2 text-xs text-grey-mid">
+                      <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
+                        {form.watch("receiptFilename")}
+                      </Badge>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs text-error"
+                        onClick={() => {
+                          setReceiptFile(null);
+                          setValue("receiptFilename", undefined);
+                          setValue("receiptStorageId", undefined);
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ) : null}
+                  {showReceiptHint ? (
+                    <p className="text-xs text-grey-mid">
+                      Upload PDFs or images. Receipts live alongside the ledger entry for audits.
+                    </p>
+                  ) : null}
+                </div>
               ) : null}
-            </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-ink">Entered by</label>
+                <Input
+                  placeholder="e.g. Sarah Thompson"
+                  className="font-primary"
+                  {...register("enteredByName")}
+                />
+                <p className="text-xs text-grey-mid">
+                  Used to attribute manual entries when user accounts are unavailable.
+                </p>
+              </div>
+            </>
           ) : null}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-ink">Entered by</label>
-            <Input
-              placeholder="e.g. Sarah Thompson"
-              className="font-primary"
-              {...register("enteredByName")}
-            />
-            <p className="text-xs text-grey-mid">
-              Used to attribute manual entries when user accounts are unavailable.
-            </p>
-          </div>
           <div className="flex items-center justify-end gap-2 border-t border-ledger pt-4">
             <Button type="submit" className="font-primary" disabled={isSubmitting}>
               {isSubmitting ? "Saving..." : submitLabel}
