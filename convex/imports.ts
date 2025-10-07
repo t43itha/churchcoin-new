@@ -1,7 +1,7 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { MutationCtx } from "./_generated/server";
-import type { Id, Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import Fuse from "fuse.js";
 import {
   createTransactionInternal,
@@ -11,18 +11,44 @@ import {
 import { internal, api } from "./_generated/api";
 
 // Donor matching function - matches by bank reference or fuzzy name search
+type ImportDetectionCache = {
+  donors?: Doc<"donors">[];
+  keywords?: Doc<"categoryKeywords">[];
+  categories?: Doc<"categories">[];
+};
+
 async function matchDonor(
   ctx: MutationCtx,
   churchId: Id<"churches">,
   description: string,
-  cachedDonors: Doc<"donors">[], // Pre-fetched active donors for this church
-  reference?: string
+  reference?: string,
+  cache?: ImportDetectionCache
 ): Promise<{ donorId?: Id<"donors">; confidence: number }> {
+  const trimmedReference = reference?.trim();
+
+  // Lazily load donor cache if needed
+  if (!cache?.donors) {
+    const donors = await ctx.db
+      .query("donors")
+      .withIndex("by_church", (q) => q.eq("churchId", churchId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    if (cache) {
+      cache.donors = donors;
+    }
+  }
+
+  const donors = cache?.donors ?? [];
+
+  if (donors.length === 0) {
+    return { confidence: 0 };
+  }
 
   // 1. Exact bank reference match (highest confidence)
-  if (reference && reference.trim().length > 0) {
-    const exactMatch = cachedDonors.find(
-      d => d.bankReference?.toLowerCase() === reference.trim().toLowerCase()
+  if (trimmedReference && trimmedReference.length > 0) {
+    const exactMatch = donors.find(
+      (donor) => donor.bankReference?.trim() === trimmedReference
     );
 
     if (exactMatch) {
@@ -30,12 +56,8 @@ async function matchDonor(
     }
   }
 
-  // 2. Fuzzy name match in description using cached donors
-  if (cachedDonors.length === 0) {
-    return { confidence: 0 };
-  }
-
-  const fuse = new Fuse(cachedDonors, {
+  // 2. Fuzzy name match in description
+  const fuse = new Fuse(donors, {
     keys: ["name", "email"],
     threshold: 0.3,
     includeScore: true,
@@ -77,18 +99,28 @@ async function detectSubcategory(
   ctx: MutationCtx,
   churchId: Id<"churches">,
   description: string,
-  transactionType: "income" | "expense",
-  keywords: Doc<"categoryKeywords">[], // Pre-fetched keywords for this transaction type
-  cachedCategories: Doc<"categories">[] // Pre-fetched categories for verification
+  cache?: ImportDetectionCache
 ): Promise<{ categoryId: Id<"categories"> | null; confidence: number; source: string }> {
   if (!description || description.trim().length === 0) {
     return { categoryId: null, confidence: 0, source: "none" };
   }
 
-  // Use pre-fetched keywords (cached for performance)
-  const keywordsForType = keywords;
+  // Get all active keywords for subcategories in this church
+  if (!cache?.keywords) {
+    const keywords = await ctx.db
+      .query("categoryKeywords")
+      .withIndex("by_church", (q) => q.eq("churchId", churchId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
 
-  if (keywordsForType.length === 0) {
+    if (cache) {
+      cache.keywords = keywords;
+    }
+  }
+
+  const keywords = cache?.keywords ?? [];
+
+  if (keywords.length === 0) {
     return { categoryId: null, confidence: 0, source: "none" };
   }
 
@@ -99,7 +131,7 @@ async function detectSubcategory(
   // Track matches with confidence scores
   const matches: { categoryId: string; confidence: number; matchedKeyword: string }[] = [];
 
-  for (const keywordRecord of keywordsForType) {
+  for (const keywordRecord of keywords) {
     const keyword = keywordRecord.keyword.toLowerCase().trim();
 
     // Exact phrase match (highest confidence)
@@ -145,12 +177,26 @@ async function detectSubcategory(
   // Sort by confidence and return the best match
   matches.sort((a, b) => b.confidence - a.confidence);
 
-  // Verify the category still exists and is a subcategory using cached data
-  const category = cachedCategories.find(
-    cat => cat._id === matches[0].categoryId && cat.isSubcategory === true
+  // Verify the category still exists and is a subcategory
+  if (!cache?.categories) {
+    const categories = await ctx.db
+      .query("categories")
+      .withIndex("by_church", (q) => q.eq("churchId", churchId))
+      .collect();
+
+    if (cache) {
+      cache.categories = categories;
+    }
+  }
+
+  const categories = cache?.categories ?? [];
+  const matchedCategory = categories.find(
+    (category) =>
+      category._id === (matches[0].categoryId as Id<"categories">) &&
+      category.isSubcategory === true
   );
 
-  if (category) {
+  if (matchedCategory) {
     return {
       categoryId: matches[0].categoryId as Id<"categories">,
       confidence: 1.0, // Keyword matches are high confidence
@@ -167,13 +213,11 @@ async function detectCategoryWithAI(
   churchId: Id<"churches">,
   description: string,
   amount: number,
-  transactionType: "income" | "expense",
   enableAI: boolean = true,
-  keywords: Doc<"categoryKeywords">[], // Pre-fetched keywords for this transaction type
-  cachedCategories: Doc<"categories">[] // Pre-fetched categories for verification
+  cache?: ImportDetectionCache
 ): Promise<{ categoryId: Id<"categories"> | null; confidence: number; source: string }> {
   // Tier 1: Keyword matching (free, fast)
-  const keywordResult = await detectSubcategory(ctx, churchId, description, transactionType, keywords, cachedCategories);
+  const keywordResult = await detectSubcategory(ctx, churchId, description, cache);
   if (keywordResult.categoryId) {
     return keywordResult;
   }
@@ -183,10 +227,20 @@ async function detectCategoryWithAI(
     return { categoryId: null, confidence: 0, source: "none" };
   }
 
-  // Get all subcategories for this church and transaction type from cached data
-  const categories = cachedCategories.filter(
-    cat => cat.type === transactionType && cat.isSubcategory === true
-  );
+  // Get all categories for this church
+  if (!cache?.categories) {
+    const categories = await ctx.db
+      .query("categories")
+      .withIndex("by_church", (q) => q.eq("churchId", churchId))
+      .filter((q) => q.eq(q.field("isSubcategory"), true))
+      .collect();
+
+    if (cache) {
+      cache.categories = categories;
+    }
+  }
+
+  const categories = cache?.categories?.filter((category) => category.isSubcategory) ?? [];
 
   if (categories.length === 0) {
     return { categoryId: null, confidence: 0, source: "none" };
@@ -273,6 +327,8 @@ export const createImportWithRows = mutation({
         .first();
     }
 
+    const detectionCache: ImportDetectionCache = {};
+
     // Create import record first (but we'll set status to processing immediately)
     const importId = await ctx.db.insert("csvImports", {
       churchId: args.churchId,
@@ -355,24 +411,21 @@ export const createImportWithRows = mutation({
           ctx,
           args.churchId,
           row.description,
-          cachedDonors,
-          row.reference
+          row.reference,
+          detectionCache
         );
         donorConfidence = donorMatch.confidence;
       }
 
       // 4. Auto-detect category using multi-tier detection (keyword → AI) with cached data
       const enableAI = church.settings.enableAiCategorization ?? true;
-      const keywordsForType = transactionType === "income" ? incomeKeywords : expenseKeywords;
       const categoryResult = await detectCategoryWithAI(
         ctx,
         args.churchId,
         row.description,
-        absAmount,
-        transactionType,
+        Math.abs(row.amount),
         enableAI,
-        keywordsForType,
-        cachedCategories
+        detectionCache
       );
 
       await ctx.db.insert("csvRows", {
