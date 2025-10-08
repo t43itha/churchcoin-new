@@ -18,16 +18,20 @@ import type * as aiInsights from "../aiInsights.js";
 import type * as auth from "../auth.js";
 import type * as categories from "../categories.js";
 import type * as churches from "../churches.js";
+import type * as crons from "../crons.js";
 import type * as donors from "../donors.js";
 import type * as files from "../files.js";
+import type * as financialPeriods from "../financialPeriods.js";
 import type * as fundraising from "../fundraising.js";
 import type * as funds from "../funds.js";
 import type * as imports from "../imports.js";
 import type * as migrations_backfill_funds from "../migrations/backfill_funds.js";
 import type * as migrations_normalize_user_roles from "../migrations/normalize_user_roles.js";
+import type * as migrations from "../migrations.js";
 import type * as reconciliation from "../reconciliation.js";
 import type * as reports from "../reports.js";
 import type * as roles from "../roles.js";
+import type * as seedCategories from "../seedCategories.js";
 import type * as transactions from "../transactions.js";
 
 /**
@@ -44,16 +48,20 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   categories: typeof categories;
   churches: typeof churches;
+  crons: typeof crons;
   donors: typeof donors;
   files: typeof files;
+  financialPeriods: typeof financialPeriods;
   fundraising: typeof fundraising;
   funds: typeof funds;
   imports: typeof imports;
   "migrations/backfill_funds": typeof migrations_backfill_funds;
   "migrations/normalize_user_roles": typeof migrations_normalize_user_roles;
+  migrations: typeof migrations;
   reconciliation: typeof reconciliation;
   reports: typeof reports;
   roles: typeof roles;
+  seedCategories: typeof seedCategories;
   transactions: typeof transactions;
 }>;
 export declare const api: FilterApi<

@@ -1,5 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 
 export const getFundBalanceSummary = query({
   args: { churchId: v.id("churches") },
@@ -440,5 +441,633 @@ export const getMonthlyIncomeExpenseReport = query({
       averageMonthlyIncome: monthlyData.length > 0 ? totalIncome / monthlyData.length : 0,
       averageMonthlyExpense: monthlyData.length > 0 ? totalExpense / monthlyData.length : 0,
     };
+  },
+});
+
+// Period-based reports for enhanced financial workflow
+
+export const getHierarchicalIncomeReport = query({
+  args: { periodId: v.id("financialPeriods") },
+  returns: v.object({
+    totalIncome: v.number(),
+    mainCategories: v.array(v.object({
+      id: v.string(),
+      name: v.string(),
+      total: v.number(),
+      isRestricted: v.boolean(),
+      subcategories: v.array(v.object({
+        id: v.string(),
+        name: v.string(),
+        amount: v.number(),
+      })),
+    })),
+  }),
+  handler: async (ctx, args) => {
+    const period = await ctx.db.get(args.periodId);
+    if (!period) throw new Error("Period not found");
+
+    const transactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_period", (q) =>
+        q.eq("churchId", period.churchId)
+         .eq("periodYear", period.year)
+         .eq("periodMonth", period.month)
+      )
+      .filter((q) => q.eq(q.field("type"), "income"))
+      .collect();
+
+    const categories = await ctx.db
+      .query("categories")
+      .withIndex("by_church", (q) => q.eq("churchId", period.churchId))
+      .filter((q) => q.eq(q.field("type"), "income"))
+      .collect();
+
+    const funds = await ctx.db
+      .query("funds")
+      .withIndex("by_church", (q) => q.eq("churchId", period.churchId))
+      .collect();
+
+    const fundLookup = new Map(funds.map(f => [f._id, f]));
+    const categoryLookup = new Map(categories.map(c => [c._id, c]));
+
+    // Build hierarchy: main categories with subcategories
+    const mainCategoriesMap = new Map<string, {
+      id: string;
+      name: string;
+      total: number;
+      isRestricted: boolean;
+      subcategories: Map<string, { id: string; name: string; amount: number }>;
+    }>();
+
+    for (const txn of transactions) {
+      const fund = fundLookup.get(txn.fundId);
+      const fundType = fund?.type ?? "general";
+      const isRestricted = fundType === "restricted";
+
+      // ONLY include categorised general/designated fund income
+      // Restricted funds are tracked separately, not in income by category
+      if (isRestricted || !txn.categoryId) {
+        continue;
+      }
+
+      const category = categoryLookup.get(txn.categoryId);
+      if (!category) continue;
+
+      let mainCategoryId: string;
+      let mainCategoryName: string;
+      let subcategoryId: string;
+      let subcategoryName: string;
+
+      if (category.isSubcategory && category.parentId) {
+        const parent = categoryLookup.get(category.parentId);
+        mainCategoryId = category.parentId;
+        mainCategoryName = parent?.name ?? "Unknown";
+        subcategoryId = category._id;
+        subcategoryName = category.name;
+      } else {
+        mainCategoryId = category._id;
+        mainCategoryName = category.name;
+        subcategoryId = category._id;
+        subcategoryName = category.name;
+      }
+
+      let mainCat = mainCategoriesMap.get(mainCategoryId);
+      if (!mainCat) {
+        mainCat = {
+          id: mainCategoryId,
+          name: mainCategoryName,
+          total: 0,
+          isRestricted: false, // All are general/designated funds
+          subcategories: new Map(),
+        };
+        mainCategoriesMap.set(mainCategoryId, mainCat);
+      }
+
+      mainCat.total += txn.amount;
+
+      let subcat = mainCat.subcategories.get(subcategoryId);
+      if (!subcat) {
+        subcat = { id: subcategoryId, name: subcategoryName, amount: 0 };
+        mainCat.subcategories.set(subcategoryId, subcat);
+      }
+      subcat.amount += txn.amount;
+    }
+
+    // Calculate totalIncome from the breakdown to ensure it matches
+    const totalIncome = Array.from(mainCategoriesMap.values()).reduce(
+      (sum, cat) => sum + cat.total,
+      0
+    );
+
+    return {
+      totalIncome,
+      mainCategories: Array.from(mainCategoriesMap.values())
+        .map(main => ({
+          ...main,
+          subcategories: Array.from(main.subcategories.values())
+            .sort((a, b) => b.amount - a.amount),
+        }))
+        .sort((a, b) => b.total - a.total),
+    };
+  },
+});
+
+export const getHierarchicalExpenditureReport = query({
+  args: { periodId: v.id("financialPeriods") },
+  returns: v.object({
+    totalExpenditure: v.number(),
+    mainCategories: v.array(v.object({
+      id: v.string(),
+      name: v.string(),
+      total: v.number(),
+      subcategories: v.array(v.object({
+        id: v.string(),
+        name: v.string(),
+        amount: v.number(),
+      })),
+    })),
+  }),
+  handler: async (ctx, args) => {
+    const period = await ctx.db.get(args.periodId);
+    if (!period) throw new Error("Period not found");
+
+    const transactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_period", (q) =>
+        q.eq("churchId", period.churchId)
+         .eq("periodYear", period.year)
+         .eq("periodMonth", period.month)
+      )
+      .filter((q) => q.eq(q.field("type"), "expense"))
+      .collect();
+
+    const categories = await ctx.db
+      .query("categories")
+      .withIndex("by_church", (q) => q.eq("churchId", period.churchId))
+      .filter((q) => q.eq(q.field("type"), "expense"))
+      .collect();
+
+    const categoryLookup = new Map(categories.map(c => [c._id, c]));
+
+    const mainCategoriesMap = new Map<string, {
+      id: string;
+      name: string;
+      total: number;
+      subcategories: Map<string, { id: string; name: string; amount: number }>;
+    }>();
+
+    for (const txn of transactions) {
+      if (!txn.categoryId) continue;
+
+      const category = categoryLookup.get(txn.categoryId);
+      if (!category) continue;
+
+      let mainCategoryId: string;
+      let mainCategoryName: string;
+      let subcategoryId: string;
+      let subcategoryName: string;
+
+      if (category.isSubcategory && category.parentId) {
+        const parent = categoryLookup.get(category.parentId);
+        mainCategoryId = category.parentId;
+        mainCategoryName = parent?.name ?? "Unknown";
+        subcategoryId = category._id;
+        subcategoryName = category.name;
+      } else {
+        mainCategoryId = category._id;
+        mainCategoryName = category.name;
+        subcategoryId = category._id;
+        subcategoryName = category.name;
+      }
+
+      let mainCat = mainCategoriesMap.get(mainCategoryId);
+      if (!mainCat) {
+        mainCat = {
+          id: mainCategoryId,
+          name: mainCategoryName,
+          total: 0,
+          subcategories: new Map(),
+        };
+        mainCategoriesMap.set(mainCategoryId, mainCat);
+      }
+
+      mainCat.total += txn.amount;
+
+      let subcat = mainCat.subcategories.get(subcategoryId);
+      if (!subcat) {
+        subcat = { id: subcategoryId, name: subcategoryName, amount: 0 };
+        mainCat.subcategories.set(subcategoryId, subcat);
+      }
+      subcat.amount += txn.amount;
+    }
+
+    const totalExpenditure = transactions.reduce((sum, txn) => sum + txn.amount, 0);
+
+    return {
+      totalExpenditure,
+      mainCategories: Array.from(mainCategoriesMap.values())
+        .map(main => ({
+          ...main,
+          subcategories: Array.from(main.subcategories.values())
+            .sort((a, b) => b.amount - a.amount),
+        }))
+        .sort((a, b) => b.total - a.total),
+    };
+  },
+});
+
+export const getWeeklySummaryReport = query({
+  args: { periodId: v.id("financialPeriods") },
+  returns: v.object({
+    weeklyData: v.array(v.object({
+      weekEnding: v.string(),
+      general: v.number(),
+      restricted: v.number(),
+      total: v.number(),
+      breakdown: v.array(v.object({
+        category: v.string(),
+        amount: v.number(),
+        fundType: v.string(),
+      })),
+    })),
+    totals: v.object({
+      general: v.number(),
+      restricted: v.number(),
+      total: v.number(),
+    }),
+  }),
+  handler: async (ctx, args) => {
+    const period = await ctx.db.get(args.periodId);
+    if (!period) throw new Error("Period not found");
+
+    const transactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_period", (q) =>
+        q.eq("churchId", period.churchId)
+         .eq("periodYear", period.year)
+         .eq("periodMonth", period.month)
+      )
+      .filter((q) => q.eq(q.field("type"), "income"))
+      .collect();
+
+    const funds = await ctx.db
+      .query("funds")
+      .withIndex("by_church", (q) => q.eq("churchId", period.churchId))
+      .collect();
+
+    const categories = await ctx.db
+      .query("categories")
+      .withIndex("by_church", (q) => q.eq("churchId", period.churchId))
+      .collect();
+
+    const fundLookup = new Map(funds.map(f => [f._id, f]));
+    const categoryLookup = new Map(categories.map(c => [c._id, c]));
+
+    const weeklyMap = new Map<string, {
+      general: number;
+      restricted: number;
+      breakdown: Map<string, { category: string; amount: number; fundType: string }>;
+    }>();
+
+    for (const txn of transactions) {
+      const weekEnding = txn.weekEnding || "Unknown";
+      const fund = fundLookup.get(txn.fundId);
+      const fundType = fund?.type ?? "general";
+      const isRestricted = fundType === "restricted";
+
+      // Skip uncategorised general/designated fund income (not counted in totals)
+      if (!isRestricted && !txn.categoryId) {
+        continue;
+      }
+
+      const category = txn.categoryId ? categoryLookup.get(txn.categoryId) : undefined;
+      const categoryName = category?.name ?? fund?.name ?? "Unknown";
+
+      let week = weeklyMap.get(weekEnding);
+      if (!week) {
+        week = { general: 0, restricted: 0, breakdown: new Map() };
+        weeklyMap.set(weekEnding, week);
+      }
+
+      if (isRestricted) {
+        week.restricted += txn.amount;
+      } else {
+        week.general += txn.amount;
+      }
+
+      const key = `${categoryName}-${fundType}`;
+      let item = week.breakdown.get(key);
+      if (!item) {
+        item = { category: categoryName, amount: 0, fundType };
+        week.breakdown.set(key, item);
+      }
+      item.amount += txn.amount;
+    }
+
+    let totalGeneral = 0;
+    let totalRestricted = 0;
+
+    const weeklyData = Array.from(weeklyMap.entries())
+      .map(([weekEnding, data]) => {
+        totalGeneral += data.general;
+        totalRestricted += data.restricted;
+        return {
+          weekEnding,
+          general: data.general,
+          restricted: data.restricted,
+          total: data.general + data.restricted,
+          breakdown: Array.from(data.breakdown.values())
+            .sort((a, b) => b.amount - a.amount),
+        };
+      })
+      .sort((a, b) => a.weekEnding.localeCompare(b.weekEnding));
+
+    return {
+      weeklyData,
+      totals: {
+        general: totalGeneral,
+        restricted: totalRestricted,
+        total: totalGeneral + totalRestricted,
+      },
+    };
+  },
+});
+
+export const getPeriodOverview = query({
+  args: { periodId: v.id("financialPeriods") },
+  returns: v.object({
+    totalIncome: v.number(),
+    totalExpenditure: v.number(),
+    netPosition: v.number(),
+    fundSegregation: v.object({
+      general: v.number(),
+      restricted: v.number(),
+    }),
+    restrictedFunds: v.array(v.object({
+      fundId: v.id("funds"),
+      fundName: v.string(),
+      amount: v.number(),
+    })),
+    generalBreakdown: v.object({
+      categories: v.array(v.object({
+        categoryId: v.id("categories"),
+        categoryName: v.string(),
+        bankAmount: v.number(),
+        cashAmount: v.number(),
+        combinedTotal: v.number(),
+      })),
+      subtotal: v.object({
+        bankAmount: v.number(),
+        cashAmount: v.number(),
+        combinedTotal: v.number(),
+      }),
+    }),
+    restrictedBreakdown: v.object({
+      funds: v.array(v.object({
+        fundId: v.id("funds"),
+        fundName: v.string(),
+        bankAmount: v.number(),
+        cashAmount: v.number(),
+        combinedTotal: v.number(),
+      })),
+      subtotal: v.object({
+        bankAmount: v.number(),
+        cashAmount: v.number(),
+        combinedTotal: v.number(),
+      }),
+    }),
+  }),
+  handler: async (ctx, args) => {
+    const period = await ctx.db.get(args.periodId);
+    if (!period) throw new Error("Period not found");
+
+    const transactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_period", (q) =>
+        q.eq("churchId", period.churchId)
+         .eq("periodYear", period.year)
+         .eq("periodMonth", period.month)
+      )
+      .collect();
+
+    const funds = await ctx.db
+      .query("funds")
+      .withIndex("by_church", (q) => q.eq("churchId", period.churchId))
+      .collect();
+
+    const categories = await ctx.db
+      .query("categories")
+      .withIndex("by_church", (q) => q.eq("churchId", period.churchId))
+      .collect();
+
+    const fundLookup = new Map(funds.map(f => [f._id, f]));
+    const categoryLookup = new Map(categories.map(c => [c._id, c]));
+
+    let totalIncome = 0;
+    let totalExpenditure = 0;
+    let general = 0;
+    let restricted = 0;
+
+    // Track individual restricted fund amounts
+    const restrictedFundAmounts = new Map<Id<"funds">, number>();
+
+    // Track general fund breakdown by category (bank vs cash)
+    type CategoryBreakdown = { bankAmount: number; cashAmount: number };
+    const generalCategoryBreakdown = new Map<Id<"categories">, CategoryBreakdown>();
+    let generalSubtotalBank = 0;
+    let generalSubtotalCash = 0;
+
+    // Track restricted fund breakdown (bank vs cash)
+    type FundBreakdown = { bankAmount: number; cashAmount: number };
+    const restrictedFundBreakdown = new Map<Id<"funds">, FundBreakdown>();
+    let restrictedSubtotalBank = 0;
+    let restrictedSubtotalCash = 0;
+
+    for (const txn of transactions) {
+      if (txn.type === "income") {
+        totalIncome += txn.amount;
+      } else {
+        totalExpenditure += txn.amount;
+      }
+
+      const fund = fundLookup.get(txn.fundId);
+      const fundType = fund?.type ?? "general";
+      const isCash = txn.method?.toLowerCase() === "cash";
+      const amount = txn.amount;
+
+      // Count towards fund type - ONLY INCOME for fund segregation
+      if (fundType === "restricted") {
+        // Only count income in fund segregation
+        if (txn.type === "income") {
+          restricted += amount;
+          // Track individual restricted fund
+          const currentAmount = restrictedFundAmounts.get(txn.fundId) ?? 0;
+          restrictedFundAmounts.set(txn.fundId, currentAmount + amount);
+
+          // Track restricted fund breakdown (bank vs cash) - only income
+          const breakdown = restrictedFundBreakdown.get(txn.fundId) ?? { bankAmount: 0, cashAmount: 0 };
+          if (isCash) {
+            breakdown.cashAmount += amount;
+            restrictedSubtotalCash += amount;
+          } else {
+            breakdown.bankAmount += amount;
+            restrictedSubtotalBank += amount;
+          }
+          restrictedFundBreakdown.set(txn.fundId, breakdown);
+        }
+      } else {
+        // Only count categorised income in fund segregation
+        if (txn.type === "income" && txn.categoryId) {
+          general += amount;
+
+          // Track general fund breakdown by category
+          const breakdown = generalCategoryBreakdown.get(txn.categoryId) ?? { bankAmount: 0, cashAmount: 0 };
+          if (isCash) {
+            breakdown.cashAmount += amount;
+            generalSubtotalCash += amount;
+          } else {
+            breakdown.bankAmount += amount;
+            generalSubtotalBank += amount;
+          }
+          generalCategoryBreakdown.set(txn.categoryId, breakdown);
+        }
+      }
+    }
+
+    // Build restricted funds breakdown
+    const restrictedFunds = Array.from(restrictedFundAmounts.entries())
+      .map(([fundId, amount]) => {
+        const fund = fundLookup.get(fundId);
+        return {
+          fundId,
+          fundName: fund?.name ?? "Unknown Fund",
+          amount,
+        };
+      })
+      .sort((a, b) => b.amount - a.amount); // Sort by amount descending
+
+    // Build general breakdown
+    const generalBreakdownCategories = Array.from(generalCategoryBreakdown.entries())
+      .map(([categoryId, breakdown]) => {
+        const category = categoryLookup.get(categoryId);
+        return {
+          categoryId,
+          categoryName: category?.name ?? "Unknown Category",
+          bankAmount: breakdown.bankAmount,
+          cashAmount: breakdown.cashAmount,
+          combinedTotal: breakdown.bankAmount + breakdown.cashAmount,
+        };
+      })
+      .sort((a, b) => a.categoryName.localeCompare(b.categoryName)); // Sort by name
+
+    // Build restricted breakdown
+    const restrictedBreakdownFunds = Array.from(restrictedFundBreakdown.entries())
+      .map(([fundId, breakdown]) => {
+        const fund = fundLookup.get(fundId);
+        return {
+          fundId,
+          fundName: fund?.name ?? "Unknown Fund",
+          bankAmount: breakdown.bankAmount,
+          cashAmount: breakdown.cashAmount,
+          combinedTotal: breakdown.bankAmount + breakdown.cashAmount,
+        };
+      })
+      .sort((a, b) => a.fundName.localeCompare(b.fundName)); // Sort by name
+
+    return {
+      totalIncome,
+      totalExpenditure,
+      netPosition: totalIncome - totalExpenditure,
+      fundSegregation: {
+        general,
+        restricted,
+      },
+      restrictedFunds,
+      generalBreakdown: {
+        categories: generalBreakdownCategories,
+        subtotal: {
+          bankAmount: generalSubtotalBank,
+          cashAmount: generalSubtotalCash,
+          combinedTotal: generalSubtotalBank + generalSubtotalCash,
+        },
+      },
+      restrictedBreakdown: {
+        funds: restrictedBreakdownFunds,
+        subtotal: {
+          bankAmount: restrictedSubtotalBank,
+          cashAmount: restrictedSubtotalCash,
+          combinedTotal: restrictedSubtotalBank + restrictedSubtotalCash,
+        },
+      },
+    };
+  },
+});
+
+export const getReviewQueue = query({
+  args: { periodId: v.id("financialPeriods") },
+  returns: v.array(v.object({
+    _id: v.id("transactions"),
+    date: v.string(),
+    description: v.string(),
+    amount: v.number(),
+    type: v.union(v.literal("income"), v.literal("expense")),
+    confidence: v.optional(v.number()),
+    needsReview: v.boolean(),
+  })),
+  handler: async (ctx, args) => {
+    const period = await ctx.db.get(args.periodId);
+    if (!period) throw new Error("Period not found");
+
+    const [transactions, funds] = await Promise.all([
+      ctx.db
+        .query("transactions")
+        .withIndex("by_period", (q) =>
+          q.eq("churchId", period.churchId)
+           .eq("periodYear", period.year)
+           .eq("periodMonth", period.month)
+        )
+        .collect(),
+      ctx.db
+        .query("funds")
+        .withIndex("by_church", (q) => q.eq("churchId", period.churchId))
+        .collect(),
+    ]);
+
+    const fundLookup = new Map(funds.map(f => [f._id, f]));
+
+    // Priority 1: Uncategorised (only for general/designated funds)
+    // Priority 2: Needs review flag (low confidence)
+    const reviewQueue = transactions
+      .filter(txn => {
+        const fund = fundLookup.get(txn.fundId);
+        const fundType = fund?.type ?? "general";
+
+        // Show if explicitly flagged for review
+        if (txn.needsReview) return true;
+
+        // Show if uncategorised AND in a general/designated fund
+        // Restricted funds are tracked by fund, not category, so don't need categories
+        if (!txn.categoryId && fundType !== "restricted") return true;
+
+        return false;
+      })
+      .sort((a, b) => {
+        // Uncategorised first
+        if (!a.categoryId && b.categoryId) return -1;
+        if (a.categoryId && !b.categoryId) return 1;
+        // Then by date
+        return a.date.localeCompare(b.date);
+      })
+      .map(txn => ({
+        _id: txn._id,
+        date: txn.date,
+        description: txn.description,
+        amount: txn.amount,
+        type: txn.type,
+        confidence: undefined, // TODO: Add confidence field to transactions
+        needsReview: !txn.categoryId || txn.needsReview || false,
+      }));
+
+    return reviewQueue;
   },
 });

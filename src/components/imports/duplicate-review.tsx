@@ -21,10 +21,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, X } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Search, X, Sparkles, Check, ChevronsUpDown, Filter } from "lucide-react";
 import type { Doc, Id } from "@/lib/convexGenerated";
 import { BulkActionsBar } from "./bulk-actions-bar";
 import { BulkAssignmentDialog } from "./bulk-assignment-dialog";
+import { ConfidenceBadge, AutoDetectedIndicator } from "./confidence-badge";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -55,6 +68,7 @@ type DuplicateReviewProps = {
     }[]
   ) => void;
   onSkipSelection: (rowIds: Id<"csvRows">[]) => void;
+  onAutoApprove?: () => Promise<{approvedCount: number; skippedCount: number}>;
 };
 
 type BulkAssignmentType = "fund" | "category" | "donor";
@@ -66,6 +80,7 @@ export function DuplicateReview({
   donors,
   onApproveSelection,
   onSkipSelection,
+  onAutoApprove,
 }: DuplicateReviewProps) {
   const [checkedRows, setCheckedRows] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Record<string, { fundId: string; categoryId?: string; donorId?: string }>>({});
@@ -81,6 +96,12 @@ export function DuplicateReview({
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [confidenceFilter, setConfidenceFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [autoApproving, setAutoApproving] = useState(false);
+
+  // Popover states for searchable dropdowns (keyed by rowId_fieldType)
+  const [openPopovers, setOpenPopovers] = useState<Record<string, boolean>>({});
 
   // Filter rows based on search and filter criteria
   const filteredRows = useMemo(() => {
@@ -95,10 +116,18 @@ export function DuplicateReview({
         }
       }
 
+      // Transaction type filter
+      if (typeFilter && typeFilter !== "__all_types") {
+        const rowType = row.transactionType || (row.raw.amount >= 0 ? "income" : "expense");
+        if (rowType !== typeFilter) {
+          return false;
+        }
+      }
+
       // Category filter
       if (categoryFilter && categoryFilter !== "__all_categories") {
-        const rowConfig = selected[row._id];
-        if (rowConfig?.categoryId !== categoryFilter) {
+        const rowCategoryId = selected[row._id]?.categoryId || row.detectedCategoryId;
+        if (rowCategoryId !== categoryFilter) {
           return false;
         }
       }
@@ -108,9 +137,41 @@ export function DuplicateReview({
         return false;
       }
 
+      // Confidence filter
+      if (confidenceFilter && confidenceFilter !== "__all_confidence") {
+        const confidences: number[] = [];
+        if (row.donorConfidence !== undefined) confidences.push(row.donorConfidence);
+        if (row.categoryConfidence !== undefined) confidences.push(row.categoryConfidence);
+
+        const avgConfidence = confidences.length > 0
+          ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length
+          : 0;
+
+        if (confidenceFilter === "high" && avgConfidence < 0.95) return false;
+        if (confidenceFilter === "medium" && (avgConfidence < 0.7 || avgConfidence >= 0.95)) return false;
+        if (confidenceFilter === "low" && avgConfidence >= 0.7) return false;
+        if (confidenceFilter === "needs_review" && avgConfidence >= 0.95) return false;
+      }
+
       return true;
     });
-  }, [rows, searchQuery, categoryFilter, statusFilter, selected]);
+  }, [rows, searchQuery, categoryFilter, statusFilter, confidenceFilter, typeFilter, selected]);
+
+  // Calculate totals from filtered rows
+  const totals = useMemo(() => {
+    return filteredRows.reduce(
+      (acc, row) => {
+        const amount = Math.abs(row.raw.amount);
+        if (row.raw.amount >= 0) {
+          acc.income += amount;
+        } else {
+          acc.expense += amount;
+        }
+        return acc;
+      },
+      { income: 0, expense: 0 }
+    );
+  }, [filteredRows]);
 
   const readyRows = useMemo(
     () =>
@@ -187,6 +248,20 @@ export function DuplicateReview({
     }));
   };
 
+  // Popover state management
+  const togglePopover = (rowId: string, fieldType: "category" | "donor", open: boolean) => {
+    const key = `${rowId}_${fieldType}`;
+    setOpenPopovers((prev) => ({
+      ...prev,
+      [key]: open,
+    }));
+  };
+
+  const isPopoverOpen = (rowId: string, fieldType: "category" | "donor") => {
+    const key = `${rowId}_${fieldType}`;
+    return openPopovers[key] || false;
+  };
+
   // Bulk assignment handlers
   const handleBulkAssign = (type: BulkAssignmentType) => {
     setBulkDialogType(type);
@@ -231,14 +306,52 @@ export function DuplicateReview({
     });
   };
 
+  // Calculate high-confidence rows for auto-approval
+  const highConfidenceRows = useMemo(() => {
+    return filteredRows.filter(row => {
+      if (row.status !== "pending") return false;
+      if (!row.detectedFundId) return false;
+
+      const confidences: number[] = [];
+      if (row.donorConfidence !== undefined) confidences.push(row.donorConfidence);
+      if (row.categoryConfidence !== undefined) confidences.push(row.categoryConfidence);
+
+      if (confidences.length === 0) return false;
+
+      const avgConfidence = confidences.reduce((sum, c) => sum + c, 0) / confidences.length;
+      return avgConfidence >= 0.95;
+    });
+  }, [filteredRows]);
+
   // Helper functions for filters
   const clearFilters = () => {
     setSearchQuery("");
     setCategoryFilter("__all_categories");
     setStatusFilter("__all_status");
+    setConfidenceFilter("__all_confidence");
+    setTypeFilter("");
   };
 
-  const hasActiveFilters = searchQuery.trim() || (categoryFilter && categoryFilter !== "__all_categories") || (statusFilter && statusFilter !== "__all_status");
+  const hasActiveFilters = searchQuery.trim() ||
+    (categoryFilter && categoryFilter !== "__all_categories") ||
+    (statusFilter && statusFilter !== "__all_status") ||
+    (confidenceFilter && confidenceFilter !== "__all_confidence") ||
+    (typeFilter && typeFilter !== "__all_types");
+
+  const handleAutoApprove = async () => {
+    if (!onAutoApprove) return;
+
+    setAutoApproving(true);
+    try {
+      const result = await onAutoApprove();
+      // Optionally show success message via parent component
+      console.log(`Auto-approved ${result.approvedCount} rows, ${result.skippedCount} require review`);
+    } catch (error) {
+      console.error("Auto-approve failed:", error);
+    } finally {
+      setAutoApproving(false);
+    }
+  };
 
   const allAvailableRows = filteredRows.filter((row) => row.status !== "skipped" && row.status !== "approved");
   const isAllSelected = allAvailableRows.length > 0 && allAvailableRows.every((row) => checkedRows.has(row._id));
@@ -259,96 +372,130 @@ export function DuplicateReview({
       )}
 
       {/* Filter Controls */}
-      <div className="flex flex-col gap-4 rounded-md border border-ledger bg-paper p-4">
-        <div className="flex flex-wrap gap-4">
-          {/* Search Input */}
-          <div className="relative flex-1 min-w-64">
+      <div className="space-y-4 rounded-md border border-ledger bg-paper p-4">
+        {/* Stats and Search Row */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-grey-mid">
+            <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
+              {filteredRows.length} of {rows.length} entries
+            </Badge>
+            <Badge variant="secondary" className="border-ledger bg-highlight text-success">
+              Income {currency.format(totals.income)}
+            </Badge>
+            <Badge variant="secondary" className="border-ledger bg-highlight text-error">
+              Expenses {currency.format(totals.expense)}
+            </Badge>
+            <span className="text-xs text-grey-mid">
+              Net {currency.format(totals.income - totals.expense)}
+            </span>
+          </div>
+          <div className="relative w-full sm:w-auto sm:min-w-[300px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-grey-mid" />
             <Input
-              placeholder="Search descriptions or references..."
+              type="text"
+              placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 font-primary border-ledger bg-paper text-ink"
+              className="pl-9 pr-9 font-primary"
             />
+            {searchQuery ? (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-mid hover:text-ink"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Filters Row */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-grey-mid" />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant={!typeFilter || typeFilter === "__all_types" ? "default" : "outline"}
+                onClick={() => setTypeFilter("")}
+                className="h-7 text-xs"
+              >
+                All
+              </Button>
+              <Button
+                size="sm"
+                variant={typeFilter === "income" ? "default" : "outline"}
+                onClick={() => setTypeFilter("income")}
+                className="h-7 text-xs"
+              >
+                Income
+              </Button>
+              <Button
+                size="sm"
+                variant={typeFilter === "expense" ? "default" : "outline"}
+                onClick={() => setTypeFilter("expense")}
+                className="h-7 text-xs"
+              >
+                Expense
+              </Button>
+            </div>
           </div>
 
           {/* Category Filter */}
-          <div className="min-w-48">
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="font-primary border-ledger bg-paper text-ink">
-                <SelectValue placeholder="All categories" />
-              </SelectTrigger>
-              <SelectContent className="font-primary">
-                <SelectItem value="__all_categories">All categories</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category._id} value={category._id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="font-primary border-ledger bg-paper text-ink h-7 w-[140px] text-xs py-0 px-3">
+              <SelectValue placeholder="Categories" />
+            </SelectTrigger>
+            <SelectContent className="font-primary">
+              <SelectItem value="__all_categories">Category</SelectItem>
+              {categories.map((category) => (
+                <SelectItem key={category._id} value={category._id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           {/* Status Filter */}
-          <div className="min-w-32">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="font-primary border-ledger bg-paper text-ink">
-                <SelectValue placeholder="All status" />
-              </SelectTrigger>
-              <SelectContent className="font-primary">
-                <SelectItem value="__all_status">All status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="duplicate">Duplicate</SelectItem>
-                <SelectItem value="ready">Ready</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="skipped">Skipped</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="font-primary border-ledger bg-paper text-ink h-7 w-[130px] text-xs py-0 px-3">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent className="font-primary">
+              <SelectItem value="__all_status">Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="duplicate">Duplicate</SelectItem>
+              <SelectItem value="ready">Ready</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="skipped">Skipped</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Confidence Filter */}
+          <Select value={confidenceFilter} onValueChange={setConfidenceFilter}>
+            <SelectTrigger className="font-primary border-ledger bg-paper text-ink h-7 w-[150px] text-xs py-0 px-3">
+              <SelectValue placeholder="Confidence" />
+            </SelectTrigger>
+            <SelectContent className="font-primary">
+              <SelectItem value="__all_confidence">Confidence</SelectItem>
+              <SelectItem value="high">High (≥95%)</SelectItem>
+              <SelectItem value="medium">Medium (70-94%)</SelectItem>
+              <SelectItem value="low">Low (&lt;70%)</SelectItem>
+              <SelectItem value="needs_review">Needs Review</SelectItem>
+            </SelectContent>
+          </Select>
 
           {/* Clear Filters Button */}
           {hasActiveFilters && (
             <Button
-              variant="outline"
+              variant="ghost"
+              size="sm"
               onClick={clearFilters}
-              className="border-ledger text-ink hover:bg-highlight"
+              className="h-7 text-xs text-grey-mid hover:text-ink"
             >
-              <X className="h-4 w-4 mr-2" />
-              Clear filters
+              <X className="h-3.5 w-3.5 mr-1" />
+              Clear
             </Button>
-          )}
-        </div>
-
-        {/* Filter Results Summary */}
-        <div className="flex items-center justify-between text-sm text-grey-mid">
-          <span>
-            Showing {filteredRows.length} of {rows.length} transactions
-            {hasActiveFilters && (
-              <span className="ml-2">
-                • {checkedRowsArray.length} selected • {readyRows.length} ready to approve
-              </span>
-            )}
-          </span>
-
-          {/* Active Filter Badges */}
-          {hasActiveFilters && (
-            <div className="flex gap-2">
-              {searchQuery.trim() && (
-                <Badge variant="outline" className="border-ledger text-ink">
-                  Search: &ldquo;{searchQuery}&rdquo;
-                </Badge>
-              )}
-              {categoryFilter && (
-                <Badge variant="outline" className="border-ledger text-ink">
-                  Category: {categories.find(c => c._id === categoryFilter)?.name}
-                </Badge>
-              )}
-              {statusFilter && (
-                <Badge variant="outline" className="border-ledger text-ink">
-                  Status: {statusFilter}
-                </Badge>
-              )}
-            </div>
           )}
         </div>
       </div>
@@ -401,28 +548,32 @@ export function DuplicateReview({
                     ) : null}
                   </div>
                 </TableCell>
-                <TableCell className={`text-right font-mono ${row.raw.amount >= 0 ? "text-success" : "text-error"}`}>
-                  {currency.format(Math.abs(row.raw.amount))}
+                <TableCell className="text-right">
+                  <span className={`font-mono ${row.raw.amount >= 0 ? "text-success" : "text-error"}`}>
+                    {currency.format(Math.abs(row.raw.amount))}
+                  </span>
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col gap-1">
                     {funds.length > 0 ? (
-                      <select
-                        value={config.fundId}
-                        className={`h-8 rounded-md border px-2 text-sm ${
-                          bulkAssignments.fund.has(row._id)
-                            ? "border-ink bg-highlight font-medium"
-                            : "border-ledger bg-paper"
-                        }`}
-                        onChange={(event) => updateSelection(row._id, "fundId", event.target.value)}
-                        disabled={isProcessed}
-                      >
-                        {funds.map((fund) => (
-                          <option key={fund._id} value={fund._id}>
-                            {fund.name}
-                          </option>
-                        ))}
-                      </select>
+                      <>
+                        <select
+                          value={config.fundId || row.detectedFundId || funds[0]?._id}
+                          className={`h-8 rounded-md border px-2 text-sm ${
+                            bulkAssignments.fund.has(row._id)
+                              ? "border-ink bg-highlight font-medium"
+                              : "border-ledger bg-paper"
+                          }`}
+                          onChange={(event) => updateSelection(row._id, "fundId", event.target.value)}
+                          disabled={isProcessed}
+                        >
+                          {funds.map((fund) => (
+                            <option key={fund._id} value={fund._id}>
+                              {fund.name}
+                            </option>
+                          ))}
+                        </select>
+                      </>
                     ) : (
                       <span className="text-sm text-error">No funds available</span>
                     )}
@@ -435,23 +586,83 @@ export function DuplicateReview({
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col gap-1">
-                    <select
-                      value={config.categoryId ?? ""}
-                      className={`h-8 rounded-md border px-2 text-sm ${
-                        bulkAssignments.category.has(row._id)
-                          ? "border-ink bg-highlight font-medium"
-                          : "border-ledger bg-paper"
-                      }`}
-                      onChange={(event) => updateSelection(row._id, "categoryId", event.target.value)}
-                      disabled={isProcessed}
-                    >
-                      <option value="">Auto-detect</option>
-                      {categories.map((category) => (
-                        <option key={category._id} value={category._id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
+                    {(() => {
+                      // Only use detected category if it matches the transaction type
+                      const rowTransactionType = row.transactionType || (row.raw.amount >= 0 ? "income" : "expense");
+                      const validDetectedCategoryId = row.detectedCategoryId &&
+                        categories.some(c =>
+                          c._id === row.detectedCategoryId &&
+                          c.type === rowTransactionType
+                        ) ? row.detectedCategoryId : undefined;
+
+                      const currentValue = config.categoryId ?? validDetectedCategoryId ?? "";
+                      const filteredCategories = categories.filter(category => category.type === rowTransactionType);
+                      const selectedCategory = filteredCategories.find(c => c._id === currentValue);
+
+                      return (
+                        <Popover
+                          open={isPopoverOpen(row._id, "category")}
+                          onOpenChange={(open) => togglePopover(row._id, "category", open)}
+                        >
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              disabled={isProcessed}
+                              className={`h-8 w-full justify-between text-sm font-normal ${
+                                bulkAssignments.category.has(row._id)
+                                  ? "border-ink bg-highlight font-medium"
+                                  : "border-ledger bg-paper"
+                              }`}
+                            >
+                              <span className="truncate">
+                                {selectedCategory ? selectedCategory.name : "Auto-detect"}
+                              </span>
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[300px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search categories..." className="h-9" />
+                              <CommandEmpty>No category found.</CommandEmpty>
+                              <CommandGroup className="max-h-64 overflow-auto">
+                                <CommandItem
+                                  value="auto-detect"
+                                  onSelect={() => {
+                                    updateSelection(row._id, "categoryId", "");
+                                    togglePopover(row._id, "category", false);
+                                  }}
+                                >
+                                  <Check
+                                    className={`mr-2 h-4 w-4 ${
+                                      !currentValue ? "opacity-100" : "opacity-0"
+                                    }`}
+                                  />
+                                  Auto-detect
+                                </CommandItem>
+                                {filteredCategories.map((category) => (
+                                  <CommandItem
+                                    key={category._id}
+                                    value={category.name}
+                                    onSelect={() => {
+                                      updateSelection(row._id, "categoryId", category._id);
+                                      togglePopover(row._id, "category", false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${
+                                        currentValue === category._id ? "opacity-100" : "opacity-0"
+                                      }`}
+                                    />
+                                    {category.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      );
+                    })()}
                     {bulkAssignments.category.has(row._id) && (
                       <Badge variant="outline" className="border-ink text-xs text-ink w-fit">
                         Bulk assigned
@@ -461,23 +672,81 @@ export function DuplicateReview({
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col gap-1">
-                    <select
-                      value={config.donorId ?? ""}
-                      className={`h-8 rounded-md border px-2 text-sm ${
-                        bulkAssignments.donor.has(row._id)
-                          ? "border-ink bg-highlight font-medium"
-                          : "border-ledger bg-paper"
-                      }`}
-                      onChange={(event) => updateSelection(row._id, "donorId", event.target.value)}
-                      disabled={isProcessed}
-                    >
-                      <option value="">No donor</option>
-                      {donors.map((donor) => (
-                        <option key={donor._id} value={donor._id}>
-                          {donor.name}
-                        </option>
-                      ))}
-                    </select>
+                    {(() => {
+                      const currentValue = config.donorId ?? row.detectedDonorId ?? "";
+                      const selectedDonor = donors.find(d => d._id === currentValue);
+
+                      return (
+                        <Popover
+                          open={isPopoverOpen(row._id, "donor")}
+                          onOpenChange={(open) => togglePopover(row._id, "donor", open)}
+                        >
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              disabled={isProcessed}
+                              className={`h-8 w-full justify-between text-sm font-normal ${
+                                bulkAssignments.donor.has(row._id)
+                                  ? "border-ink bg-highlight font-medium"
+                                  : "border-ledger bg-paper"
+                              }`}
+                            >
+                              <span className="truncate">
+                                {selectedDonor ? selectedDonor.name : "No donor"}
+                              </span>
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[300px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search donors..." className="h-9" />
+                              <CommandEmpty>No donor found.</CommandEmpty>
+                              <CommandGroup className="max-h-64 overflow-auto">
+                                <CommandItem
+                                  value="no-donor"
+                                  onSelect={() => {
+                                    updateSelection(row._id, "donorId", "");
+                                    togglePopover(row._id, "donor", false);
+                                  }}
+                                >
+                                  <Check
+                                    className={`mr-2 h-4 w-4 ${
+                                      !currentValue ? "opacity-100" : "opacity-0"
+                                    }`}
+                                  />
+                                  No donor
+                                </CommandItem>
+                                {donors.map((donor) => (
+                                  <CommandItem
+                                    key={donor._id}
+                                    value={donor.name}
+                                    onSelect={() => {
+                                      updateSelection(row._id, "donorId", donor._id);
+                                      togglePopover(row._id, "donor", false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${
+                                        currentValue === donor._id ? "opacity-100" : "opacity-0"
+                                      }`}
+                                    />
+                                    {donor.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      );
+                    })()}
+                    {row.detectedDonorId && row.donorConfidence !== undefined && (
+                      <ConfidenceBadge
+                        confidence={row.donorConfidence}
+                        source="keyword"
+                        showPercentage={true}
+                      />
+                    )}
                     {bulkAssignments.donor.has(row._id) && (
                       <Badge variant="outline" className="border-ink text-xs text-ink w-fit">
                         Bulk assigned
@@ -514,8 +783,24 @@ export function DuplicateReview({
         <div className="text-sm text-grey-mid">
           {checkedRowsArray.length} row{checkedRowsArray.length !== 1 ? "s" : ""} selected
           {hasActiveFilters && ` (from ${filteredRows.length} filtered)`}
+          {highConfidenceRows.length > 0 && (
+            <span className="ml-2 text-success">
+              • {highConfidenceRows.length} high confidence
+            </span>
+          )}
         </div>
         <div className="flex gap-2">
+          {onAutoApprove && highConfidenceRows.length > 0 && (
+            <Button
+              variant="outline"
+              className="border-success text-success hover:bg-success/10"
+              disabled={autoApproving || funds.length === 0}
+              onClick={handleAutoApprove}
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              {autoApproving ? "Auto-approving..." : `Auto-Approve High Confidence (${highConfidenceRows.length})`}
+            </Button>
+          )}
           <Button
             variant="outline"
             className="border-ledger"

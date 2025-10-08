@@ -107,11 +107,121 @@ export const updateChurchSettings = mutation({
       fiscalYearEnd: v.string(),
       giftAidEnabled: v.boolean(),
       defaultCurrency: v.string(),
+      defaultFundId: v.optional(v.id("funds")),
+      autoApproveThreshold: v.optional(v.number()),
+      enableAiCategorization: v.optional(v.boolean()),
     }),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.churchId, {
       settings: args.settings,
     });
+  },
+});
+
+// Set default fund for import automation
+export const setDefaultFund = mutation({
+  args: {
+    churchId: v.id("churches"),
+    fundId: v.id("funds"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const church = await ctx.db.get(args.churchId);
+    if (!church) {
+      throw new Error("Church not found");
+    }
+
+    await ctx.db.patch(args.churchId, {
+      settings: {
+        ...church.settings,
+        defaultFundId: args.fundId,
+      },
+    });
+    return null;
+  },
+});
+
+// Set auto-approve threshold
+export const setAutoApproveThreshold = mutation({
+  args: {
+    churchId: v.id("churches"),
+    threshold: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const church = await ctx.db.get(args.churchId);
+    if (!church) {
+      throw new Error("Church not found");
+    }
+
+    await ctx.db.patch(args.churchId, {
+      settings: {
+        ...church.settings,
+        autoApproveThreshold: args.threshold,
+      },
+    });
+    return null;
+  },
+});
+
+// Toggle AI categorization
+export const setEnableAiCategorization = mutation({
+  args: {
+    churchId: v.id("churches"),
+    enabled: v.boolean(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const church = await ctx.db.get(args.churchId);
+    if (!church) {
+      throw new Error("Church not found");
+    }
+
+    await ctx.db.patch(args.churchId, {
+      settings: {
+        ...church.settings,
+        enableAiCategorization: args.enabled,
+      },
+    });
+    return null;
+  },
+});
+
+// Get default fund (or first general fund as fallback)
+export const getDefaultFund = query({
+  args: { churchId: v.id("churches") },
+  returns: v.union(v.object({
+    _id: v.id("funds"),
+    churchId: v.id("churches"),
+    name: v.string(),
+    type: v.union(v.literal("general"), v.literal("restricted"), v.literal("designated")),
+    balance: v.number(),
+    description: v.optional(v.string()),
+    restrictions: v.optional(v.string()),
+    isFundraising: v.boolean(),
+    fundraisingTarget: v.optional(v.number()),
+    isActive: v.boolean(),
+    _creationTime: v.number(),
+  }), v.null()),
+  handler: async (ctx, args) => {
+    const church = await ctx.db.get(args.churchId);
+
+    // Return configured default fund
+    if (church?.settings.defaultFundId) {
+      const defaultFund = await ctx.db.get(church.settings.defaultFundId);
+      if (defaultFund) return defaultFund;
+    }
+
+    // Fallback to first general fund
+    const generalFund = await ctx.db
+      .query("funds")
+      .withIndex("by_type", (q) =>
+        q.eq("churchId", args.churchId).eq("type", "general")
+      )
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .first();
+
+    return generalFund || null;
   },
 });
