@@ -16,7 +16,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { api, type Id } from "@/lib/convexGenerated";
-import { cn } from "@/lib/utils";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",

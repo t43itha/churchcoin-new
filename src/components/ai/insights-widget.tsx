@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactElement } from "react";
 import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import {
@@ -89,7 +90,7 @@ export function InsightsWidget({ churchId }: InsightsWidgetProps) {
   );
 
   const renderQuickActions = (insight: (typeof activeInsights)[number]) => {
-    const actions = [] as Array<JSX.Element>;
+    const actions: ReactElement[] = [];
     if (insight.actionable && insight.actionUrl) {
       actions.push(
         <Link key="view" href={insight.actionUrl}>
