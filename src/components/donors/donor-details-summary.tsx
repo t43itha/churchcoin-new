@@ -19,6 +19,17 @@ const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
 });
 
+function formatDateSafe(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return dateFormatter.format(parsed);
+}
+
 type DonorDetailsSummaryProps = {
   donor: Doc<"donors">;
   givingTotals: {
@@ -39,6 +50,9 @@ export function DonorDetailsSummary({
   onArchive,
   onGenerateStatement,
 }: DonorDetailsSummaryProps) {
+  const formattedGiftAidDate = formatDateSafe(donor.giftAidDeclaration?.date);
+  const formattedLastGiftDate = formatDateSafe(givingTotals.lastGiftDate);
+
   return (
     <div className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-ledger bg-paper px-4 py-3">
@@ -54,9 +68,9 @@ export function DonorDetailsSummary({
               </Badge>
             ) : null}
           </div>
-          {givingTotals.lastGiftDate ? (
+          {formattedLastGiftDate ? (
             <p className="text-xs text-grey-mid">
-              Last gift on {dateFormatter.format(new Date(givingTotals.lastGiftDate))}
+              Last gift on {formattedLastGiftDate}
             </p>
           ) : (
             <p className="text-xs text-grey-mid">No gifts recorded yet</p>
@@ -118,9 +132,7 @@ export function DonorDetailsSummary({
             <div className="flex items-center justify-between">
               <span>Declaration date</span>
               <span className="font-medium text-ink">
-                {donor.giftAidDeclaration?.date
-                  ? dateFormatter.format(new Date(donor.giftAidDeclaration.date))
-                  : "—"}
+                {formattedGiftAidDate ?? "—"}
               </span>
             </div>
             <p className="text-xs text-grey-mid">
@@ -139,7 +151,7 @@ export function DonorDetailsSummary({
         />
         <SummaryTile
           label="Last gift"
-          value={givingTotals.lastGiftDate ? dateFormatter.format(new Date(givingTotals.lastGiftDate)) : "—"}
+          value={formattedLastGiftDate ?? "—"}
         />
       </div>
 
