@@ -12,6 +12,10 @@ export default defineSchema({
       fiscalYearEnd: v.string(),
       giftAidEnabled: v.boolean(),
       defaultCurrency: v.string(),
+      // Import automation settings
+      defaultFundId: v.optional(v.id("funds")),
+      autoApproveThreshold: v.optional(v.number()), // 0-1, default 0.95
+      enableAiCategorization: v.optional(v.boolean()), // default true
     }),
   }),
 
@@ -51,6 +55,33 @@ export default defineSchema({
     .index("by_church", ["churchId"])
     .index("by_fund", ["fundId"])
     .index("by_donor", ["donorId"]),
+
+  // Financial Periods
+  financialPeriods: defineTable({
+    churchId: v.id("churches"),
+    month: v.number(), // 1-12
+    year: v.number(),
+    periodName: v.string(), // "September 2025"
+    status: v.union(
+      v.literal("draft"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("overdue")
+    ),
+    periodStart: v.string(), // ISO date
+    periodEnd: v.string(), // ISO date
+    bankTransactionCount: v.number(),
+    cashRecordsCount: v.number(),
+    categorizedCount: v.number(),
+    reviewedCount: v.number(),
+    needsReviewCount: v.number(),
+    bankUploadedAt: v.optional(v.number()),
+    cashEnteredAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_church", ["churchId"])
+    .index("by_church_period", ["churchId", "year", "month"])
+    .index("by_status", ["churchId", "status"]),
 
   // Transactions
   transactions: defineTable({
@@ -144,12 +175,13 @@ export default defineSchema({
       reference: v.optional(v.string()),
       type: v.optional(v.string()),
     }),
+    // Auto-detection fields
+    detectedFundId: v.optional(v.id("funds")),
     detectedDonorId: v.optional(v.id("donors")),
     donorConfidence: v.optional(v.number()),
-    detectedFundId: v.optional(v.id("funds")),
     detectedCategoryId: v.optional(v.id("categories")),
     categoryConfidence: v.optional(v.number()),
-    categorySource: v.optional(v.string()),
+    categorySource: v.optional(v.string()), // "keyword" | "ai" | "feedback" | "manual"
     transactionType: v.optional(v.union(v.literal("income"), v.literal("expense"))),
     duplicateOf: v.optional(v.id("transactions")),
     status: v.union(
@@ -228,10 +260,12 @@ export default defineSchema({
     categoryId: v.id("categories"), // Links to subcategory only
     keyword: v.string(),
     isActive: v.boolean(),
+    categoryType: v.optional(v.union(v.literal("income"), v.literal("expense"))), // Denormalized for performance
   })
     .index("by_church", ["churchId"])
     .index("by_category", ["categoryId"])
-    .index("by_keyword", ["churchId", "keyword"]),
+    .index("by_keyword", ["churchId", "keyword"])
+    .index("by_church_type", ["churchId", "categoryType"]),
 
   // Donors
   donors: defineTable({

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { ArrowRight, Layers, NotebookPen } from "lucide-react";
+import { ArrowRight, Layers, Sparkles } from "lucide-react";
 
 import { CsvUploadCard } from "@/components/imports/csv-upload-card";
 import {
@@ -44,10 +44,10 @@ export default function ImportsPage() {
   const imports = useQuery(api.imports.listImports, churchId ? { churchId } : "skip");
   const rows = useQuery(api.imports.getImportRows, activeImportId ? { importId: activeImportId } : "skip");
 
-  const createImport = useMutation(api.imports.createCsvImport);
-  const saveRows = useMutation(api.imports.saveCsvRows);
+  const createImportWithRows = useMutation(api.imports.createImportWithRows);
   const skipRows = useMutation(api.imports.skipRows);
   const approveRows = useMutation(api.imports.approveRows);
+  const autoApproveRows = useMutation(api.imports.autoApproveRows);
 
   useEffect(() => {
     if (!churchId && churches && churches.length > 0) {
@@ -97,49 +97,53 @@ export default function ImportsPage() {
       return;
     }
 
-    setStatusMessage("Saving import and queuing rows…");
+    setStatusMessage("Processing import and detecting duplicates…");
 
-    const importId = await createImport({
-      churchId,
-      filename: parsedFile.filename,
-      bankFormat: parsedFile.bankFormat,
-      mapping,
-      rowCount: parsedRows.length,
-    });
+    try {
+      // Map rows locally
+      const mappedRows = parsedRows.map((row) => {
+        let amount = 0;
 
-    const mappedRows = parsedRows.map((row) => {
-      let amount = 0;
+        // Handle Metro Bank dual amount columns
+        if (mapping.amountIn && mapping.amountOut) {
+          const amountIn = Number(row[mapping.amountIn]) || 0;
+          const amountOut = Number(row[mapping.amountOut]) || 0;
 
-      // Handle Metro Bank dual amount columns
-      if (mapping.amountIn && mapping.amountOut) {
-        const amountIn = Number(row[mapping.amountIn]) || 0;
-        const amountOut = Number(row[mapping.amountOut]) || 0;
+          // Income is positive, expense is negative
+          amount = amountIn - amountOut;
+        } else {
+          // Handle single amount column
+          const rawAmount = Number(row[mapping.amount]);
+          amount = Number.isNaN(rawAmount) ? 0 : rawAmount;
+        }
 
-        // Income is positive, expense is negative
-        amount = amountIn - amountOut;
-      } else {
-        // Handle single amount column
-        const rawAmount = Number(row[mapping.amount]);
-        amount = Number.isNaN(rawAmount) ? 0 : rawAmount;
-      }
+        return {
+          date: normalizeCsvDate(row[mapping.date]),
+          description: String(row[mapping.description] ?? ""),
+          amount,
+          reference: mapping.reference ? String(row[mapping.reference] ?? "") : undefined,
+          type: mapping.type ? String(row[mapping.type] ?? "") : undefined,
+        };
+      });
 
-      return {
-        date: normalizeCsvDate(row[mapping.date]),
-        description: String(row[mapping.description] ?? ""),
-        amount,
-        reference: mapping.reference ? String(row[mapping.reference] ?? "") : undefined,
-        type: mapping.type ? String(row[mapping.type] ?? "") : undefined,
-      };
-    });
+      // Single atomic mutation - creates import AND saves all rows
+      const importId = await createImportWithRows({
+        churchId,
+        filename: parsedFile.filename,
+        bankFormat: parsedFile.bankFormat,
+        mapping,
+        rows: mappedRows,
+      });
 
-    await saveRows({
-      importId,
-      rows: mappedRows,
-    });
-
-    setActiveImportId(importId);
-    setParsedRows([]);
-    setStatusMessage(`Saved ${parsedRows.length} rows. Review duplicates below before approving.`);
+      setActiveImportId(importId);
+      setParsedRows([]);
+      setStatusMessage(`Saved ${mappedRows.length} rows. Review duplicates below before approving.`);
+    } catch (error) {
+      setStatusMessage(
+        `Failed to save import: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+      console.error("Import error:", error);
+    }
   };
 
   const handleApproveSelection = async (
@@ -165,6 +169,23 @@ export default function ImportsPage() {
   const handleSkipSelection = async (rowIds: Id<"csvRows">[]) => {
     await skipRows({ rowIds });
     setStatusMessage(`Skipped ${rowIds.length} rows.`);
+  };
+
+  const handleAutoApprove = async () => {
+    if (!churchId || !activeImportId) {
+      return { approvedCount: 0, skippedCount: 0 };
+    }
+
+    const result = await autoApproveRows({
+      importId: activeImportId,
+      churchId,
+    });
+
+    setStatusMessage(
+      `Auto-approved ${result.approvedCount} high-confidence rows. ${result.skippedCount} require manual review.`
+    );
+
+    return result;
   };
 
   const latestRows = rows ?? [];
@@ -206,8 +227,8 @@ export default function ImportsPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs text-grey-mid">
-            <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
-              <NotebookPen className="mr-1 h-3 w-3" /> AI categorisation hooks up in iteration 5
+            <Badge variant="secondary" className="border-success/40 bg-success/10 text-success">
+              <Sparkles className="mr-1 h-3 w-3" /> AI auto-detection active
             </Badge>
             <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
               <ArrowRight className="mr-1 h-3 w-3" /> Import history stored for audit
@@ -240,6 +261,7 @@ export default function ImportsPage() {
                 donors={donors as Doc<"donors">[]}
                 onApproveSelection={handleApproveSelection}
                 onSkipSelection={handleSkipSelection}
+                onAutoApprove={handleAutoApprove}
               />
             ) : null}
           </div>

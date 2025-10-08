@@ -156,6 +156,7 @@ export const addKeywordToSubcategory = mutation({
       categoryId: args.categoryId,
       keyword: args.keyword.toLowerCase().trim(),
       isActive: true,
+      categoryType: category.type, // Denormalized for performance
     });
   },
 });
@@ -738,6 +739,7 @@ export const seedCategories = mutation({
       categoryId: tithesId,
       keyword: "tithe",
       isActive: true,
+      categoryType: "income",
     });
 
     await ctx.db.insert("categoryKeywords", {
@@ -745,6 +747,7 @@ export const seedCategories = mutation({
       categoryId: tithesId,
       keyword: "tithing",
       isActive: true,
+      categoryType: "income",
     });
 
     await ctx.db.insert("categoryKeywords", {
@@ -752,6 +755,7 @@ export const seedCategories = mutation({
       categoryId: tithesId,
       keyword: "thithe",
       isActive: true,
+      categoryType: "income",
     });
 
     await ctx.db.insert("categoryKeywords", {
@@ -759,6 +763,7 @@ export const seedCategories = mutation({
       categoryId: thanksgivingId,
       keyword: "thanks",
       isActive: true,
+      categoryType: "income",
     });
 
     await ctx.db.insert("categoryKeywords", {
@@ -766,6 +771,7 @@ export const seedCategories = mutation({
       categoryId: thanksgivingId,
       keyword: "thanksgiving",
       isActive: true,
+      categoryType: "income",
     });
 
     await ctx.db.insert("categoryKeywords", {
@@ -773,6 +779,7 @@ export const seedCategories = mutation({
       categoryId: thanksgivingId,
       keyword: "thx",
       isActive: true,
+      categoryType: "income",
     });
 
     await ctx.db.insert("categoryKeywords", {
@@ -780,6 +787,7 @@ export const seedCategories = mutation({
       categoryId: offeringsId,
       keyword: "pledge",
       isActive: true,
+      categoryType: "income",
     });
 
     await ctx.db.insert("categoryKeywords", {
@@ -787,6 +795,7 @@ export const seedCategories = mutation({
       categoryId: offeringsId,
       keyword: "offering",
       isActive: true,
+      categoryType: "income",
     });
 
     await ctx.db.insert("categoryKeywords", {
@@ -794,6 +803,7 @@ export const seedCategories = mutation({
       categoryId: offeringsId,
       keyword: "seed",
       isActive: true,
+      categoryType: "income",
     });
 
     await ctx.db.insert("categoryKeywords", {
@@ -801,6 +811,7 @@ export const seedCategories = mutation({
       categoryId: offeringsId,
       keyword: "sacrifice",
       isActive: true,
+      categoryType: "income",
     });
 
     console.log("Categories seeded successfully");
