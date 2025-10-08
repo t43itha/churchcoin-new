@@ -14,6 +14,22 @@ const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
 });
 
+/**
+ * Safely format a date string, returning a fallback if invalid
+ */
+function formatDateSafe(dateString: string): string {
+  if (!dateString || dateString.trim() === "") {
+    return "—";
+  }
+
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return dateFormatter.format(date);
+}
+
 type HistoryEntry = {
   date: string;
   fundName: string | null;
@@ -62,7 +78,7 @@ export function GivingHistoryLedger({ history, className }: GivingHistoryLedgerP
           {history.map((entry) => (
             <tr key={entry.transactionId} className="border-t border-ledger/70 text-sm text-ink hover:bg-highlight/40">
               <td className="px-4 py-3 font-mono text-xs text-grey-mid">
-                {dateFormatter.format(new Date(entry.date))}
+                {formatDateSafe(entry.date)}
               </td>
               <td className="px-4 py-3 text-sm">{entry.fundName ?? "—"}</td>
               <td className="px-4 py-3 text-right font-medium text-success">
