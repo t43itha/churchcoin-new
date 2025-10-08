@@ -58,7 +58,7 @@ const donorFormSchema = z
     },
   );
 
-type DonorFormValues = z.input<typeof donorFormSchema>;
+type DonorFormValues = z.infer<typeof donorFormSchema>;
 
 type DonorFormDialogProps = {
   donor?: Doc<"donors"> | null;
