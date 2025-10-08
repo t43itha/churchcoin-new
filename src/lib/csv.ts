@@ -41,7 +41,7 @@ const daysInMonth = (month: number, year: number) => {
 };
 
 const formatDateParts = (year: number, month: number, day: number) =>
-  `${pad(day)}/${pad(month)}/${year.toString().padStart(4, "0")}`;
+  `${year.toString().padStart(4, "0")}-${pad(month)}-${pad(day)}`;
 
 const isValidDateParts = (year: number, month: number, day: number) => {
   if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {

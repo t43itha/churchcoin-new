@@ -11,6 +11,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { formatUkDateWithMonth } from "@/lib/dates";
 
 import {
   Table,
@@ -47,12 +48,6 @@ import { ConfidenceBadge } from "./confidence-badge";
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
   currency: "GBP",
-});
-
-const dateFormatter = new Intl.DateTimeFormat("en-GB", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
 });
 
 type CsvRow = Doc<"csvRows">;
@@ -748,7 +743,7 @@ export function DuplicateReview({
                       />
                     </TableCell>
                     <TableCell className="font-mono text-xs text-grey-mid">
-                      {formatDate(row.raw.date)}
+                      {formatUkDateWithMonth(row.raw.date) || "—"}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
@@ -756,9 +751,9 @@ export function DuplicateReview({
                           <span className="text-sm font-medium text-ink">{row.raw.description}</span>
                           <RowStatusBadge status={row.status} />
                         </div>
-                        {row.duplicateMatches && row.duplicateMatches.length > 0 ? (
+                        {row.duplicateOf ? (
                           <p className="text-xs text-error">
-                            Potential duplicate detected ({row.duplicateMatches.length})
+                            Potential duplicate detected
                           </p>
                         ) : null}
                         {row.raw.reference ? (
@@ -1096,11 +1091,3 @@ function RowStatusBadge({ status }: { status: RowStatus }) {
   );
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return dateFormatter.format(date);
-}

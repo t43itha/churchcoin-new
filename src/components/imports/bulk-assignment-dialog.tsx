@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { Doc, Id } from "@/lib/convexGenerated";
+import { formatUkDateWithMonth } from "@/lib/dates";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -205,7 +206,7 @@ export function BulkAssignmentDialog({
                       <span className="font-medium text-ink truncate">
                         {row.raw.description}
                       </span>
-                      <span className="text-xs text-grey-mid">{row.raw.date}</span>
+                      <span className="text-xs text-grey-mid">{formatUkDateWithMonth(row.raw.date) || "—"}</span>
                     </div>
                     <span
                       className={`font-mono flex-shrink-0 ${

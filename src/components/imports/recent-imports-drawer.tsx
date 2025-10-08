@@ -27,10 +27,11 @@ import type { Doc, Id } from "@/lib/convexGenerated";
 import { formatUkDateTime } from "@/lib/dates";
 
 const statusLabels: Record<Doc<"csvImports">["status"], string> = {
-  pending: "In progress",
+  uploaded: "Uploaded",
+  mapping: "Mapping",
   processing: "Processing",
-  ready: "Ready",
-  complete: "Complete",
+  completed: "Complete",
+  failed: "Failed",
 };
 
 type RecentImportsDrawerProps = {
@@ -126,8 +127,10 @@ export function RecentImportsDrawer({ imports, activeImportId, onSelect, onDelet
                     <Badge
                       variant="secondary"
                       className={`${
-                        record.status === "complete"
+                        record.status === "completed"
                           ? "border-success/40 bg-success/10 text-success"
+                          : record.status === "failed"
+                          ? "border-error/40 bg-error/10 text-error"
                           : "border-ledger bg-highlight text-ink"
                       }`}
                     >
