@@ -1,6 +1,7 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 
 // Helper to parse date and calculate period fields
 function parseDateToUTC(dateString: string): Date {
@@ -111,8 +112,8 @@ export const backfillPeriodFields = mutation({
     let periodsCreated = 0;
 
     for (const periodKey of periodsToCreate) {
-      const [churchIdStr, yearStr, monthStr] = periodKey.split(':');
-      const churchId = churchIdStr as any; // Already an ID string
+      const [churchIdStr, yearStr, monthStr] = periodKey.split(":");
+      const churchId = churchIdStr as Id<"churches">;
       const year = parseInt(yearStr);
       const month = parseInt(monthStr);
 

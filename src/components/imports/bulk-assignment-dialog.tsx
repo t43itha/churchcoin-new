@@ -105,17 +105,35 @@ export function BulkAssignmentDialog({
             ))}
           </>
         );
-      case "category":
+      case "category": {
+        // Determine transaction types in selected rows
+        const hasIncome = selectedRows.some((row) => row.raw.amount >= 0);
+        const hasExpense = selectedRows.some((row) => row.raw.amount < 0);
+
+        // Filter categories based on transaction types
+        const filteredCategories = categories.filter((category) => {
+          if (hasIncome && hasExpense) {
+            // Mixed types - show all categories
+            return true;
+          } else if (hasIncome) {
+            return category.type === "income";
+          } else if (hasExpense) {
+            return category.type === "expense";
+          }
+          return true;
+        });
+
         return (
           <>
             <SelectItem value="__auto_detect">Auto-detect</SelectItem>
-            {categories.map((category) => (
+            {filteredCategories.map((category) => (
               <SelectItem key={category._id} value={category._id}>
                 {category.name}
               </SelectItem>
             ))}
           </>
         );
+      }
       case "donor":
         return (
           <>

@@ -166,15 +166,20 @@ export const normalizeCsvDate = (value: unknown) => {
     return formatDateParts(textualParts.year, textualParts.month, textualParts.day);
   }
 
-  const parsed = new Date(raw);
-  if (!Number.isNaN(parsed.getTime())) {
-    return formatDateParts(
-      parsed.getUTCFullYear(),
-      parsed.getUTCMonth() + 1,
-      parsed.getUTCDate()
-    );
+  // Try ISO format as last resort (YYYY-MM-DD only)
+  const isoOnlyMatch = raw.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/);
+  if (isoOnlyMatch) {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return formatDateParts(
+        parsed.getUTCFullYear(),
+        parsed.getUTCMonth() + 1,
+        parsed.getUTCDate()
+      );
+    }
   }
 
+  // Return raw if unable to parse - don't use new Date() as it defaults to US format
   return raw;
 };
 
@@ -221,7 +226,7 @@ export function detectBankFormat(headers: string[]): "barclays" | "hsbc" | "metr
 export function parseCsv(content: string) {
   return Papa.parse<ParsedCsvRow>(content, {
     header: true,
-    dynamicTyping: true,
+    dynamicTyping: false, // Disable automatic type conversion to preserve date strings
     skipEmptyLines: true,
   });
 }
