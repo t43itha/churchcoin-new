@@ -58,7 +58,7 @@ const donorFormSchema = z
     },
   );
 
-type DonorFormValues = z.infer<typeof donorFormSchema>;
+type DonorFormValues = z.input<typeof donorFormSchema>;
 
 type DonorFormDialogProps = {
   donor?: Doc<"donors"> | null;
@@ -136,6 +136,7 @@ export function DonorFormDialog({ donor, open, onOpenChange, churchId }: DonorFo
   };
 
   const onSubmit = (values: DonorFormValues) => {
+    const isGiftAidSigned = Boolean(values.giftAidSigned);
     if (!churchId && !donor) {
       setFeedback({ type: "error", message: "Select a church before adding donors." });
       return;
@@ -153,7 +154,7 @@ export function DonorFormDialog({ donor, open, onOpenChange, churchId }: DonorFo
             ? values.bankReference.trim()
             : undefined,
           notes: values.notes?.trim() ? values.notes.trim() : undefined,
-          giftAidDeclaration: values.giftAidSigned
+          giftAidDeclaration: isGiftAidSigned
             ? {
                 signed: true,
                 date: values.giftAidDate ?? new Date().toISOString().slice(0, 10),
@@ -186,7 +187,7 @@ export function DonorFormDialog({ donor, open, onOpenChange, churchId }: DonorFo
     })();
   };
 
-  const watchGiftAid = form.watch("giftAidSigned");
+  const watchGiftAid = Boolean(form.watch("giftAidSigned"));
 
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
@@ -329,7 +330,7 @@ export function DonorFormDialog({ donor, open, onOpenChange, churchId }: DonorFo
                     <FormItem className="flex flex-col items-center gap-2 text-sm">
                       <FormControl>
                         <Checkbox
-                          checked={field.value}
+                          checked={Boolean(field.value)}
                           onCheckedChange={(checked) => field.onChange(Boolean(checked))}
                           disabled={isSubmitting}
                         />
