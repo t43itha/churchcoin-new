@@ -826,6 +826,11 @@ export const getRecent = query({
     pendingReason: v.optional(v.string()),
     expectedClearDate: v.optional(v.string()),
     clearedAt: v.optional(v.number()),
+    periodMonth: v.optional(v.number()),
+    periodYear: v.optional(v.number()),
+    weekEnding: v.optional(v.string()),
+    needsReview: v.optional(v.boolean()),
+    reviewedAt: v.optional(v.number()),
     _creationTime: v.number(),
   })),
   handler: async (ctx, args) => {
