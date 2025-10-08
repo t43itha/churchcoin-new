@@ -438,28 +438,30 @@ export default function TransactionsPage() {
             <h2 className="text-xl font-semibold text-ink font-primary">
               Period Breakdown
             </h2>
-            {multiPeriodSummary.map((summary, index) => {
-              const period = periods[index];
-              const key = `${period.year}-${period.month}`;
-              return (
-                <PeriodCard
-                  key={key}
-                  period={period}
-                  churchId={churchId}
-                  summary={summary}
-                  isExpanded={expandedPeriods.has(key)}
-                  onToggle={() => togglePeriod(period.year, period.month)}
-                  onEdit={canManageTransactions ? (tx) => {
-                    setEditingTransaction(tx);
-                    setIsEditDialogOpen(true);
-                  } : undefined}
-                  onDelete={canManageTransactions ? handleDelete : undefined}
-                  onToggleReconciled={canManageTransactions ? handleToggleReconciled : undefined}
-                  onRequestReceipt={canViewFinancialData ? handleRequestReceipt : undefined}
-                  onSuggestCategory={canManageTransactions ? handleSuggestCategory : undefined}
-                />
-              );
-            })}
+            {multiPeriodSummary
+              .map((summary, index) => ({ summary, period: periods[index] }))
+              .filter(({ summary }) => summary.count > 0)
+              .map(({ summary, period }) => {
+                const key = `${period.year}-${period.month}`;
+                return (
+                  <PeriodCard
+                    key={key}
+                    period={period}
+                    churchId={churchId}
+                    summary={summary}
+                    isExpanded={expandedPeriods.has(key)}
+                    onToggle={() => togglePeriod(period.year, period.month)}
+                    onEdit={canManageTransactions ? (tx) => {
+                      setEditingTransaction(tx);
+                      setIsEditDialogOpen(true);
+                    } : undefined}
+                    onDelete={canManageTransactions ? handleDelete : undefined}
+                    onToggleReconciled={canManageTransactions ? handleToggleReconciled : undefined}
+                    onRequestReceipt={canViewFinancialData ? handleRequestReceipt : undefined}
+                    onSuggestCategory={canManageTransactions ? handleSuggestCategory : undefined}
+                  />
+                );
+              })}
           </div>
         )}
 

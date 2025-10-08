@@ -222,7 +222,9 @@ export function DuplicateReview({
           return row && row.status !== "skipped" && row.status !== "approved";
         })
         .map((rowId) => {
-          const config = selected[rowId] || { fundId: funds[0]?._id || "" };
+          const row = filteredRows.find((r) => r._id === rowId);
+          const defaultFundId = row?.detectedFundId || funds[0]?._id || "";
+          const config = selected[rowId] || { fundId: defaultFundId };
           return {
             rowId: rowId as Id<"csvRows">,
             fundId: config.fundId as Id<"funds">,
@@ -265,11 +267,16 @@ export function DuplicateReview({
       const newSet = new Set(prev);
       if (checked) {
         newSet.add(rowId);
-        if (!selected[rowId] && funds.length > 0) {
-          setSelected((prevSelected) => ({
-            ...prevSelected,
-            [rowId]: { fundId: funds[0]._id },
-          }));
+        // Only set a default fund if no selection exists AND no detected fund
+        if (!selected[rowId]) {
+          const row = rows.find((r) => r._id === rowId);
+          const defaultFundId = row?.detectedFundId || funds[0]?._id || "";
+          if (defaultFundId) {
+            setSelected((prevSelected) => ({
+              ...prevSelected,
+              [rowId]: { fundId: defaultFundId },
+            }));
+          }
         }
       } else {
         newSet.delete(rowId);
@@ -284,15 +291,17 @@ export function DuplicateReview({
         .filter((row) => row.status !== "skipped" && row.status !== "approved")
         .map((row) => row._id);
       setCheckedRows(new Set(availableRowIds));
-      if (funds.length > 0) {
-        const newSelected = { ...selected };
-        availableRowIds.forEach((rowId) => {
-          if (!newSelected[rowId]) {
-            newSelected[rowId] = { fundId: funds[0]._id };
+      const newSelected = { ...selected };
+      availableRowIds.forEach((rowId) => {
+        if (!newSelected[rowId]) {
+          const row = filteredRows.find((r) => r._id === rowId);
+          const defaultFundId = row?.detectedFundId || funds[0]?._id || "";
+          if (defaultFundId) {
+            newSelected[rowId] = { fundId: defaultFundId };
           }
-        });
-        setSelected(newSelected);
-      }
+        }
+      });
+      setSelected(newSelected);
     } else {
       setCheckedRows(new Set());
     }
@@ -335,7 +344,11 @@ export function DuplicateReview({
     const newSelected = { ...selected };
     availableRowIds.forEach((rowId) => {
       if (!newSelected[rowId]) {
-        newSelected[rowId] = { fundId: funds[0]?._id || "" };
+        const row = filteredRows.find((r) => r._id === rowId);
+        const defaultFundId = row?.detectedFundId || funds[0]?._id || "";
+        if (defaultFundId) {
+          newSelected[rowId] = { fundId: defaultFundId };
+        }
       }
       if (bulkDialogType === "fund") {
         newSelected[rowId].fundId = value;

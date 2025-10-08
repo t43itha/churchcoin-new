@@ -387,19 +387,33 @@ export default function ImportsPage() {
           </section>
         ) : null}
 
-        {latestRows.length > 0 && funds && categories && donors ? (
+        {currentStep === 3 && (
           <section className="space-y-6">
-            <DuplicateReview
-              rows={latestRows as Doc<"csvRows">[]}
-              funds={funds as Doc<"funds">[]}
-              categories={categories}
-              donors={donors as Doc<"donors">[]}
-              onApproveSelection={handleApproveSelection}
-              onSkipSelection={handleSkipSelection}
-              onAutoApprove={handleAutoApprove}
-            />
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold text-ink">Step 3 · Review &amp; Approve</h2>
+              <p className="text-sm text-grey-mid">
+                Assign funds to each transaction and approve them into the ledger.
+              </p>
+            </div>
+            {latestRows.length > 0 && funds && categories && donors ? (
+              <DuplicateReview
+                rows={latestRows as Doc<"csvRows">[]}
+                funds={funds as Doc<"funds">[]}
+                categories={categories}
+                donors={donors as Doc<"donors">[]}
+                onApproveSelection={handleApproveSelection}
+                onSkipSelection={handleSkipSelection}
+                onAutoApprove={handleAutoApprove}
+              />
+            ) : (
+              <div className="rounded-lg border border-ledger bg-paper px-6 py-10 text-center">
+                <p className="text-grey-mid">
+                  All rows have been processed. Upload a new CSV to start another import.
+                </p>
+              </div>
+            )}
           </section>
-        ) : null}
+        )}
       </div>
     </div>
   );
