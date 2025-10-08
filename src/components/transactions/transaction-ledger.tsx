@@ -1,12 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, FileText, Filter, Pencil, Search, Sparkles, Trash2, Undo2, X } from "lucide-react";
+import { Filter, Search, X } from "lucide-react";
 
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
@@ -14,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { formatUkDateNumeric } from "@/lib/dates";
+import { CollapsibleTransactionRow } from "./collapsible-transaction-row";
 import type { Doc, Id } from "@/lib/convexGenerated";
 
 const currency = new Intl.NumberFormat("en-GB", {
@@ -45,13 +44,8 @@ export function TransactionLedger({
   rows,
   onEdit,
   onDelete,
-  onToggleReconciled,
-  onRequestReceipt,
-  onSuggestCategory,
   loading = false,
 }: TransactionLedgerProps) {
-  const [deletingId, setDeletingId] = useState<Id<"transactions"> | null>(null);
-  const [togglingId, setTogglingId] = useState<Id<"transactions"> | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
 
@@ -118,10 +112,6 @@ export function TransactionLedger({
       </div>
     );
   }
-
-  const hasActions = Boolean(
-    onEdit || onDelete || onToggleReconciled || onRequestReceipt || onSuggestCategory
-  );
 
   return (
     <div className="space-y-4">
@@ -211,124 +201,29 @@ export function TransactionLedger({
         <Table>
           <TableHeader>
             <TableRow className="bg-ledger/30">
+              <TableHead className="w-8"></TableHead>
               <TableHead className="whitespace-nowrap">Date</TableHead>
               <TableHead className="min-w-[200px]">Description</TableHead>
               <TableHead className="whitespace-nowrap">Fund</TableHead>
-              <TableHead className="whitespace-nowrap">Category</TableHead>
-              <TableHead className="whitespace-nowrap">Donor</TableHead>
               <TableHead className="whitespace-nowrap text-right">Amount</TableHead>
-              {hasActions ? (
-                <TableHead className="whitespace-nowrap text-right">Actions</TableHead>
-              ) : null}
             </TableRow>
           </TableHeader>
-        <TableBody>
-          {filteredRows.map((row) => {
-            const { transaction, fund, category, donor } = row;
-            const reconciled = transaction.reconciled;
-            return (
-              <TableRow
-                key={transaction._id}
-                className={reconciled ? "bg-success/5" : undefined}
-              >
-                <TableCell>{formatUkDateNumeric(transaction.date) || "—"}</TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span className="font-medium text-ink">{transaction.description}</span>
-                    <span className="text-xs text-grey-mid">
-                      {transaction.method ? `${transaction.method.toUpperCase()} · ` : ""}
-                      {transaction.reference || 
-                        (transaction.source === "csv" ? "CSV import" : 
-                         transaction.source === "api" ? "API import" : 
-                         "Manual entry")}
-                    </span>
-                    {transaction.notes ? (
-                      <span className="text-xs text-grey-mid">{transaction.notes}</span>
-                    ) : null}
-                  </div>
-                </TableCell>
-                <TableCell>{fund ? fund.name : "—"}</TableCell>
-                <TableCell>{category ? category.name : "—"}</TableCell>
-                <TableCell>{donor ? donor.name : transaction.enteredByName ?? "—"}</TableCell>
-                <TableCell className={`text-right font-mono ${transaction.type === "income" ? "text-success" : "text-error"}`}>
-                  {transaction.type === "income" ? "" : "-"}
-                  {currency.format(transaction.amount)}
-                </TableCell>
-                {hasActions ? (
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1 whitespace-nowrap">
-                      {!category && onSuggestCategory ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-2 text-xs"
-                          onClick={() => onSuggestCategory(transaction)}
-                        >
-                          <Sparkles className="mr-1 h-3.5 w-3.5" /> Suggest
-                        </Button>
-                      ) : null}
-                      {onEdit ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-2 text-xs"
-                          onClick={() => onEdit(transaction)}
-                        >
-                          <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
-                        </Button>
-                      ) : null}
-                      {onToggleReconciled ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-2 text-xs"
-                          disabled={togglingId === transaction._id}
-                          onClick={async () => {
-                            setTogglingId(transaction._id);
-                            await onToggleReconciled(transaction._id, !reconciled);
-                            setTogglingId(null);
-                          }}
-                        >
-                          {reconciled ? (
-                            <Undo2 className="mr-1 h-3.5 w-3.5" />
-                          ) : (
-                            <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
-                          )}
-                          {reconciled ? "Unreconcile" : "Reconcile"}
-                        </Button>
-                      ) : null}
-                      {transaction.receiptStorageId && onRequestReceipt ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-2 text-xs"
-                          onClick={() => onRequestReceipt(transaction)}
-                        >
-                          <FileText className="mr-1 h-3.5 w-3.5" /> Receipt
-                        </Button>
-                      ) : null}
-                      {onDelete ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-2 text-xs text-error"
-                          disabled={deletingId === transaction._id}
-                          onClick={async () => {
-                            setDeletingId(transaction._id);
-                            await onDelete(transaction._id);
-                            setDeletingId(null);
-                          }}
-                        >
-                          <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
-                        </Button>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                ) : null}
-              </TableRow>
-            );
-          })}
-        </TableBody>
+          <TableBody>
+            {filteredRows.map((row) => {
+              const { transaction, fund, category, donor } = row;
+              return (
+                <CollapsibleTransactionRow
+                  key={transaction._id}
+                  transaction={transaction}
+                  fund={fund}
+                  category={category}
+                  donor={donor}
+                  onEdit={onEdit ? () => onEdit(transaction) : undefined}
+                  onDelete={onDelete ? () => onDelete(transaction._id) : undefined}
+                />
+              );
+            })}
+          </TableBody>
         </Table>
       </div>
     </div>
