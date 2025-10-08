@@ -265,43 +265,97 @@ export default function ReportsPage() {
                       </div>
                     </div>
 
-                    {/* Fund Segregation */}
-                    <div className="border-t border-ledger pt-4">
-                      <h3 className="text-sm font-medium text-grey-mid font-primary mb-3">
-                        Fund Segregation
+                    {/* GENERAL/UNRESTRICTED FUNDS BREAKDOWN */}
+                    <div className="border-t border-ledger pt-6 mt-6">
+                      <h3 className="text-sm font-semibold text-ink font-primary mb-3 uppercase">
+                        General/Unrestricted Funds Breakdown
                       </h3>
-                      <div className="space-y-2">
-                        <div className="flex justify-between font-primary">
-                          <span className="text-ink">General/Unrestricted</span>
-                          <span className="text-ink font-medium">
-                            {currency.format(overview.fundSegregation.general)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between font-primary">
-                          <span className="text-ink font-bold">Restricted Funds (Total)</span>
-                          <span className="text-ink font-bold">
-                            {currency.format(overview.fundSegregation.restricted)}
-                          </span>
-                        </div>
-
-                        {/* Individual Restricted Funds Breakdown */}
-                        {overview.restrictedFunds && overview.restrictedFunds.length > 0 && (
-                          <div className="pl-4 space-y-1 border-l-2 border-ledger ml-2">
-                            {overview.restrictedFunds.map((fund) => (
-                              <div key={fund.fundId} className="flex justify-between font-primary text-sm">
-                                <span className="text-grey-dark">{fund.fundName}</span>
-                                <span className="text-ink font-medium">
-                                  {currency.format(fund.amount)}
-                                </span>
-                              </div>
+                      <div className="bg-paper border border-ledger rounded-lg overflow-hidden">
+                        <table className="w-full font-primary text-sm">
+                          <thead className="bg-ledger">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-grey-dark">Category</th>
+                              <th className="px-4 py-3 text-right text-grey-dark">Bank Amount</th>
+                              <th className="px-4 py-3 text-right text-grey-dark">Cash Amount</th>
+                              <th className="px-4 py-3 text-right text-grey-dark">Combined Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {overview.generalBreakdown.categories.map((category) => (
+                              <tr key={category.categoryId} className="border-b border-ledger">
+                                <td className="px-4 py-2 text-ink">{category.categoryName}</td>
+                                <td className="px-4 py-2 text-right text-ink">
+                                  {currency.format(category.bankAmount)}
+                                </td>
+                                <td className="px-4 py-2 text-right text-ink">
+                                  {currency.format(category.cashAmount)}
+                                </td>
+                                <td className="px-4 py-2 text-right text-ink font-medium">
+                                  {currency.format(category.combinedTotal)}
+                                </td>
+                              </tr>
                             ))}
-                          </div>
-                        )}
+                            <tr className="bg-ledger border-t-2 border-ink">
+                              <td className="px-4 py-3 text-ink font-bold">SUBTOTAL GENERAL FUNDS</td>
+                              <td className="px-4 py-3 text-right text-ink font-bold">
+                                {currency.format(overview.generalBreakdown.subtotal.bankAmount)}
+                              </td>
+                              <td className="px-4 py-3 text-right text-ink font-bold">
+                                {currency.format(overview.generalBreakdown.subtotal.cashAmount)}
+                              </td>
+                              <td className="px-4 py-3 text-right text-ink font-bold">
+                                {currency.format(overview.generalBreakdown.subtotal.combinedTotal)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
 
-                        <div className="flex justify-between font-primary text-grey-mid text-sm pt-2 border-t border-ledger">
-                          <span>Uncategorised (excluded)</span>
-                          <span>{currency.format(overview.fundSegregation.uncategorised)}</span>
-                        </div>
+                    {/* RESTRICTED FUNDS BREAKDOWN (RING-FENCED) */}
+                    <div className="border-t border-ledger pt-6 mt-6">
+                      <h3 className="text-sm font-semibold text-ink font-primary mb-3 uppercase">
+                        Restricted Funds Breakdown (Ring-Fenced)
+                      </h3>
+                      <div className="bg-paper border border-ledger rounded-lg overflow-hidden">
+                        <table className="w-full font-primary text-sm">
+                          <thead className="bg-ledger">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-grey-dark">Category</th>
+                              <th className="px-4 py-3 text-right text-grey-dark">Bank Amount</th>
+                              <th className="px-4 py-3 text-right text-grey-dark">Cash Amount</th>
+                              <th className="px-4 py-3 text-right text-grey-dark">Combined Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {overview.restrictedBreakdown.funds.map((fund) => (
+                              <tr key={fund.fundId} className="border-b border-ledger">
+                                <td className="px-4 py-2 text-ink">{fund.fundName}</td>
+                                <td className="px-4 py-2 text-right text-ink">
+                                  {currency.format(fund.bankAmount)}
+                                </td>
+                                <td className="px-4 py-2 text-right text-ink">
+                                  {currency.format(fund.cashAmount)}
+                                </td>
+                                <td className="px-4 py-2 text-right text-ink font-medium">
+                                  {currency.format(fund.combinedTotal)}
+                                </td>
+                              </tr>
+                            ))}
+                            <tr className="bg-ledger border-t-2 border-ink">
+                              <td className="px-4 py-3 text-ink font-bold">SUBTOTAL RESTRICTED FUNDS</td>
+                              <td className="px-4 py-3 text-right text-ink font-bold">
+                                {currency.format(overview.restrictedBreakdown.subtotal.bankAmount)}
+                              </td>
+                              <td className="px-4 py-3 text-right text-ink font-bold">
+                                {currency.format(overview.restrictedBreakdown.subtotal.cashAmount)}
+                              </td>
+                              <td className="px-4 py-3 text-right text-ink font-bold">
+                                {currency.format(overview.restrictedBreakdown.subtotal.combinedTotal)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
                     </div>
 

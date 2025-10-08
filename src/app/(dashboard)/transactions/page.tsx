@@ -154,9 +154,17 @@ export default function TransactionsPage() {
   };
 
   const handleQuickUpdateTransaction = async (updates: {
-    fundId?: Id<"funds">;
+    date: string;
+    description: string;
+    amount: number;
+    type: "income" | "expense";
+    fundId: Id<"funds">;
     categoryId?: Id<"categories">;
     donorId?: Id<"donors">;
+    method?: string;
+    reference?: string;
+    giftAid?: boolean;
+    notes?: string;
   }) => {
     if (!editingTransaction) return;
     await handleUpdateTransaction(editingTransaction._id, updates);
