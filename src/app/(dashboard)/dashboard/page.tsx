@@ -30,6 +30,7 @@ import {
   KpiCard,
   type KpiDelta,
   type TrendPoint,
+  type KpiCardProps,
 } from "@/components/dashboard/kpi-card";
 import {
   PeriodSelector,
@@ -52,6 +53,13 @@ type PeriodKey =
   | "this-quarter"
   | "this-year"
   | "ytd";
+
+type DashboardKpi = {
+  key: string;
+} & Pick<
+  KpiCardProps,
+  "title" | "value" | "subtitle" | "delta" | "sparkline" | "status"
+>;
 
 const PERIOD_OPTIONS: PeriodOption[] = [
   { id: "this-month", label: "This Month", shortcut: "M" },
@@ -372,7 +380,7 @@ export default function DashboardPage() {
     }));
   }, [periodHistory]);
 
-  const financialKpis = useMemo(() => {
+  const financialKpis = useMemo<DashboardKpi[]>(() => {
     const delta: KpiDelta | undefined = comparisonReport
       ? {
           value: Math.round(netResult - previousNet),
@@ -482,7 +490,7 @@ export default function DashboardPage() {
     expenses,
   ]);
 
-  const donorKpis = useMemo(() => {
+  const donorKpis = useMemo<DashboardKpi[]>(() => {
     return [
       {
         key: "active-donors",
@@ -611,7 +619,7 @@ export default function DashboardPage() {
     transactionSparkline,
   ]);
 
-  const advancedKpis = useMemo(() => {
+  const advancedKpis = useMemo<DashboardKpi[]>(() => {
     const topDonorContribution = (() => {
       const transactions = incomeExpenseReport?.transactions ?? [];
       const incomes = transactions.filter((txn) => txn.type === "income");

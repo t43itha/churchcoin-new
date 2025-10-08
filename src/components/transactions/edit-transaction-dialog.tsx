@@ -16,7 +16,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import type { Doc, Id } from "@/lib/convexGenerated";
-import { formatUkDateNumeric } from "@/lib/dates";
 
 const editSchema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -130,8 +129,7 @@ export function EditTransactionDialog({
 
   if (!transaction) return null;
 
-  const isImported = transaction.source === "csv" || transaction.source === "api";
-  const sourceLabel = 
+  const sourceLabel =
     transaction.source === "csv" ? "CSV import" :
     transaction.source === "api" ? "API import" :
     "Manual entry";
