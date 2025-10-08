@@ -17,7 +17,6 @@ import { PeriodSelector, type PeriodViewMode } from "@/components/transactions/p
 import { MultiPeriodOverview } from "@/components/transactions/multi-period-overview";
 import { PeriodCard } from "@/components/transactions/period-card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
