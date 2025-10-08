@@ -87,11 +87,19 @@ export default defineSchema({
     pendingReason: v.optional(v.string()),
     expectedClearDate: v.optional(v.string()),
     clearedAt: v.optional(v.number()),
+    // Period tracking
+    periodMonth: v.optional(v.number()),
+    periodYear: v.optional(v.number()),
+    weekEnding: v.optional(v.string()), // Sunday date in DD/MM/YYYY
+    needsReview: v.optional(v.boolean()),
+    reviewedAt: v.optional(v.number()),
   })
     .index("by_church_date", ["churchId", "date"])
     .index("by_fund", ["fundId"])
     .index("by_donor", ["donorId"])
-    .index("by_reconciled", ["churchId", "reconciled"]),
+    .index("by_reconciled", ["churchId", "reconciled"])
+    .index("by_period", ["churchId", "periodYear", "periodMonth"])
+    .index("by_review_status", ["churchId", "needsReview"]),
 
   // CSV Imports
   csvImports: defineTable({
@@ -137,7 +145,12 @@ export default defineSchema({
       type: v.optional(v.string()),
     }),
     detectedDonorId: v.optional(v.id("donors")),
+    donorConfidence: v.optional(v.number()),
     detectedFundId: v.optional(v.id("funds")),
+    detectedCategoryId: v.optional(v.id("categories")),
+    categoryConfidence: v.optional(v.number()),
+    categorySource: v.optional(v.string()),
+    transactionType: v.optional(v.union(v.literal("income"), v.literal("expense"))),
     duplicateOf: v.optional(v.id("transactions")),
     status: v.union(
       v.literal("pending"),
