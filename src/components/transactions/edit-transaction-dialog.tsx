@@ -61,6 +61,25 @@ const currency = new Intl.NumberFormat("en-GB", {
   minimumFractionDigits: 2,
 });
 
+// Convert UK date format (DD/MM/YYYY) to ISO format (YYYY-MM-DD) for date input
+function ukDateToIso(ukDate: string): string {
+  if (!ukDate) return "";
+
+  // Check if already in ISO format
+  if (ukDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return ukDate;
+  }
+
+  // Parse DD/MM/YYYY format
+  const parts = ukDate.split("/");
+  if (parts.length === 3) {
+    const [day, month, year] = parts;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  return "";
+}
+
 export function EditTransactionDialog({
   open,
   onOpenChange,
@@ -76,7 +95,7 @@ export function EditTransactionDialog({
   const form = useForm<EditFormValues>({
     resolver: zodResolver(editSchema),
     values: {
-      date: transaction?.date ?? "",
+      date: transaction ? ukDateToIso(transaction.date) : "",
       description: transaction?.description ?? "",
       amount: transaction?.amount ?? 0,
       type: transaction?.type ?? "income",

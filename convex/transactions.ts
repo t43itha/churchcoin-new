@@ -384,6 +384,23 @@ export const updateTransaction = mutation({
         rawUpdates.pendingStatus === "cleared" ? Date.now() : undefined;
     }
 
+    // Recalculate period fields if date changed
+    if (rawUpdates.date && rawUpdates.date !== transaction.date) {
+      const periodFields = calculatePeriodFields(rawUpdates.date);
+
+      // Ensure the new period exists
+      await ctx.runMutation(api.financialPeriods.createOrGetPeriod, {
+        churchId: transaction.churchId,
+        month: periodFields.periodMonth,
+        year: periodFields.periodYear,
+      });
+
+      // Add period fields to updates
+      transactionUpdates.periodMonth = periodFields.periodMonth;
+      transactionUpdates.periodYear = periodFields.periodYear;
+      transactionUpdates.weekEnding = periodFields.weekEnding;
+    }
+
     // Update the transaction
     await ctx.db.patch(transactionId, transactionUpdates);
 
@@ -795,6 +812,160 @@ export const resolvePendingTransaction = mutation({
     }
 
     return args.transactionId;
+  },
+});
+
+// Optimized period-based query for multi-period view
+export const getLedgerByPeriod = query({
+  args: {
+    churchId: v.id("churches"),
+    periodYear: v.number(),
+    periodMonth: v.number(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    // Use indexed query - super fast!
+    const transactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_period", (q) =>
+        q.eq("churchId", args.churchId)
+         .eq("periodYear", args.periodYear)
+         .eq("periodMonth", args.periodMonth)
+      )
+      .order("desc")
+      .take(args.limit ?? 100);
+
+    // OPTIMIZATION: Only fetch entities that are actually used
+    const usedFundIds = new Set(transactions.map(t => t.fundId));
+    const usedCategoryIds = new Set(
+      transactions.map(t => t.categoryId).filter(Boolean) as Id<"categories">[]
+    );
+    const usedDonorIds = new Set(
+      transactions.map(t => t.donorId).filter(Boolean) as Id<"donors">[]
+    );
+
+    // Parallel fetch only what we need
+    const [funds, categories, donors] = await Promise.all([
+      Promise.all(Array.from(usedFundIds).map(id => ctx.db.get(id))),
+      usedCategoryIds.size > 0
+        ? Promise.all(Array.from(usedCategoryIds).map(id => ctx.db.get(id)))
+        : [],
+      usedDonorIds.size > 0
+        ? Promise.all(Array.from(usedDonorIds).map(id => ctx.db.get(id)))
+        : []
+    ]);
+
+    const fundLookup = new Map(funds.filter(Boolean).map(f => [f!._id, f]));
+    const categoryLookup = new Map(categories.filter(Boolean).map(c => [c!._id, c]));
+    const donorLookup = new Map(donors.filter(Boolean).map(d => [d!._id, d]));
+
+    return transactions.map(transaction => ({
+      transaction,
+      fund: fundLookup.get(transaction.fundId) ?? null,
+      category: transaction.categoryId ? categoryLookup.get(transaction.categoryId) ?? null : null,
+      donor: transaction.donorId ? donorLookup.get(transaction.donorId) ?? null : null,
+    }));
+  },
+});
+
+// Multi-period summary for overview cards
+export const getMultiPeriodSummary = query({
+  args: {
+    churchId: v.id("churches"),
+    periods: v.array(v.object({
+      year: v.number(),
+      month: v.number(),
+    })),
+  },
+  handler: async (ctx, args) => {
+    // Parallel queries for all periods
+    const results = await Promise.all(
+      args.periods.map(async (period) => {
+        const transactions = await ctx.db
+          .query("transactions")
+          .withIndex("by_period", (q) =>
+            q.eq("churchId", args.churchId)
+             .eq("periodYear", period.year)
+             .eq("periodMonth", period.month)
+          )
+          .collect();
+
+        const summary = transactions.reduce(
+          (acc, tx) => {
+            acc.count += 1;
+            acc.income += tx.type === "income" ? tx.amount : 0;
+            acc.expense += tx.type === "expense" ? tx.amount : 0;
+            acc.unreconciled += tx.reconciled ? 0 : 1;
+            acc.uncategorized += tx.categoryId ? 0 : 1;
+            return acc;
+          },
+          {
+            income: 0,
+            expense: 0,
+            count: 0,
+            unreconciled: 0,
+            uncategorized: 0,
+            year: period.year,
+            month: period.month
+          }
+        );
+
+        return summary;
+      })
+    );
+
+    return results;
+  },
+});
+
+// Period trends for sparkline charts
+export const getPeriodTrends = query({
+  args: {
+    churchId: v.id("churches"),
+    periods: v.array(v.object({
+      year: v.number(),
+      month: v.number(),
+    })),
+  },
+  returns: v.array(v.object({
+    year: v.number(),
+    month: v.number(),
+    income: v.number(),
+    expense: v.number(),
+    net: v.number(),
+  })),
+  handler: async (ctx, args) => {
+    const summaries = await Promise.all(
+      args.periods.map(async (period) => {
+        const transactions = await ctx.db
+          .query("transactions")
+          .withIndex("by_period", (q) =>
+            q.eq("churchId", args.churchId)
+             .eq("periodYear", period.year)
+             .eq("periodMonth", period.month)
+          )
+          .collect();
+
+        const totals = transactions.reduce(
+          (acc, tx) => {
+            if (tx.type === "income") acc.income += tx.amount;
+            else acc.expense += tx.amount;
+            return acc;
+          },
+          { income: 0, expense: 0 }
+        );
+
+        return {
+          year: period.year,
+          month: period.month,
+          income: totals.income,
+          expense: totals.expense,
+          net: totals.income - totals.expense,
+        };
+      })
+    );
+
+    return summaries;
   },
 });
 

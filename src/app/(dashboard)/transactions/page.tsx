@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useConvex, useMutation, useQuery } from "convex/react";
-import { Banknote, LineChart, NotebookPen, PlusCircle } from "lucide-react";
+import { PlusCircle } from "lucide-react";
 
 import {
   ManualTransactionDialog,
@@ -13,6 +13,9 @@ import {
   TransactionLedger,
   type TransactionLedgerRow,
 } from "@/components/transactions/transaction-ledger";
+import { PeriodSelector, type PeriodViewMode } from "@/components/transactions/period-selector";
+import { MultiPeriodOverview } from "@/components/transactions/multi-period-overview";
+import { PeriodCard } from "@/components/transactions/period-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -25,17 +28,14 @@ import {
 import { api, type Doc, type Id } from "@/lib/convexGenerated";
 import { useSession } from "@/components/auth/session-provider";
 import { getRolePermissions } from "@/lib/rbac";
-
-const currency = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "GBP",
-  minimumFractionDigits: 2,
-});
+import { getLastNMonths, getCurrentPeriod, periodToKey } from "@/lib/periods";
 
 export default function TransactionsPage() {
   const convex = useConvex();
   const churches = useQuery(api.churches.listChurches, {});
   const [churchId, setChurchId] = useState<Id<"churches"> | null>(null);
+  const [viewMode, setViewMode] = useState<PeriodViewMode>("last-6");
+  const [expandedPeriods, setExpandedPeriods] = useState<Set<string>>(new Set());
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Doc<"transactions"> | null>(null);
@@ -50,6 +50,22 @@ export default function TransactionsPage() {
   const canViewFinancialData = permissions.canViewFinancialData;
   const showLedger = canViewFinancialData && !permissions.restrictedToManualEntry;
 
+  // Calculate periods based on view mode
+  const periods = useMemo(() => {
+    switch (viewMode) {
+      case "current":
+        return [getCurrentPeriod()];
+      case "last-3":
+        return getLastNMonths(3);
+      case "last-6":
+        return getLastNMonths(6);
+      case "all":
+        return null; // Will use old query
+      default:
+        return getLastNMonths(6);
+    }
+  }, [viewMode]);
+
   const funds = useQuery(
     api.funds.getFunds,
     churchId ? { churchId } : "skip"
@@ -62,9 +78,23 @@ export default function TransactionsPage() {
     api.donors.getDonors,
     churchId ? { churchId } : "skip"
   );
-  const ledger = useQuery(
+
+  // Load multi-period summary
+  const multiPeriodSummary = useQuery(
+    api.transactions.getMultiPeriodSummary,
+    churchId && periods ? { churchId, periods } : "skip"
+  );
+
+  // Load trend data for overview
+  const trendData = useQuery(
+    api.transactions.getPeriodTrends,
+    churchId && periods && periods.length > 1 ? { churchId, periods } : "skip"
+  );
+
+  // Fallback for "All" mode - use old query
+  const allTransactions = useQuery(
     api.transactions.getLedger,
-    churchId ? { churchId, limit: 1000 } : "skip"
+    churchId && viewMode === "all" ? { churchId, limit: 1000 } : "skip"
   );
 
   const createTransaction = useMutation(api.transactions.createTransaction);
@@ -77,6 +107,27 @@ export default function TransactionsPage() {
       setChurchId(churches[0]._id);
     }
   }, [churches, churchId]);
+
+  // Auto-expand current period
+  useEffect(() => {
+    if (periods && periods.length > 0) {
+      const currentKey = periodToKey(periods[0]);
+      setExpandedPeriods(new Set([currentKey]));
+    }
+  }, [periods]);
+
+  const togglePeriod = (year: number, month: number) => {
+    const key = `${year}-${month}`;
+    setExpandedPeriods(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   const handleCreateTransactions = async (transactions: TransactionCreateValues[]) => {
     if (!canRecordManualTransactions) {
@@ -280,29 +331,7 @@ export default function TransactionsPage() {
   };
 
 
-  const totals = useMemo(() => {
-    if (!ledger) {
-      return { income: 0, expense: 0, count: 0, unreconciled: 0 };
-    }
-
-    return ledger.reduce(
-      (acc, row) => {
-        acc.count += 1;
-        if (row.transaction.type === "income") {
-          acc.income += row.transaction.amount;
-        } else {
-          acc.expense += row.transaction.amount;
-        }
-        if (!row.transaction.reconciled) {
-          acc.unreconciled += 1;
-        }
-        return acc;
-      },
-      { income: 0, expense: 0, count: 0, unreconciled: 0 }
-    );
-  }, [ledger]);
-
-
+  // Render loading state
   if (!churches) {
     return (
       <div className="min-h-screen bg-paper">
@@ -326,19 +355,17 @@ export default function TransactionsPage() {
 
   return (
     <div className="min-h-screen bg-paper pb-12">
+      {/* Header */}
       <div className="border-b border-ledger bg-paper">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-grey-mid">
-                <NotebookPen className="h-5 w-5 text-grey-mid" />
-                <span className="text-sm uppercase tracking-wide">Transaction Management</span>
-              </div>
-              <h1 className="text-3xl font-semibold text-ink">Transactions</h1>
+              <h1 className="text-3xl font-semibold text-ink">Transactions Hub</h1>
               <p className="text-sm text-grey-mid">
-                Record in-person donations and manage your transaction ledger with powerful search and filters.
+                View and manage transactions across different periods with powerful insights.
               </p>
             </div>
+
             <div className="flex flex-col items-start gap-3 md:items-end">
               <Select
                 value={churchId ?? undefined}
@@ -356,129 +383,109 @@ export default function TransactionsPage() {
                   ))}
                 </SelectContent>
               </Select>
-              {canRecordManualTransactions ? (
+              {canRecordManualTransactions && (
                 <Button
                   className="font-primary"
-                  onClick={() => {
-                    setEditingTransaction(null);
-                    setIsDialogOpen(true);
-                  }}
+                  onClick={() => setIsDialogOpen(true)}
                   disabled={!churchId}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />
-                  New transaction
+                  New Transaction
                 </Button>
-              ) : null}
+              )}
             </div>
           </div>
-          {canViewFinancialData ? (
-            <div className="grid gap-4 md:grid-cols-4">
-              <Card className="border-ledger">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
-                    <Banknote className="h-4 w-4 text-grey-mid" />
-                    Total income
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-2xl font-semibold text-success">
-                  +{currency.format(totals.income)}
-                </CardContent>
-              </Card>
-              <Card className="border-ledger">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
-                    <LineChart className="h-4 w-4 text-grey-mid" />
-                    Total expenses
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-2xl font-semibold text-error">
-                  -{currency.format(totals.expense)}
-                </CardContent>
-              </Card>
-              <Card className="border-ledger">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
-                    <NotebookPen className="h-4 w-4 text-grey-mid" />
-                    Transactions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-2xl font-semibold text-ink">
-                  {totals.count}
-                </CardContent>
-              </Card>
-              <Card className="border-ledger">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
-                    <Banknote className="h-4 w-4 text-grey-mid" />
-                    Unreconciled
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-semibold text-ink">{totals.unreconciled}</div>
-                  <p className="text-xs text-grey-mid">Need bank matching</p>
-                </CardContent>
-              </Card>
-            </div>
-          ) : null}
+
+          {/* Period Selector */}
+          <PeriodSelector value={viewMode} onChange={setViewMode} />
         </div>
       </div>
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        {!churchId ? (
+
+      {/* Main Content */}
+      <div className="mx-auto max-w-6xl px-6 py-10 space-y-6">
+        {feedback && (
+          <div
+            className={`rounded-md border px-4 py-3 text-sm ${
+              feedback.type === "success"
+                ? "border-success/40 bg-success/10 text-success"
+                : "border-error/40 bg-error/10 text-error"
+            }`}
+          >
+            {feedback.message}
+          </div>
+        )}
+
+        {!churchId && (
           <div className="rounded-lg border border-dashed border-ledger bg-paper px-6 py-10 text-center text-grey-mid">
             Add a church to Convex and select it to begin tracking transactions.
           </div>
-        ) : null}
-        {!showLedger && canRecordManualTransactions ? (
+        )}
+
+        {!showLedger && canRecordManualTransactions && (
           <div className="rounded-lg border border-ledger bg-paper px-6 py-10 text-center text-grey-mid">
             You can record transactions using the manual entry form. Financial ledgers are hidden for this access level.
           </div>
-        ) : null}
-        {churchId && showLedger && ledger === undefined ? (
-          <div className="rounded-lg border border-ledger bg-paper px-6 py-10 text-center text-grey-mid">
-            Loading transactions…
+        )}
+
+        {/* Multi-Period Overview */}
+        {showLedger && trendData && trendData.length > 1 && (
+          <MultiPeriodOverview trends={trendData} />
+        )}
+
+        {/* Period Cards */}
+        {showLedger && multiPeriodSummary && periods && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold text-ink font-primary">
+              Period Breakdown
+            </h2>
+            {multiPeriodSummary.map((summary, index) => {
+              const period = periods[index];
+              const key = `${period.year}-${period.month}`;
+              return (
+                <PeriodCard
+                  key={key}
+                  period={period}
+                  churchId={churchId}
+                  summary={summary}
+                  isExpanded={expandedPeriods.has(key)}
+                  onToggle={() => togglePeriod(period.year, period.month)}
+                  onEdit={canManageTransactions ? (tx) => {
+                    setEditingTransaction(tx);
+                    setIsEditDialogOpen(true);
+                  } : undefined}
+                  onDelete={canManageTransactions ? handleDelete : undefined}
+                  onToggleReconciled={canManageTransactions ? handleToggleReconciled : undefined}
+                  onRequestReceipt={canViewFinancialData ? handleRequestReceipt : undefined}
+                  onSuggestCategory={canManageTransactions ? handleSuggestCategory : undefined}
+                />
+              );
+            })}
           </div>
-        ) : null}
-        {churchId && showLedger && ledger ? (
-          <div className="space-y-6">
-            {feedback ? (
-              <div
-                className={`rounded-md border px-4 py-3 text-sm ${
-                  feedback.type === "success"
-                    ? "border-success/40 bg-success/10 text-success"
-                    : "border-error/40 bg-error/10 text-error"
-                }`}
-              >
-                {feedback.message}
-              </div>
-            ) : null}
-            
-            <div className="rounded-lg border border-ledger bg-paper p-6 shadow-none">
-              <div className="mb-6 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold text-ink">Transaction ledger</h2>
-                  <p className="text-sm text-grey-mid">
-                    Search, filter, and manage all transactions. Click edit to update details or reconcile when matched to bank statements.
-                  </p>
-                </div>
-              </div>
-              <TransactionLedger
-                rows={(ledger ?? []) as TransactionLedgerRow[]}
-                loading={!ledger}
-                onEdit={canManageTransactions ? (transaction) => {
-                  setEditingTransaction(transaction);
-                  setIsEditDialogOpen(true);
-                } : undefined}
-                onDelete={canManageTransactions ? handleDelete : undefined}
-                onToggleReconciled={canManageTransactions ? handleToggleReconciled : undefined}
-                onRequestReceipt={canViewFinancialData ? handleRequestReceipt : undefined}
-                onSuggestCategory={canManageTransactions ? handleSuggestCategory : undefined}
-              />
-            </div>
+        )}
+
+        {/* Fallback for "All" mode */}
+        {showLedger && viewMode === "all" && allTransactions && (
+          <div className="rounded-lg border border-ledger bg-paper p-6">
+            <h2 className="text-xl font-semibold text-ink font-primary mb-4">
+              All Transactions
+            </h2>
+            <TransactionLedger
+              rows={allTransactions as TransactionLedgerRow[]}
+              onEdit={canManageTransactions ? (tx) => {
+                setEditingTransaction(tx);
+                setIsEditDialogOpen(true);
+              } : undefined}
+              onDelete={canManageTransactions ? handleDelete : undefined}
+              onToggleReconciled={canManageTransactions ? handleToggleReconciled : undefined}
+              onRequestReceipt={canViewFinancialData ? handleRequestReceipt : undefined}
+              onSuggestCategory={canManageTransactions ? handleSuggestCategory : undefined}
+            />
           </div>
-        ) : null}
+        )}
       </div>
 
-      {canRecordManualTransactions && churchId && funds && categories && donors ? (
+      {/* Dialogs */}
+      {canRecordManualTransactions && churchId && funds && categories && donors && (
         <>
           <ManualTransactionDialog
             open={isDialogOpen}
@@ -490,7 +497,7 @@ export default function TransactionsPage() {
             onSubmit={handleCreateTransactions}
           />
 
-          {canManageTransactions && editingTransaction ? (
+          {canManageTransactions && editingTransaction && (
             <EditTransactionDialog
               open={isEditDialogOpen}
               onOpenChange={setIsEditDialogOpen}
@@ -500,9 +507,9 @@ export default function TransactionsPage() {
               donors={donors as Doc<"donors">[]}
               onSubmit={handleQuickUpdateTransaction}
             />
-          ) : null}
+          )}
         </>
-      ) : null}
+      )}
     </div>
   );
 }
