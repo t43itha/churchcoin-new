@@ -37,7 +37,7 @@ import { Search, X, Sparkles, Check, ChevronsUpDown, Filter } from "lucide-react
 import type { Doc, Id } from "@/lib/convexGenerated";
 import { BulkActionsBar } from "./bulk-actions-bar";
 import { BulkAssignmentDialog } from "./bulk-assignment-dialog";
-import { ConfidenceBadge, AutoDetectedIndicator } from "./confidence-badge";
+import { ConfidenceBadge } from "./confidence-badge";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
