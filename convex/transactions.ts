@@ -384,6 +384,23 @@ export const updateTransaction = mutation({
         rawUpdates.pendingStatus === "cleared" ? Date.now() : undefined;
     }
 
+    // Recalculate period fields if date changed
+    if (rawUpdates.date && rawUpdates.date !== transaction.date) {
+      const periodFields = calculatePeriodFields(rawUpdates.date);
+
+      // Ensure the new period exists
+      await ctx.runMutation(api.financialPeriods.createOrGetPeriod, {
+        churchId: transaction.churchId,
+        month: periodFields.periodMonth,
+        year: periodFields.periodYear,
+      });
+
+      // Add period fields to updates
+      transactionUpdates.periodMonth = periodFields.periodMonth;
+      transactionUpdates.periodYear = periodFields.periodYear;
+      transactionUpdates.weekEnding = periodFields.weekEnding;
+    }
+
     // Update the transaction
     await ctx.db.patch(transactionId, transactionUpdates);
 

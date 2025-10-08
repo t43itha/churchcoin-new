@@ -44,6 +44,9 @@ export function TransactionLedger({
   rows,
   onEdit,
   onDelete,
+  onToggleReconciled,
+  onRequestReceipt,
+  onSuggestCategory,
   loading = false,
 }: TransactionLedgerProps) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -220,6 +223,9 @@ export function TransactionLedger({
                   donor={donor}
                   onEdit={onEdit ? () => onEdit(transaction) : undefined}
                   onDelete={onDelete ? () => onDelete(transaction._id) : undefined}
+                  onToggleReconciled={onToggleReconciled ? (reconciled) => onToggleReconciled(transaction._id, reconciled) : undefined}
+                  onRequestReceipt={onRequestReceipt ? () => onRequestReceipt(transaction) : undefined}
+                  onSuggestCategory={onSuggestCategory ? () => onSuggestCategory(transaction) : undefined}
                 />
               );
             })}

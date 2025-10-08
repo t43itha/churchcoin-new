@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, ChevronDown, Pencil, StickyNote, Trash2 } from "lucide-react";
+import { ChevronRight, ChevronDown, Pencil, StickyNote, Trash2, CheckCircle2, Undo2, FileText, Sparkles } from "lucide-react";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { formatUkDateNumeric } from "@/lib/dates";
@@ -19,6 +19,9 @@ type CollapsibleTransactionRowProps = {
   donor: Doc<"donors"> | null;
   onEdit?: () => void;
   onDelete?: () => Promise<void>;
+  onToggleReconciled?: (reconciled: boolean) => Promise<void>;
+  onRequestReceipt?: () => Promise<void>;
+  onSuggestCategory?: () => Promise<void>;
 };
 
 export function CollapsibleTransactionRow({
@@ -28,15 +31,26 @@ export function CollapsibleTransactionRow({
   donor,
   onEdit,
   onDelete,
+  onToggleReconciled,
+  onRequestReceipt,
+  onSuggestCategory,
 }: CollapsibleTransactionRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isTogglingReconciled, setIsTogglingReconciled] = useState(false);
 
   const handleDelete = async () => {
     if (!onDelete) return;
     setIsDeleting(true);
     await onDelete();
     setIsDeleting(false);
+  };
+
+  const handleToggleReconciled = async () => {
+    if (!onToggleReconciled) return;
+    setIsTogglingReconciled(true);
+    await onToggleReconciled(!transaction.reconciled);
+    setIsTogglingReconciled(false);
   };
 
   const formatDateTime = (timestamp: number) => {
@@ -177,6 +191,20 @@ export function CollapsibleTransactionRow({
                   Quick Actions
                 </h4>
                 <div className="flex flex-wrap gap-2">
+                  {!category && onSuggestCategory && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSuggestCategory();
+                      }}
+                      className="h-8 px-3 text-xs"
+                    >
+                      <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                      Suggest Category
+                    </Button>
+                  )}
                   {onEdit && (
                     <Button
                       variant="outline"
@@ -189,6 +217,44 @@ export function CollapsibleTransactionRow({
                     >
                       <Pencil className="mr-1.5 h-3.5 w-3.5" />
                       Edit
+                    </Button>
+                  )}
+                  {onToggleReconciled && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleReconciled();
+                      }}
+                      disabled={isTogglingReconciled}
+                      className="h-8 px-3 text-xs"
+                    >
+                      {transaction.reconciled ? (
+                        <>
+                          <Undo2 className="mr-1.5 h-3.5 w-3.5" />
+                          Unreconcile
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                          Reconcile
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  {transaction.receiptStorageId && onRequestReceipt && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRequestReceipt();
+                      }}
+                      className="h-8 px-3 text-xs"
+                    >
+                      <FileText className="mr-1.5 h-3.5 w-3.5" />
+                      View Receipt
                     </Button>
                   )}
                   <Button
