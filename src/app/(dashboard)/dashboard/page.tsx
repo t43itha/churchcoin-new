@@ -294,11 +294,11 @@ export default function DashboardPage() {
       (entry) => entry.count >= 2
     ).length;
 
-    const averageDonation = transactions.length
-      ? transactions
-          .filter((txn) => txn.type === "income")
-          .reduce((sum, txn) => sum + txn.amount, 0) /
-        transactions.filter((txn) => txn.type === "income").length
+    const incomeTransactions = transactions.filter((txn) => txn.type === "income");
+    const incomeTransactionCount = incomeTransactions.length;
+    const averageDonation = incomeTransactionCount
+      ? incomeTransactions.reduce((sum, txn) => sum + txn.amount, 0) /
+        incomeTransactionCount
       : 0;
 
     const newDonors = donors
