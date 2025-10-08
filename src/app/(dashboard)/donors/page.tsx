@@ -271,6 +271,8 @@ export default function DonorDirectoryPage() {
     setPageNotice(`${donorToArchive.name} archived.`);
   };
 
+  const selectedChurchId = churchId ?? "";
+
   return (
     <div className="min-h-screen bg-paper pb-12">
       <header className="border-b border-ledger bg-paper">
@@ -289,8 +291,10 @@ export default function DonorDirectoryPage() {
             <div className="flex flex-col gap-2 lg:items-end">
               <span className="text-xs uppercase tracking-wide text-grey-mid">Active church</span>
               <Select
-                value={churchId ?? undefined}
-                onValueChange={(value) => setChurchId(value as Id<"churches">)}
+                value={selectedChurchId}
+                onValueChange={(value) =>
+                  setChurchId(value ? (value as Id<"churches">) : null)
+                }
               >
                 <SelectTrigger className="w-[240px] font-primary">
                   <SelectValue placeholder="Select church" />
