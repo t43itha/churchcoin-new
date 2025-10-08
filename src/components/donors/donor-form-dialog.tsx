@@ -47,7 +47,7 @@ const donorFormSchema = z
     address: z.string().optional().or(z.literal("")),
     bankReference: z.string().optional().or(z.literal("")),
     notes: z.string().optional().or(z.literal("")),
-    giftAidSigned: z.boolean().default(false),
+    giftAidSigned: z.boolean(),
     giftAidDate: z.string().optional().or(z.literal("")),
   })
   .refine(
