@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { ArrowRight, Layers, Sparkles } from "lucide-react";
+import { Layers, Sparkles } from "lucide-react";
 
 import { CsvUploadCard } from "@/components/imports/csv-upload-card";
 import {
@@ -11,7 +11,6 @@ import {
 } from "@/components/imports/mapping-drawer";
 import { DuplicateReview } from "@/components/imports/duplicate-review";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -19,14 +18,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { WorkflowStepper, type StepStatus, type WorkflowStep } from "@/components/imports/workflow-stepper";
+import { StatusBanner } from "@/components/imports/status-banner";
+import { RecentImportsDrawer } from "@/components/imports/recent-imports-drawer";
 import { deriveMapping, normalizeCsvDate, type ParsedCsvRow } from "@/lib/csv";
 import { api, type Doc, type Id } from "@/lib/convexGenerated";
-import { formatUkDateTime } from "@/lib/dates";
 
 type ParsedFileState = {
   filename: string;
   headers: string[];
   bankFormat: "barclays" | "hsbc" | "metrobank" | "generic";
+};
+
+type StatusAction = {
+  label: string;
+  onClick: () => void;
+};
+
+type StatusMessage = {
+  variant: "info" | "success" | "warning" | "error";
+  title: string;
+  description?: string;
+  actions?: StatusAction[];
 };
 
 export default function ImportsPage() {
@@ -35,7 +48,7 @@ export default function ImportsPage() {
   const [parsedFile, setParsedFile] = useState<ParsedFileState | null>(null);
   const [mapping, setMapping] = useState<MappingConfig | null>(null);
   const [activeImportId, setActiveImportId] = useState<Id<"csvImports"> | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
   const [parsedRows, setParsedRows] = useState<ParsedCsvRow[]>([]);
 
   const funds = useQuery(api.funds.getFunds, churchId ? { churchId } : "skip");
@@ -48,6 +61,7 @@ export default function ImportsPage() {
   const skipRows = useMutation(api.imports.skipRows);
   const approveRows = useMutation(api.imports.approveRows);
   const autoApproveRows = useMutation(api.imports.autoApproveRows);
+  const deleteImport = useMutation(api.imports.deleteImport);
 
   useEffect(() => {
     if (!churchId && churches && churches.length > 0) {
@@ -55,23 +69,31 @@ export default function ImportsPage() {
     }
   }, [churches, churchId]);
 
+  const showStatus = (message: StatusMessage) => {
+    setStatusMessage(message);
+  };
+
   const handleFileParsed = ({
     filename,
     headers,
     bankFormat,
-    rows,
+    rows: parsed,
   }: {
     filename: string;
     headers: string[];
     bankFormat: "barclays" | "hsbc" | "metrobank" | "generic";
     rows: ParsedCsvRow[];
+    rawContent: string;
   }) => {
     setParsedFile({ filename, headers, bankFormat });
     setMapping(deriveMapping(headers));
-    setParsedRows(rows);
-    setStatusMessage(
-      `Detected ${bankFormat.toUpperCase()} layout – review the column mapping before saving.`
-    );
+    setParsedRows(parsed);
+    setActiveImportId(null);
+    showStatus({
+      variant: "info",
+      title: `Detected ${bankFormat.toUpperCase()} layout`,
+      description: "Review the column mapping before saving.",
+    });
   };
 
   const handleConfirmMapping = async () => {
@@ -80,39 +102,47 @@ export default function ImportsPage() {
     }
 
     if (parsedRows.length === 0) {
-      setStatusMessage("Upload a CSV before saving the mapping.");
+      showStatus({
+        variant: "warning",
+        title: "Upload a CSV before saving the mapping.",
+      });
       return;
     }
 
-    // Validate required fields
     if (!mapping.date || !mapping.description) {
-      setStatusMessage("Please map the date and description columns before continuing.");
+      showStatus({
+        variant: "warning",
+        title: "Map the required columns",
+        description: "Please map the date and description columns before continuing.",
+      });
       return;
     }
 
-    // Validate amount fields - either single amount or both amountIn/amountOut for Metro Bank
     const hasAmountFields = mapping.amount || (mapping.amountIn && mapping.amountOut);
     if (!hasAmountFields) {
-      setStatusMessage("Please map the amount column(s) before continuing.");
+      showStatus({
+        variant: "warning",
+        title: "Amount mapping missing",
+        description: "Please map the amount column(s) before continuing.",
+      });
       return;
     }
 
-    setStatusMessage("Processing import and detecting duplicates…");
+    showStatus({
+      variant: "info",
+      title: "Processing import",
+      description: "Detecting duplicates and AI matches…",
+    });
 
     try {
-      // Map rows locally
       const mappedRows = parsedRows.map((row) => {
         let amount = 0;
 
-        // Handle Metro Bank dual amount columns
         if (mapping.amountIn && mapping.amountOut) {
           const amountIn = Number(row[mapping.amountIn]) || 0;
           const amountOut = Number(row[mapping.amountOut]) || 0;
-
-          // Income is positive, expense is negative
           amount = amountIn - amountOut;
         } else {
-          // Handle single amount column
           const rawAmount = Number(row[mapping.amount]);
           amount = Number.isNaN(rawAmount) ? 0 : rawAmount;
         }
@@ -126,7 +156,6 @@ export default function ImportsPage() {
         };
       });
 
-      // Single atomic mutation - creates import AND saves all rows
       const importId = await createImportWithRows({
         churchId,
         filename: parsedFile.filename,
@@ -137,11 +166,17 @@ export default function ImportsPage() {
 
       setActiveImportId(importId);
       setParsedRows([]);
-      setStatusMessage(`Saved ${mappedRows.length} rows. Review duplicates below before approving.`);
+      showStatus({
+        variant: "success",
+        title: `Saved ${mappedRows.length} rows`,
+        description: "Review duplicates below before approving.",
+      });
     } catch (error) {
-      setStatusMessage(
-        `Failed to save import: ${error instanceof Error ? error.message : "Unknown error"}`
-      );
+      showStatus({
+        variant: "error",
+        title: "Failed to save import",
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
       console.error("Import error:", error);
     }
   };
@@ -163,12 +198,19 @@ export default function ImportsPage() {
       churchId,
       rows: selection,
     });
-    setStatusMessage(`Approved ${selection.length} rows. They are now in the ledger.`);
+    showStatus({
+      variant: "success",
+      title: `Approved ${selection.length} rows`,
+      description: "They are now available in the ledger.",
+    });
   };
 
   const handleSkipSelection = async (rowIds: Id<"csvRows">[]) => {
     await skipRows({ rowIds });
-    setStatusMessage(`Skipped ${rowIds.length} rows.`);
+    showStatus({
+      variant: "info",
+      title: `Skipped ${rowIds.length} row${rowIds.length === 1 ? "" : "s"}`,
+    });
   };
 
   const handleAutoApprove = async () => {
@@ -181,78 +223,178 @@ export default function ImportsPage() {
       churchId,
     });
 
-    setStatusMessage(
-      `Auto-approved ${result.approvedCount} high-confidence rows. ${result.skippedCount} require manual review.`
-    );
+    showStatus({
+      variant: "success",
+      title: `Auto-approved ${result.approvedCount} high-confidence rows`,
+      description: `${result.skippedCount} still require manual review.`,
+    });
 
     return result;
   };
 
+  const handleDeleteImport = async (importId: Id<"csvImports">) => {
+    if (!churchId) return;
+
+    const result = await deleteImport({ importId, churchId });
+
+    // If the deleted import was active, clear it
+    if (activeImportId === importId) {
+      setActiveImportId(null);
+    }
+
+    showStatus({
+      variant: "success",
+      title: "Import deleted",
+      description: `Deleted ${result.deletedRows} rows and ${result.deletedTransactions} transactions.`,
+    });
+  };
+
   const latestRows = rows ?? [];
 
+  const currentStep = useMemo(() => {
+    if (activeImportId) {
+      return 3;
+    }
+    if (parsedFile && mapping) {
+      return 2;
+    }
+    return 1;
+  }, [activeImportId, mapping, parsedFile]);
+
+  const stepperSteps = useMemo<WorkflowStep[]>(() => {
+    const statusFor = (stepNumber: number): StepStatus => {
+      if (currentStep === stepNumber) return "active";
+      if (currentStep > stepNumber) return "complete";
+      return "upcoming";
+    };
+
+    return [
+      {
+        id: 1,
+        label: "Upload CSV",
+        description: "Drop your bank export",
+        status: statusFor(1),
+      },
+      {
+        id: 2,
+        label: "Map columns",
+        description: "Confirm the required fields",
+        status: statusFor(2),
+      },
+      {
+        id: 3,
+        label: "Review & approve",
+        description: "Assign funds and approve",
+        status: statusFor(3),
+      },
+    ];
+  }, [currentStep]);
+
+  const handleResetToUpload = () => {
+    setParsedFile(null);
+    setParsedRows([]);
+    setMapping(null);
+    setActiveImportId(null);
+  };
+
   return (
-    
-      <div className="min-h-screen bg-paper pb-12">
+    <div className="min-h-screen bg-paper pb-16">
       <div className="border-b border-ledger bg-paper">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-2">
+        <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-10">
+          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-4">
               <div className="flex items-center gap-2 text-grey-mid">
                 <Layers className="h-5 w-5 text-grey-mid" />
-                <span className="text-sm uppercase tracking-wide">Bank Imports</span>
+                <span className="text-sm uppercase tracking-wide">Bank imports</span>
               </div>
-              <h1 className="text-3xl font-semibold text-ink">CSV import workspace</h1>
-              <p className="text-sm text-grey-mid">
-                Drag and drop bank exports, map the columns, and push transactions straight into the ledger with duplicate
-                detection.
-              </p>
+              <div className="space-y-2">
+                <h1 className="text-3xl font-semibold text-ink">CSV import workspace</h1>
+                <p className="text-sm text-grey-mid">
+                  Upload CSV exports, map the required columns, and review AI-assisted recommendations before approving
+                  transactions into the ledger.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-xs text-grey-mid">
+                <Badge variant="secondary" className="border-success/40 bg-success/10 text-success">
+                  <Sparkles className="mr-1 h-3 w-3" /> AI auto-detection active
+                </Badge>
+                <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
+                  Import history stored for audit
+                </Badge>
+              </div>
             </div>
-            <div className="flex flex-col gap-2 md:items-end">
-              <span className="text-xs uppercase tracking-wide text-grey-mid">Active church</span>
-              <Select
-                value={churchId ?? undefined}
-                onValueChange={(value) => setChurchId(value as Id<"churches">)}
-              >
-                <SelectTrigger className="w-[240px] font-primary">
-                  <SelectValue placeholder="Select church" />
-                </SelectTrigger>
-                <SelectContent className="font-primary">
-                  {churches?.map((church) => (
-                    <SelectItem key={church._id} value={church._id}>
-                      {church.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex flex-col items-start gap-4 md:items-end">
+              <div className="space-y-2">
+                <span className="text-xs uppercase tracking-wide text-grey-mid">Active church</span>
+                <Select value={churchId ?? undefined} onValueChange={(value) => setChurchId(value as Id<"churches">)}>
+                  <SelectTrigger className="w-[240px] font-primary">
+                    <SelectValue placeholder="Select church" />
+                  </SelectTrigger>
+                  <SelectContent className="font-primary">
+                    {churches?.map((church) => (
+                      <SelectItem key={church._id} value={church._id}>
+                        {church.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <RecentImportsDrawer
+                imports={imports ?? []}
+                activeImportId={activeImportId}
+                onSelect={(importId) => setActiveImportId(importId)}
+                onDelete={handleDeleteImport}
+              />
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-grey-mid">
-            <Badge variant="secondary" className="border-success/40 bg-success/10 text-success">
-              <Sparkles className="mr-1 h-3 w-3" /> AI auto-detection active
-            </Badge>
-            <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
-              <ArrowRight className="mr-1 h-3 w-3" /> Import history stored for audit
-            </Badge>
-          </div>
+          <WorkflowStepper steps={stepperSteps} />
         </div>
       </div>
+
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
         {statusMessage ? (
-          <div className="rounded-md border border-ledger bg-highlight/40 px-4 py-3 text-sm text-grey-mid">
-            {statusMessage}
-          </div>
+          <StatusBanner
+            variant={statusMessage.variant}
+            title={statusMessage.title}
+            description={statusMessage.description}
+            actions={statusMessage.actions}
+            onDismiss={() => setStatusMessage(null)}
+          />
         ) : null}
-        <div className="grid gap-6 lg:grid-cols-[1.2fr,1fr]">
-          <div className="space-y-4">
-            <CsvUploadCard onFileParsed={handleFileParsed} />
-            {parsedFile && mapping ? (
-              <MappingDrawer
-                headers={parsedFile.headers}
-                mapping={mapping}
-                onChange={setMapping}
-                onConfirm={handleConfirmMapping}
-              />
-            ) : null}
+
+        <section className="space-y-6">
+          <div className="space-y-3">
+            <h2 className="text-xl font-semibold text-ink">Step 1 · Upload CSV</h2>
+            <p className="text-sm text-grey-mid">Drop your bank export to detect the format automatically.</p>
+          </div>
+          <CsvUploadCard onFileParsed={handleFileParsed} />
+        </section>
+
+        {currentStep === 2 && parsedFile && mapping ? (
+          <section className="space-y-6">
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold text-ink">Step 2 · Map columns</h2>
+              <p className="text-sm text-grey-mid">Confirm the required fields and optional enrichments.</p>
+            </div>
+            <MappingDrawer
+              headers={parsedFile.headers}
+              previewRows={parsedRows}
+              mapping={mapping}
+              onChange={setMapping}
+              onConfirm={handleConfirmMapping}
+              onBack={handleResetToUpload}
+            />
+          </section>
+        ) : null}
+
+        {currentStep === 3 && (
+          <section className="space-y-6">
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold text-ink">Step 3 · Review &amp; Approve</h2>
+              <p className="text-sm text-grey-mid">
+                Assign funds to each transaction and approve them into the ledger.
+              </p>
+            </div>
             {latestRows.length > 0 && funds && categories && donors ? (
               <DuplicateReview
                 rows={latestRows as Doc<"csvRows">[]}
@@ -263,43 +405,16 @@ export default function ImportsPage() {
                 onSkipSelection={handleSkipSelection}
                 onAutoApprove={handleAutoApprove}
               />
-            ) : null}
-          </div>
-          <Card className="border-ledger bg-paper shadow-none">
-            <CardHeader>
-              <CardTitle className="text-ink">Recent imports</CardTitle>
-              <CardDescription className="text-grey-mid">
-                Track processing progress and reopen batches for review.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-grey-mid">
-              {imports && imports.length > 0 ? (
-                imports.map((record: Doc<"csvImports">) => (
-                  <button
-                    key={record._id}
-                    type="button"
-                    className={`flex w-full flex-col rounded-md border border-ledger px-3 py-2 text-left transition hover:border-ink ${
-                      activeImportId === record._id ? "bg-highlight/60" : "bg-paper"
-                    }`}
-                    onClick={() => setActiveImportId(record._id)}
-                  >
-                    <span className="font-medium text-ink">{record.filename}</span>
-                    <span className="text-xs text-grey-mid">
-                      {formatUkDateTime(record.uploadedAt) || "—"} · Status: {record.status}
-                    </span>
-                    <span className="text-xs text-grey-mid">
-                      {record.processedCount}/{record.rowCount} processed · Duplicates {record.duplicateCount}
-                    </span>
-                  </button>
-                ))
-              ) : (
-                <p>No imports yet. Upload a CSV to get started.</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+            ) : (
+              <div className="rounded-lg border border-ledger bg-paper px-6 py-10 text-center">
+                <p className="text-grey-mid">
+                  All rows have been processed. Upload a new CSV to start another import.
+                </p>
+              </div>
+            )}
+          </section>
+        )}
       </div>
-      </div>
-    
+    </div>
   );
 }

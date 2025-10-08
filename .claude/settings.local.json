@@ -9,7 +9,9 @@
       "Bash(npx convex run:*)",
       "Bash(npm run build:*)",
       "Bash(npm run lint:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(npm run convex:dev:*)",
+      "Bash(npx shadcn:*)"
     ],
     "deny": [],
     "ask": []

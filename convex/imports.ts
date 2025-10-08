@@ -781,3 +781,46 @@ export const cleanupStuckImports = internalMutation({
   },
 });
 
+// Delete an import and all its associated data (rows and transactions)
+export const deleteImport = mutation({
+  args: {
+    importId: v.id("csvImports"),
+    churchId: v.id("churches"),
+  },
+  handler: async (ctx, args) => {
+    // Verify the import belongs to this church
+    const importRecord = await ctx.db.get(args.importId);
+    if (!importRecord || importRecord.churchId !== args.churchId) {
+      throw new Error("Import not found or access denied");
+    }
+
+    // 1. Delete all transactions created from this import
+    const transactions = await ctx.db
+      .query("transactions")
+      .filter((q) => q.eq(q.field("csvBatch"), args.importId))
+      .collect();
+
+    for (const transaction of transactions) {
+      await ctx.db.delete(transaction._id);
+    }
+
+    // 2. Delete all CSV rows
+    const rows = await ctx.db
+      .query("csvRows")
+      .withIndex("by_import", (q) => q.eq("importId", args.importId))
+      .collect();
+
+    for (const row of rows) {
+      await ctx.db.delete(row._id);
+    }
+
+    // 3. Delete the import record
+    await ctx.db.delete(args.importId);
+
+    return {
+      deletedTransactions: transactions.length,
+      deletedRows: rows.length,
+    };
+  },
+});
+
