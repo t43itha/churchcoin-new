@@ -6,10 +6,8 @@ import {
   ChevronUp,
   ChevronsUpDown,
   Check,
-  Filter,
   Search,
   Sparkles,
-  X,
 } from "lucide-react";
 import { formatUkDateWithMonth } from "@/lib/dates";
 
@@ -79,12 +77,6 @@ type DuplicateReviewProps = {
 
 type BulkAssignmentType = "fund" | "category" | "donor";
 
-type ActiveFilterChip = {
-  id: string;
-  label: string;
-  onClear: () => void;
-};
-
 export function DuplicateReview({
   rows,
   funds,
@@ -108,14 +100,12 @@ export function DuplicateReview({
     category: new Set(),
     donor: new Set(),
   });
-  const [filtersOpen, setFiltersOpen] = useState(false);
-
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("__all_categories");
-  const [statusFilter, setStatusFilter] = useState("__all_status");
-  const [confidenceFilter, setConfidenceFilter] = useState("__all_confidence");
-  const [typeFilter, setTypeFilter] = useState("__all_types");
+  const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "skipped">("all");
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [confidenceFilter, setConfidenceFilter] = useState<"all" | "high" | "medium" | "low">("all");
   const [autoApproving, setAutoApproving] = useState(false);
 
   // Popover states for searchable dropdowns (keyed by rowId_fieldType)
@@ -123,65 +113,59 @@ export function DuplicateReview({
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
+      // Apply search query
       if (searchQuery && searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchesDescription = row.raw.description.toLowerCase().includes(query);
         const matchesReference = row.raw.reference?.toLowerCase().includes(query);
-        if (!matchesDescription && !matchesReference) {
+        const matchesDate = row.raw.date?.toLowerCase().includes(query);
+        const matchesAmount = row.raw.amount?.toString().includes(query);
+        if (!matchesDescription && !matchesReference && !matchesDate && !matchesAmount) {
           return false;
         }
       }
 
-      if (typeFilter && typeFilter !== "__all_types") {
-        const rowType = row.transactionType || (row.raw.amount >= 0 ? "income" : "expense");
+      // Apply type filter
+      if (typeFilter !== "all") {
+        const rowType = row.raw.amount >= 0 ? "income" : "expense";
         if (rowType !== typeFilter) {
           return false;
         }
       }
 
-      if (categoryFilter && categoryFilter !== "__all_categories") {
+      // Apply status filter
+      if (statusFilter !== "all") {
+        if (!row.status && statusFilter !== "pending") {
+          return false;
+        }
+        if (row.status && row.status !== statusFilter) {
+          return false;
+        }
+      }
+
+      // Apply category filter
+      if (categoryFilter) {
         const rowCategoryId = selected[row._id]?.categoryId || row.detectedCategoryId;
         if (rowCategoryId !== categoryFilter) {
           return false;
         }
       }
 
-      if (statusFilter && statusFilter !== "__all_status" && row.status !== statusFilter) {
-        return false;
-      }
-
-      if (confidenceFilter && confidenceFilter !== "__all_confidence") {
+      // Apply confidence filter
+      if (confidenceFilter !== "all") {
         const confidences: number[] = [];
         if (row.donorConfidence !== undefined) confidences.push(row.donorConfidence);
         if (row.categoryConfidence !== undefined) confidences.push(row.categoryConfidence);
-
-        const avgConfidence =
-          confidences.length > 0 ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length : 0;
+        const avgConfidence = confidences.length > 0 ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length : 0;
 
         if (confidenceFilter === "high" && avgConfidence < 0.95) return false;
         if (confidenceFilter === "medium" && (avgConfidence < 0.7 || avgConfidence >= 0.95)) return false;
         if (confidenceFilter === "low" && avgConfidence >= 0.7) return false;
-        if (confidenceFilter === "needs_review" && avgConfidence >= 0.95) return false;
       }
 
       return true;
     });
-  }, [rows, searchQuery, typeFilter, categoryFilter, statusFilter, confidenceFilter, selected]);
-
-  const totals = useMemo(() => {
-    return filteredRows.reduce(
-      (acc, row) => {
-        const amount = Math.abs(row.raw.amount);
-        if (row.raw.amount >= 0) {
-          acc.income += amount;
-        } else {
-          acc.expense += amount;
-        }
-        return acc;
-      },
-      { income: 0, expense: 0 }
-    );
-  }, [filteredRows]);
+  }, [rows, searchQuery, typeFilter, statusFilter, categoryFilter, confidenceFilter, selected]);
 
   const overallTotals = useMemo(() => {
     return rows.reduce(
@@ -375,66 +359,6 @@ export function DuplicateReview({
     });
   };
 
-  const clearFilters = () => {
-    setSearchQuery("");
-    setCategoryFilter("__all_categories");
-    setStatusFilter("__all_status");
-    setConfidenceFilter("__all_confidence");
-    setTypeFilter("__all_types");
-  };
-
-  const hasActiveFilters =
-    Boolean(searchQuery.trim()) ||
-    (categoryFilter && categoryFilter !== "__all_categories") ||
-    (statusFilter && statusFilter !== "__all_status") ||
-    (confidenceFilter && confidenceFilter !== "__all_confidence") ||
-    (typeFilter && typeFilter !== "__all_types");
-
-  const activeFilterChips: ActiveFilterChip[] = [];
-  if (searchQuery.trim()) {
-    activeFilterChips.push({
-      id: "search",
-      label: `Search: ${searchQuery}`,
-      onClear: () => setSearchQuery(""),
-    });
-  }
-  if (typeFilter !== "__all_types") {
-    activeFilterChips.push({
-      id: "type",
-      label: typeFilter === "income" ? "Income" : "Expense",
-      onClear: () => setTypeFilter("__all_types"),
-    });
-  }
-  if (categoryFilter !== "__all_categories") {
-    const category = categories.find((item) => item._id === categoryFilter);
-    activeFilterChips.push({
-      id: "category",
-      label: category ? category.name : "Category",
-      onClear: () => setCategoryFilter("__all_categories"),
-    });
-  }
-  if (statusFilter !== "__all_status") {
-    activeFilterChips.push({
-      id: "status",
-      label: statusFilter,
-      onClear: () => setStatusFilter("__all_status"),
-    });
-  }
-  if (confidenceFilter !== "__all_confidence") {
-    const confidenceLabel =
-      confidenceFilter === "high"
-        ? "High confidence"
-        : confidenceFilter === "medium"
-        ? "Medium confidence"
-        : confidenceFilter === "low"
-        ? "Low confidence"
-        : "Needs review";
-    activeFilterChips.push({
-      id: "confidence",
-      label: confidenceLabel,
-      onClear: () => setConfidenceFilter("__all_confidence"),
-    });
-  }
 
   const handleAutoApprove = async () => {
     if (!onAutoApprove) return;
@@ -467,10 +391,10 @@ export function DuplicateReview({
       value: rows.length.toString(),
       sublabel: `${rows.length} imported`,
       onClick: () => {
-        setTypeFilter("__all_types");
-        setStatusFilter("__all_status");
-        setConfidenceFilter("__all_confidence");
-        setCategoryFilter("__all_categories");
+        setTypeFilter("all");
+        setStatusFilter("all");
+        setCategoryFilter(null);
+        setConfidenceFilter("all");
       },
     },
     {
@@ -501,19 +425,6 @@ export function DuplicateReview({
 
   return (
     <section className="space-y-6">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-grey-mid">
-          <span className="rounded-md border border-ledger px-2 py-1 font-mono">Step 3</span>
-          Review &amp; approve
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-2xl font-semibold text-ink">Review transactions</h2>
-          <Badge variant="secondary" className="border-success/40 bg-success/10 text-success">
-            {readyRows.length} ready to approve
-          </Badge>
-        </div>
-      </div>
-
       {funds.length === 0 && (
         <div className="rounded-lg border border-error bg-error/10 px-4 py-3 text-sm text-error">
           No funds are configured for this church. Please create at least one fund before importing transactions.
@@ -557,164 +468,93 @@ export function DuplicateReview({
         </div>
       ) : null}
 
-      <div className="rounded-lg border border-ledger bg-paper">
-        <button
-          type="button"
-          onClick={() => setFiltersOpen((prev) => !prev)}
-          className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
-        >
-          <div className="flex items-center gap-2 text-sm font-medium text-ink">
-            <Filter className="h-4 w-4 text-grey-mid" /> Filters
-            <span className="text-xs font-normal text-grey-mid">{filteredRows.length} shown</span>
+      {/* Filters Section */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {/* Left side: Type Filter Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setTypeFilter("all")}
+            className={`rounded-full px-4 py-1.5 text-sm font-primary transition-colors ${
+              typeFilter === "all"
+                ? "bg-ink text-paper"
+                : "bg-paper text-grey-mid border border-ledger hover:border-ink hover:text-ink"
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setTypeFilter("income")}
+            className={`rounded-full px-4 py-1.5 text-sm font-primary transition-colors ${
+              typeFilter === "income"
+                ? "bg-ink text-paper"
+                : "bg-paper text-grey-mid border border-ledger hover:border-ink hover:text-ink"
+            }`}
+          >
+            Income
+          </button>
+          <button
+            onClick={() => setTypeFilter("expense")}
+            className={`rounded-full px-4 py-1.5 text-sm font-primary transition-colors ${
+              typeFilter === "expense"
+                ? "bg-ink text-paper"
+                : "bg-paper text-grey-mid border border-ledger hover:border-ink hover:text-ink"
+            }`}
+          >
+            Expense
+          </button>
+        </div>
+
+        {/* Right side: Status/Category/Confidence Dropdowns + Search */}
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as "all" | "pending" | "approved" | "skipped")}>
+            <SelectTrigger className="w-[180px] border-ledger bg-paper font-primary text-sm">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent className="font-primary">
+              <SelectItem value="all">Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="skipped">Skipped</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={categoryFilter || "all"} onValueChange={(value) => setCategoryFilter(value === "all" ? null : value)}>
+            <SelectTrigger className="w-[180px] border-ledger bg-paper font-primary text-sm">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent className="font-primary">
+              <SelectItem value="all">Category</SelectItem>
+              {categories.map((category) => (
+                <SelectItem key={category._id} value={category._id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={confidenceFilter} onValueChange={(value) => setConfidenceFilter(value as "all" | "high" | "medium" | "low")}>
+            <SelectTrigger className="w-[180px] border-ledger bg-paper font-primary text-sm">
+              <SelectValue placeholder="Confidence" />
+            </SelectTrigger>
+            <SelectContent className="font-primary">
+              <SelectItem value="all">Confidence</SelectItem>
+              <SelectItem value="high">High (≥95%)</SelectItem>
+              <SelectItem value="medium">Medium (70-94%)</SelectItem>
+              <SelectItem value="low">Low (&lt;70%)</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-grey-mid" />
+            <Input
+              type="text"
+              placeholder="Search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 font-primary border-ledger bg-paper"
+            />
           </div>
-          <div className="flex items-center gap-2">
-            {hasActiveFilters ? (
-              <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
-                {activeFilterChips.length} active
-              </Badge>
-            ) : (
-              <span className="text-xs text-grey-mid">Collapsed</span>
-            )}
-            {filtersOpen ? <ChevronUp className="h-4 w-4 text-grey-mid" /> : <ChevronDown className="h-4 w-4 text-grey-mid" />}
-          </div>
-        </button>
-        {(!filtersOpen && activeFilterChips.length > 0) ? (
-          <div className="flex flex-wrap gap-2 border-t border-ledger px-4 py-3">
-            {activeFilterChips.map((chip) => (
-              <button
-                key={chip.id}
-                className="flex items-center gap-2 rounded-full border border-ledger bg-highlight px-3 py-1 text-xs text-ink transition hover:border-ink"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  chip.onClear();
-                }}
-              >
-                {chip.label}
-                <X className="h-3 w-3" />
-              </button>
-            ))}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 text-xs text-grey-mid hover:text-ink"
-              onClick={(event) => {
-                event.stopPropagation();
-                clearFilters();
-              }}
-            >
-              Clear all
-            </Button>
-          </div>
-        ) : null}
-        {filtersOpen ? (
-          <div className="space-y-4 border-t border-ledger px-4 py-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-grey-mid" />
-              <Input
-                type="text"
-                placeholder="Search description or reference"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="pl-9 pr-10 font-primary"
-              />
-              {searchQuery ? (
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-mid hover:text-ink"
-                  onClick={() => setSearchQuery("")}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              ) : null}
-            </div>
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium uppercase text-grey-mid">Type</span>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant={typeFilter === "__all_types" ? "default" : "outline"}
-                    onClick={() => setTypeFilter("__all_types")}
-                    className="h-8 flex-1"
-                  >
-                    All
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={typeFilter === "income" ? "default" : "outline"}
-                    onClick={() => setTypeFilter("income")}
-                    className="h-8 flex-1"
-                  >
-                    Income
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={typeFilter === "expense" ? "default" : "outline"}
-                    onClick={() => setTypeFilter("expense")}
-                    className="h-8 flex-1"
-                  >
-                    Expense
-                  </Button>
-                </div>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium uppercase text-grey-mid">Category</span>
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="h-9 border-ledger bg-paper font-primary text-sm">
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent className="font-primary">
-                    <SelectItem value="__all_categories">All categories</SelectItem>
-                    {categories.map((category) => (
-                      <SelectItem key={category._id} value={category._id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium uppercase text-grey-mid">Status</span>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="h-9 border-ledger bg-paper font-primary text-sm">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent className="font-primary">
-                    <SelectItem value="__all_status">All statuses</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="duplicate">Duplicate</SelectItem>
-                    <SelectItem value="ready">Ready</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="skipped">Skipped</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium uppercase text-grey-mid">Confidence</span>
-                <Select value={confidenceFilter} onValueChange={setConfidenceFilter}>
-                  <SelectTrigger className="h-9 border-ledger bg-paper font-primary text-sm">
-                    <SelectValue placeholder="Confidence" />
-                  </SelectTrigger>
-                  <SelectContent className="font-primary">
-                    <SelectItem value="__all_confidence">All</SelectItem>
-                    <SelectItem value="high">High (≥95%)</SelectItem>
-                    <SelectItem value="medium">Medium (70-94%)</SelectItem>
-                    <SelectItem value="low">Low (&lt;70%)</SelectItem>
-                    <SelectItem value="needs_review">Needs review</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="flex justify-between">
-              <Button variant="ghost" className="text-sm text-grey-mid hover:text-ink" onClick={clearFilters}>
-                Clear filters
-              </Button>
-              <div className="flex items-center gap-2 text-xs text-grey-mid">
-                {filteredRows.length} of {rows.length} rows shown · Income {currency.format(totals.income)} · Expenses {currency.format(totals.expense)}
-              </div>
-            </div>
-          </div>
-        ) : null}
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-ledger">

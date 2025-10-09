@@ -10,7 +10,6 @@ import {
   type MappingConfig,
 } from "@/components/imports/mapping-drawer";
 import { DuplicateReview } from "@/components/imports/duplicate-review";
-import { SearchFilterBar, type FilterOption } from "@/components/common/search-filter-bar";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -24,14 +23,6 @@ import { StatusBanner } from "@/components/imports/status-banner";
 import { RecentImportsDrawer } from "@/components/imports/recent-imports-drawer";
 import { deriveMapping, normalizeCsvDate, type ParsedCsvRow } from "@/lib/csv";
 import { api, type Doc, type Id } from "@/lib/convexGenerated";
-
-const IMPORT_ROW_FILTER_OPTIONS: FilterOption<"all" | "pending" | "approved" | "skipped" | "high-confidence">[] = [
-  { value: "all", label: "All" },
-  { value: "pending", label: "Pending" },
-  { value: "approved", label: "Approved" },
-  { value: "skipped", label: "Skipped" },
-  { value: "high-confidence", label: "High Confidence" },
-];
 
 type ParsedFileState = {
   filename: string;
@@ -59,8 +50,6 @@ export default function ImportsPage() {
   const [activeImportId, setActiveImportId] = useState<Id<"csvImports"> | null>(null);
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
   const [parsedRows, setParsedRows] = useState<ParsedCsvRow[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [rowFilter, setRowFilter] = useState<"all" | "pending" | "approved" | "skipped" | "high-confidence">("all");
 
   const funds = useQuery(api.funds.getFunds, churchId ? { churchId } : "skip");
   const categories = useQuery(api.categories.getSubcategoriesWithParents, churchId ? { churchId } : "skip");
@@ -260,36 +249,6 @@ export default function ImportsPage() {
     });
   };
 
-  const latestRows = rows ?? [];
-
-  // Filter rows based on search and filter
-  const filteredRows = useMemo(() => {
-    let filtered = latestRows;
-
-    // Apply status filter
-    if (rowFilter === "pending") {
-      filtered = filtered.filter((row) => !row.status || row.status === "pending");
-    } else if (rowFilter === "approved") {
-      filtered = filtered.filter((row) => row.status === "approved");
-    } else if (rowFilter === "skipped") {
-      filtered = filtered.filter((row) => row.status === "skipped");
-    } else if (rowFilter === "high-confidence") {
-      filtered = filtered.filter((row) => row.categoryConfidence && row.categoryConfidence > 0.8);
-    }
-
-    // Apply search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter((row) =>
-        row.raw.description?.toLowerCase().includes(query) ||
-        row.raw.date?.toLowerCase().includes(query) ||
-        row.raw.amount?.toString().includes(query)
-      );
-    }
-
-    return filtered;
-  }, [latestRows, rowFilter, searchQuery]);
-
   const currentStep = useMemo(() => {
     if (activeImportId) {
       return 3;
@@ -435,21 +394,9 @@ export default function ImportsPage() {
               </p>
             </div>
 
-            {/* Search and Filter */}
-            {latestRows.length > 0 && (
-              <SearchFilterBar
-                searchValue={searchQuery}
-                onSearchChange={setSearchQuery}
-                searchPlaceholder="Search by description, date, amount..."
-                filterValue={rowFilter}
-                onFilterChange={setRowFilter}
-                filterOptions={IMPORT_ROW_FILTER_OPTIONS}
-              />
-            )}
-
-            {filteredRows.length > 0 && funds && categories && donors ? (
+            {rows && rows.length > 0 && funds && categories && donors ? (
               <DuplicateReview
-                rows={filteredRows as Doc<"csvRows">[]}
+                rows={rows as Doc<"csvRows">[]}
                 funds={funds as Doc<"funds">[]}
                 categories={categories}
                 donors={donors as Doc<"donors">[]}

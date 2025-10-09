@@ -1,7 +1,7 @@
 "use client";
 
 import { Calendar } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export type PeriodViewMode = "current" | "last-3" | "last-6" | "all";
 
@@ -21,21 +21,25 @@ export function PeriodSelector({ value, onChange, className }: PeriodSelectorPro
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2 mb-3">
         <Calendar className="h-4 w-4 text-grey-mid" />
         <span className="text-sm text-grey-mid font-primary">Period:</span>
       </div>
       <div className="flex gap-2 flex-wrap">
         {modes.map((mode) => (
-          <Button
+          <button
             key={mode.value}
-            variant={value === mode.value ? "default" : "outline"}
-            size="sm"
+            type="button"
             onClick={() => onChange(mode.value)}
-            className="font-primary text-xs"
+            className={cn(
+              "h-8 rounded-full border-ledger px-4 text-xs font-primary transition-colors",
+              value === mode.value
+                ? "bg-ink text-paper hover:bg-ink/90"
+                : "border bg-paper text-grey-mid hover:bg-highlight"
+            )}
           >
             {mode.label}
-          </Button>
+          </button>
         ))}
       </div>
     </div>
