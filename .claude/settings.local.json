@@ -13,7 +13,11 @@
       "Bash(npm run convex:dev:*)",
       "Bash(npx shadcn:*)",
       "Bash(git checkout:*)",
-      "Read(//c/Users/tabit/Downloads/**)"
+      "Read(//c/Users/tabit/Downloads/**)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
