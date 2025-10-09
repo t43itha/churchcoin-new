@@ -14,7 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SearchFilterBar, type FilterOption } from "@/components/common/search-filter-bar";
 import { DonorCard, type DonorMetrics } from "@/components/donors/donor-card";
 import {
   DonorFilterChips,
@@ -27,10 +26,6 @@ import { GivingByFundCard } from "@/components/donors/giving-by-fund-card";
 import { DonorFormDialog } from "@/components/donors/donor-form-dialog";
 import type { Doc, Id } from "@/lib/convexGenerated";
 import { api } from "@/lib/convexGenerated";
-
-const DONOR_FILTER_OPTIONS: FilterOption<"all">[] = [
-  { value: "all", label: "All" },
-];
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -51,7 +46,6 @@ export default function DonorDirectoryPage() {
   const [selectedDonorId, setSelectedDonorId] = useState<Id<"donors"> | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<FilterState>({});
-  const [donorFilter, setDonorFilter] = useState<"all">("all");
   const [sortBy, setSortBy] = useState<SortOption>("name");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formDonor, setFormDonor] = useState<Doc<"donors"> | null>(null);
@@ -356,15 +350,12 @@ export default function DonorDirectoryPage() {
       <main className="mx-auto max-w-7xl px-6 py-10">
         <div className="grid gap-6 lg:grid-cols-[1fr,1.4fr]">
           <section className="space-y-4">
-            <SearchFilterBar
-              searchValue={searchQuery}
+            <DonorFilterChips
+              activeFilters={filters}
+              onFilterChange={setFilters}
+              searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
-              searchPlaceholder="Search donors..."
-              filterValue={donorFilter}
-              onFilterChange={setDonorFilter}
-              filterOptions={DONOR_FILTER_OPTIONS}
             />
-            <DonorFilterChips activeFilters={filters} onFilterChange={setFilters} />
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs text-grey-mid">
                 Showing {filteredDonors.length} of {donors?.length ?? 0} donors
