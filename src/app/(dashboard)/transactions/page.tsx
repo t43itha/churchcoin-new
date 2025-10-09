@@ -16,6 +16,7 @@ import {
 import { PeriodSelector, type PeriodViewMode } from "@/components/transactions/period-selector";
 import { MultiPeriodOverview } from "@/components/transactions/multi-period-overview";
 import { PeriodCard } from "@/components/transactions/period-card";
+import { SearchFilterBar, type FilterOption } from "@/components/common/search-filter-bar";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -29,6 +30,14 @@ import { useSession } from "@/components/auth/session-provider";
 import { getRolePermissions } from "@/lib/rbac";
 import { getLastNMonths, getCurrentPeriod, periodToKey } from "@/lib/periods";
 
+const TRANSACTION_FILTER_OPTIONS: FilterOption<"all" | "income" | "expense" | "reconciled" | "unreconciled">[] = [
+  { value: "all", label: "All" },
+  { value: "income", label: "Income" },
+  { value: "expense", label: "Expense" },
+  { value: "reconciled", label: "Reconciled" },
+  { value: "unreconciled", label: "Unreconciled" },
+];
+
 export default function TransactionsPage() {
   const convex = useConvex();
   const churches = useQuery(api.churches.listChurches, {});
@@ -39,6 +48,8 @@ export default function TransactionsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Doc<"transactions"> | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [transactionFilter, setTransactionFilter] = useState<"all" | "income" | "expense" | "reconciled" | "unreconciled">("all");
   const { user } = useSession();
   const permissions = useMemo(
     () => getRolePermissions(user?.role),
@@ -95,6 +106,36 @@ export default function TransactionsPage() {
     api.transactions.getLedger,
     churchId && viewMode === "all" ? { churchId, limit: 1000 } : "skip"
   );
+
+  // Filter transactions based on search and filter
+  const filteredAllTransactions = useMemo(() => {
+    if (!allTransactions) return allTransactions;
+
+    let filtered = allTransactions;
+
+    // Apply type filter
+    if (transactionFilter === "income") {
+      filtered = filtered.filter((tx) => tx.type === "income");
+    } else if (transactionFilter === "expense") {
+      filtered = filtered.filter((tx) => tx.type === "expense");
+    } else if (transactionFilter === "reconciled") {
+      filtered = filtered.filter((tx) => tx.reconciled === true);
+    } else if (transactionFilter === "unreconciled") {
+      filtered = filtered.filter((tx) => tx.reconciled !== true);
+    }
+
+    // Apply search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((tx) =>
+        tx.description.toLowerCase().includes(query) ||
+        tx.reference?.toLowerCase().includes(query) ||
+        tx.fundName?.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [allTransactions, transactionFilter, searchQuery]);
 
   const createTransaction = useMutation(api.transactions.createTransaction);
   const updateTransaction = useMutation(api.transactions.updateTransaction);
@@ -431,6 +472,18 @@ export default function TransactionsPage() {
           <MultiPeriodOverview trends={trendData} />
         )}
 
+        {/* Search and Filter */}
+        {showLedger && (
+          <SearchFilterBar
+            searchValue={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Search transactions..."
+            filterValue={transactionFilter}
+            onFilterChange={setTransactionFilter}
+            filterOptions={TRANSACTION_FILTER_OPTIONS}
+          />
+        )}
+
         {/* Period Cards */}
         {showLedger && multiPeriodSummary && periods && (
           <div className="space-y-4">
@@ -465,13 +518,13 @@ export default function TransactionsPage() {
         )}
 
         {/* Fallback for "All" mode */}
-        {showLedger && viewMode === "all" && allTransactions && (
+        {showLedger && viewMode === "all" && filteredAllTransactions && (
           <div className="rounded-lg border border-ledger bg-paper p-6">
             <h2 className="text-xl font-semibold text-ink font-primary mb-4">
               All Transactions
             </h2>
             <TransactionLedger
-              rows={allTransactions as TransactionLedgerRow[]}
+              rows={filteredAllTransactions as TransactionLedgerRow[]}
               onEdit={canManageTransactions ? (tx) => {
                 setEditingTransaction(tx);
                 setIsEditDialogOpen(true);
