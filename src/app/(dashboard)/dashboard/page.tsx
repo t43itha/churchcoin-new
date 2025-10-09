@@ -13,7 +13,6 @@ import {
   Plus,
   Receipt,
   Target,
-  TrendingUp,
 } from "lucide-react";
 import {
   Card,

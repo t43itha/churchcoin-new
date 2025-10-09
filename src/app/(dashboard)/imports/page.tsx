@@ -274,7 +274,7 @@ export default function ImportsPage() {
     } else if (rowFilter === "skipped") {
       filtered = filtered.filter((row) => row.status === "skipped");
     } else if (rowFilter === "high-confidence") {
-      filtered = filtered.filter((row) => row.aiConfidence && row.aiConfidence > 0.8);
+      filtered = filtered.filter((row) => row.categoryConfidence && row.categoryConfidence > 0.8);
     }
 
     // Apply search query
