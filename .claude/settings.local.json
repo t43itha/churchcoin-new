@@ -11,7 +11,9 @@
       "Bash(npm run lint:*)",
       "Bash(npm run dev:*)",
       "Bash(npm run convex:dev:*)",
-      "Bash(npx shadcn:*)"
+      "Bash(npx shadcn:*)",
+      "Bash(git checkout:*)",
+      "Read(//c/Users/tabit/Downloads/**)"
     ],
     "deny": [],
     "ask": []

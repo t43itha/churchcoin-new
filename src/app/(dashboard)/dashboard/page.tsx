@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Church,
   Layers,
+  Plus,
   Receipt,
   Target,
   TrendingUp,
@@ -802,8 +803,8 @@ export default function DashboardPage() {
             </Button>
             <Button className="font-primary" asChild>
               <Link href="/transactions">
-                <TrendingUp className="mr-2 h-4 w-4" />
-                Record Activity
+                <Plus className="mr-2 h-4 w-4" />
+                Add Transaction
               </Link>
             </Button>
           </div>
