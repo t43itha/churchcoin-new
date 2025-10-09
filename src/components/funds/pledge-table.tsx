@@ -1,6 +1,8 @@
 "use client";
 
+import { Edit2, Trash2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { formatUkDateNumeric } from "@/lib/dates";
 import { type FundSupporter } from "./types";
 
@@ -19,9 +21,11 @@ const statusTone: Record<FundSupporter["computedStatus"], string> = {
 type PledgeTableProps = {
   supporters: FundSupporter[];
   emptyMessage?: string;
+  onEdit?: (supporter: FundSupporter) => void;
+  onDelete?: (supporter: FundSupporter) => void;
 };
 
-export function PledgeTable({ supporters, emptyMessage }: PledgeTableProps) {
+export function PledgeTable({ supporters, emptyMessage, onEdit, onDelete }: PledgeTableProps) {
   if (supporters.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-ledger bg-paper px-4 py-6 text-center text-sm text-grey-mid">
@@ -29,6 +33,8 @@ export function PledgeTable({ supporters, emptyMessage }: PledgeTableProps) {
       </div>
     );
   }
+
+  const showActions = onEdit || onDelete;
 
   return (
     <div className="overflow-hidden rounded-lg border border-ledger bg-paper">
@@ -42,6 +48,9 @@ export function PledgeTable({ supporters, emptyMessage }: PledgeTableProps) {
               <TableHead className="text-right text-xs uppercase tracking-wide text-grey-dark">Outstanding</TableHead>
               <TableHead className="text-xs uppercase tracking-wide text-grey-dark">Status</TableHead>
               <TableHead className="text-xs uppercase tracking-wide text-grey-dark">Last donation</TableHead>
+              {showActions && (
+                <TableHead className="text-xs uppercase tracking-wide text-grey-dark">Actions</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -74,6 +83,34 @@ export function PledgeTable({ supporters, emptyMessage }: PledgeTableProps) {
                 <TableCell className="whitespace-nowrap text-sm text-grey-mid">
                   {supporter.lastDonationDate ? formatUkDateNumeric(supporter.lastDonationDate) : "—"}
                 </TableCell>
+                {showActions && (
+                  <TableCell className="text-sm">
+                    <div className="flex items-center gap-1">
+                      {onEdit && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onEdit(supporter)}
+                          className="h-8 w-8 p-0 hover:bg-highlight"
+                          aria-label="Edit pledge"
+                        >
+                          <Edit2 className="h-4 w-4 text-grey-mid" />
+                        </Button>
+                      )}
+                      {onDelete && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onDelete(supporter)}
+                          className="h-8 w-8 p-0 hover:bg-error/10"
+                          aria-label="Delete pledge"
+                        >
+                          <Trash2 className="h-4 w-4 text-error" />
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>

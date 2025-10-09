@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import { FundFundraisingTab } from "@/components/funds/fund-fundraising-tab";
 import { FundHeader } from "@/components/funds/fund-header";
@@ -17,17 +17,14 @@ import type { FundOverview } from "@/components/funds/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { api, type Id } from "@/lib/convexGenerated";
 
-type FundPageProps = {
-  params: { id: string };
-};
-
 const loadingState = (
   <div className="flex min-h-screen items-center justify-center bg-paper text-sm text-grey-mid">
     Loading fund…
   </div>
 );
 
-export default function FundPage({ params }: FundPageProps) {
+export default function FundPage() {
+  const params = useParams<{ id: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
   const fundId = params.id as Id<"funds">;
@@ -250,7 +247,7 @@ export default function FundPage({ params }: FundPageProps) {
       <PledgeImportDialog
         open={isImportDialogOpen}
         onOpenChange={setIsImportDialogOpen}
-        fundId={fund._id}
+        fund={fund}
         churchId={fund.churchId}
       />
     </div>

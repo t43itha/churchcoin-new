@@ -100,6 +100,22 @@ export const updatePledge = mutation({
   },
 });
 
+export const deletePledge = mutation({
+  args: {
+    pledgeId: v.id("fundPledges"),
+  },
+  handler: async (ctx, args) => {
+    const pledge = await ctx.db.get(args.pledgeId);
+    if (!pledge) {
+      throw new Error("Pledge not found");
+    }
+
+    await ctx.db.delete(args.pledgeId);
+
+    return args.pledgeId;
+  },
+});
+
 // Match donor by name or email with fuzzy matching
 export const matchDonorByNameOrEmail = query({
   args: {
