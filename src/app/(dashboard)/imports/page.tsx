@@ -249,36 +249,6 @@ export default function ImportsPage() {
     });
   };
 
-  const latestRows = rows ?? [];
-
-  // Filter rows based on search and filter
-  const filteredRows = useMemo(() => {
-    let filtered = latestRows;
-
-    // Apply status filter
-    if (rowFilter === "pending") {
-      filtered = filtered.filter((row) => !row.status || row.status === "pending");
-    } else if (rowFilter === "approved") {
-      filtered = filtered.filter((row) => row.status === "approved");
-    } else if (rowFilter === "skipped") {
-      filtered = filtered.filter((row) => row.status === "skipped");
-    } else if (rowFilter === "high-confidence") {
-      filtered = filtered.filter((row) => row.categoryConfidence && row.categoryConfidence > 0.8);
-    }
-
-    // Apply search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter((row) =>
-        row.raw.description?.toLowerCase().includes(query) ||
-        row.raw.date?.toLowerCase().includes(query) ||
-        row.raw.amount?.toString().includes(query)
-      );
-    }
-
-    return filtered;
-  }, [latestRows, rowFilter, searchQuery]);
-
   const currentStep = useMemo(() => {
     if (activeImportId) {
       return 3;
