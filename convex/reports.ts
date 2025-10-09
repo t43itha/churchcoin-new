@@ -73,6 +73,7 @@ export const getDonorStatementBatch = query({
       v.literal("designated"),
       v.literal("all")
     )),
+    donorIds: v.optional(v.array(v.id("donors"))),
   },
   handler: async (ctx, args) => {
     const donors = await ctx.db
@@ -80,6 +81,12 @@ export const getDonorStatementBatch = query({
       .withIndex("by_church", (q) => q.eq("churchId", args.churchId))
       .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
+
+    const donorIdSet = args.donorIds ? new Set<Id<"donors">>(args.donorIds) : null;
+
+    const targetDonors = donorIdSet
+      ? donors.filter((donor) => donorIdSet.has(donor._id))
+      : donors;
 
     const funds = await ctx.db
       .query("funds")
@@ -111,6 +118,10 @@ export const getDonorStatementBatch = query({
       });
     }
 
+    if (donorIdSet) {
+      filtered = filtered.filter((txn) => txn.donorId && donorIdSet.has(txn.donorId));
+    }
+
     const pledgesByDonor = new Map<string, { pledgedTotal: number; pledgeCount: number }>();
 
     if (args.fundType === "restricted" && restrictedFundIds.length > 0) {
@@ -123,6 +134,9 @@ export const getDonorStatementBatch = query({
         if (!restrictedFundIdSet.has(pledge.fundId)) {
           continue;
         }
+        if (donorIdSet && !donorIdSet.has(pledge.donorId)) {
+          continue;
+        }
         const entry = pledgesByDonor.get(pledge.donorId) ?? {
           pledgedTotal: 0,
           pledgeCount: 0,
@@ -133,15 +147,16 @@ export const getDonorStatementBatch = query({
       }
     }
 
-    const byDonor = new Map<string, typeof filtered>();
+    const byDonor = new Map<Id<"donors">, typeof filtered>();
     for (const txn of filtered) {
       if (!txn.donorId) continue;
+      if (donorIdSet && !donorIdSet.has(txn.donorId)) continue;
       const list = byDonor.get(txn.donorId) ?? [];
       list.push(txn);
       byDonor.set(txn.donorId, list);
     }
 
-    return donors.map((donor) => {
+    return targetDonors.map((donor) => {
       const donorTxns = byDonor.get(donor._id) ?? [];
       const total = donorTxns.reduce((sum, txn) => sum + txn.amount, 0);
       const pledgeInfo = pledgesByDonor.get(donor._id);

@@ -656,11 +656,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
-    const { churchId, fromDate, toDate, fundType } = body as {
+    const { churchId, fromDate, toDate, fundType, donorIds } = body as {
       churchId: string;
       fromDate: string;
       toDate: string;
       fundType?: "general" | "restricted" | "designated" | "all";
+      donorIds?: string[];
     };
 
     if (!churchId || !fromDate || !toDate) {
@@ -670,21 +671,48 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log("Fetching donor statements:", { churchId, fromDate, toDate, fundType });
+    if (donorIds && (!Array.isArray(donorIds) || donorIds.some((id) => typeof id !== "string"))) {
+      return NextResponse.json(
+        { error: "donorIds must be an array of strings" },
+        { status: 400 }
+      );
+    }
+
+    const donorIdList = donorIds?.length ? (donorIds as Id<"donors">[]) : undefined;
+
+    console.log("Fetching donor statements:", {
+      churchId,
+      fromDate,
+      toDate,
+      fundType,
+      donorIds: donorIdList?.length ?? 0,
+    });
     console.log("Convex URL:", process.env.NEXT_PUBLIC_CONVEX_URL);
 
     if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
       throw new Error("NEXT_PUBLIC_CONVEX_URL is not configured");
     }
 
+    const queryArgs: {
+      churchId: Id<"churches">;
+      fromDate: string;
+      toDate: string;
+      fundType?: "general" | "restricted" | "designated" | "all";
+      donorIds?: Id<"donors">[];
+    } = {
+      churchId: churchId as Id<"churches">,
+      fromDate,
+      toDate,
+      fundType: fundType || "all",
+    };
+
+    if (donorIdList) {
+      queryArgs.donorIds = donorIdList;
+    }
+
     const statements = await convexServerClient.query(
       api.reports.getDonorStatementBatch,
-      { 
-        churchId: churchId as Id<"churches">, 
-        fromDate, 
-        toDate,
-        fundType: fundType || "all"
-      }
+      queryArgs
     );
 
     console.log(`Found ${statements?.length || 0} donor statements`);

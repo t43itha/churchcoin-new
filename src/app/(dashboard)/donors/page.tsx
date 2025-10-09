@@ -1,12 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { HandHeart, Upload, Users, UserPlus } from "lucide-react";
+import { FileDown, HandHeart, Upload, Users, UserPlus } from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -50,6 +60,15 @@ export default function DonorDirectoryPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formDonor, setFormDonor] = useState<Doc<"donors"> | null>(null);
   const [pageNotice, setPageNotice] = useState<string | null>(null);
+  const [statementDialog, setStatementDialog] = useState<{
+    open: boolean;
+    donorIds: Id<"donors">[] | null;
+  }>({ open: false, donorIds: null });
+
+  const handleOpenStatements = useCallback((ids: Id<"donors">[] | null) => {
+    setStatementDialog({ open: true, donorIds: ids });
+    setPageNotice(null);
+  }, []);
 
   useEffect(() => {
     if (!churchId && churches && churches.length > 0) {
@@ -61,6 +80,17 @@ export default function DonorDirectoryPage() {
     api.donors.getDonors,
     churchId ? { churchId } : "skip",
   );
+
+  const statementScopeLabel = useMemo(() => {
+    if (!statementDialog.donorIds) {
+      return "All donors";
+    }
+    if (statementDialog.donorIds.length === 1) {
+      const donorName = donors?.find((donor) => donor._id === statementDialog.donorIds?.[0])?.name;
+      return donorName ? `Donor: ${donorName}` : "Selected donor";
+    }
+    return `${statementDialog.donorIds.length} donors`;
+  }, [statementDialog.donorIds, donors]);
 
   const donorStatements = useQuery(
     api.reports.getDonorStatementBatch,
@@ -328,6 +358,14 @@ export default function DonorDirectoryPage() {
                 </Button>
               </Link>
               <Button
+                variant="outline"
+                className="border-ledger font-primary"
+                onClick={() => handleOpenStatements(null)}
+                disabled={!churchId || !donors || donors.length === 0}
+              >
+                <FileDown className="mr-2 h-4 w-4" /> Statements
+              </Button>
+              <Button
                 className="border-ledger bg-ink text-paper hover:bg-ink/90"
                 onClick={() => {
                   setFormDonor(null);
@@ -419,11 +457,7 @@ export default function DonorDirectoryPage() {
                     setIsFormOpen(true);
                   }}
                   onArchive={() => handleArchive(selectedDonor)}
-                  onGenerateStatement={() =>
-                    setPageNotice(
-                      `Statement generation for ${selectedDonor.name} will be available in a future update.`,
-                    )
-                  }
+                  onGenerateStatement={() => handleOpenStatements([selectedDonor._id])}
                 />
                 <GivingHistoryLedger history={historyEntries} />
                 <GivingByFundCard givingByFund={givingByFund} />
@@ -444,6 +478,22 @@ export default function DonorDirectoryPage() {
         }}
         churchId={churchId}
       />
+
+      <GenerateStatementsDialog
+        open={statementDialog.open}
+        onOpenChange={(open) => {
+          setStatementDialog((prev) => ({
+            open,
+            donorIds: open ? prev.donorIds : null,
+          }));
+        }}
+        churchId={churchId}
+        donorIds={statementDialog.donorIds}
+        scopeLabel={statementScopeLabel}
+        defaultRange={statementRange}
+        onComplete={(message) => setPageNotice(message)}
+        onError={(message) => setPageNotice(message)}
+      />
     </div>
   );
 }
@@ -461,6 +511,181 @@ function periodToDays(period: NonNullable<FilterState["lastGiftPeriod"]>) {
     default:
       return 365;
   }
+}
+
+type GenerateStatementsDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  churchId: Id<"churches"> | null;
+  donorIds: Id<"donors">[] | null;
+  scopeLabel: string;
+  defaultRange: { fromDate: string; toDate: string };
+  onComplete: (message: string) => void;
+  onError: (message: string) => void;
+};
+
+function GenerateStatementsDialog({
+  open,
+  onOpenChange,
+  churchId,
+  donorIds,
+  scopeLabel,
+  defaultRange,
+  onComplete,
+  onError,
+}: GenerateStatementsDialogProps) {
+  const { fromDate: defaultFromDate, toDate: defaultToDate } = defaultRange;
+  const [fromDate, setFromDate] = useState(defaultFromDate);
+  const [toDate, setToDate] = useState(defaultToDate);
+  const [fundType, setFundType] = useState<"general" | "restricted">("restricted");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setFromDate(defaultFromDate);
+      setToDate(defaultToDate);
+      setFundType("restricted");
+    }
+  }, [open, defaultFromDate, defaultToDate]);
+
+  const handleGenerate = async () => {
+    if (!churchId) {
+      onError("Select a church before generating statements.");
+      return;
+    }
+
+    if (!fromDate || !toDate) {
+      onError("Please choose both start and end dates.");
+      return;
+    }
+
+    setIsGenerating(true);
+
+    try {
+      const payload: Record<string, unknown> = {
+        churchId,
+        fromDate,
+        toDate,
+        fundType,
+      };
+
+      if (donorIds && donorIds.length > 0) {
+        payload.donorIds = donorIds;
+      }
+
+      const response = await fetch("/api/reports/donor-statements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        let errorMessage = "Failed to generate statements.";
+        try {
+          const data = await response.json();
+          if (data?.error) {
+            errorMessage = data.error as string;
+          }
+        } catch {
+          // ignore
+        }
+        throw new Error(errorMessage);
+      }
+
+      const blob = await response.blob();
+      if (!blob || blob.size === 0) {
+        throw new Error("Received an empty document.");
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const statementSlug = fundType === "restricted" ? "building-fund" : "tithe";
+      const scopeSlug = donorIds?.length
+        ? donorIds.length === 1
+          ? "donor"
+          : "selection"
+        : "all";
+      link.href = url;
+      link.download = `${statementSlug}-statements-${fromDate}-${toDate}-${scopeSlug}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      const typeLabel = fundType === "restricted" ? "Building Fund" : "Tithe";
+      onComplete(`${typeLabel} statements prepared for ${scopeLabel}.`);
+      onOpenChange(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to generate statements.";
+      onError(message);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="font-primary sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Generate donor statements</DialogTitle>
+          <DialogDescription>
+            Download a PDF for {scopeLabel} using the selected schedule.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="grid gap-2">
+            <Label htmlFor="statement-from">From date</Label>
+            <Input
+              id="statement-from"
+              type="date"
+              value={fromDate}
+              max={toDate}
+              onChange={(event) => setFromDate(event.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="statement-to">To date</Label>
+            <Input
+              id="statement-to"
+              type="date"
+              value={toDate}
+              min={fromDate}
+              onChange={(event) => setToDate(event.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>Statement type</Label>
+            <Select value={fundType} onValueChange={(value) => setFundType(value as "general" | "restricted") }>
+              <SelectTrigger className="font-primary">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="font-primary text-sm">
+                <SelectItem value="general">Tithe schedule</SelectItem>
+                <SelectItem value="restricted">Building Fund schedule</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-grey-mid">
+            Building Fund statements reuse the dedicated PDF design already configured for legacy projects.
+          </p>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" className="border-ledger" onClick={() => onOpenChange(false)} disabled={isGenerating}>
+            Cancel
+          </Button>
+          <Button
+            className="border-ledger bg-ink text-paper hover:bg-ink/90"
+            onClick={handleGenerate}
+            disabled={isGenerating || !churchId}
+          >
+            {isGenerating ? "Preparing…" : "Generate PDF"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 type EmptyStateProps = {
