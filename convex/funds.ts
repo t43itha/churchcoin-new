@@ -370,7 +370,7 @@ export const getFundsOverview = query({
         }
 
         const donor = donorsById.get(pledge.donorId);
-        const computedStatus =
+        const computedStatus: "open" | "fulfilled" | "cancelled" =
           pledge.status === "cancelled"
             ? "cancelled"
             : donatedAmount >= pledge.amount
