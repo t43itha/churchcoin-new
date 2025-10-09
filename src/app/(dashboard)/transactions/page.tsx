@@ -18,6 +18,7 @@ import { MultiPeriodOverview } from "@/components/transactions/multi-period-over
 import { PeriodCard } from "@/components/transactions/period-card";
 import { SearchFilterBar, type FilterOption } from "@/components/common/search-filter-bar";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -37,6 +38,11 @@ const TRANSACTION_FILTER_OPTIONS: FilterOption<"all" | "income" | "expense" | "r
   { value: "reconciled", label: "Reconciled" },
   { value: "unreconciled", label: "Unreconciled" },
 ];
+
+const currency = new Intl.NumberFormat("en-GB", {
+  style: "currency",
+  currency: "GBP",
+});
 
 export default function TransactionsPage() {
   const convex = useConvex();
@@ -136,6 +142,23 @@ export default function TransactionsPage() {
 
     return filtered;
   }, [allTransactions, transactionFilter, searchQuery]);
+
+  // Calculate totals for filtered transactions
+  const allTransactionsTotals = useMemo(() => {
+    if (!filteredAllTransactions) return { income: 0, expense: 0 };
+
+    return filteredAllTransactions.reduce(
+      (acc, row) => {
+        if (row.transaction.type === "income") {
+          acc.income += row.transaction.amount;
+        } else {
+          acc.expense += row.transaction.amount;
+        }
+        return acc;
+      },
+      { income: 0, expense: 0 }
+    );
+  }, [filteredAllTransactions]);
 
   const createTransaction = useMutation(api.transactions.createTransaction);
   const updateTransaction = useMutation(api.transactions.updateTransaction);
@@ -472,18 +495,6 @@ export default function TransactionsPage() {
           <MultiPeriodOverview trends={trendData} />
         )}
 
-        {/* Search and Filter */}
-        {showLedger && (
-          <SearchFilterBar
-            searchValue={searchQuery}
-            onSearchChange={setSearchQuery}
-            searchPlaceholder="Search transactions..."
-            filterValue={transactionFilter}
-            onFilterChange={setTransactionFilter}
-            filterOptions={TRANSACTION_FILTER_OPTIONS}
-          />
-        )}
-
         {/* Period Cards */}
         {showLedger && multiPeriodSummary && periods && (
           <div className="space-y-4">
@@ -519,12 +530,40 @@ export default function TransactionsPage() {
 
         {/* Fallback for "All" mode */}
         {showLedger && viewMode === "all" && filteredAllTransactions && (
-          <div className="rounded-lg border border-ledger bg-paper p-6">
-            <h2 className="text-xl font-semibold text-ink font-primary mb-4">
+          <div className="rounded-lg border border-ledger bg-paper p-6 space-y-6">
+            <h2 className="text-xl font-semibold text-ink font-primary">
               All Transactions
             </h2>
+
+            {/* KPI Badges */}
+            <div className="flex flex-wrap items-center gap-2 text-xs text-grey-mid">
+              <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
+                {filteredAllTransactions.length} {allTransactions?.length ? `of ${allTransactions.length}` : ""} entries
+              </Badge>
+              <Badge variant="secondary" className="border-ledger bg-highlight text-success">
+                Income {currency.format(allTransactionsTotals.income)}
+              </Badge>
+              <Badge variant="secondary" className="border-ledger bg-highlight text-error">
+                Expenses {currency.format(allTransactionsTotals.expense)}
+              </Badge>
+              <span className="text-xs text-grey-mid">
+                Net {currency.format(allTransactionsTotals.income - allTransactionsTotals.expense)}
+              </span>
+            </div>
+
+            {/* Search and Filter */}
+            <SearchFilterBar
+              searchValue={searchQuery}
+              onSearchChange={setSearchQuery}
+              searchPlaceholder="Search transactions..."
+              filterValue={transactionFilter}
+              onFilterChange={setTransactionFilter}
+              filterOptions={TRANSACTION_FILTER_OPTIONS}
+            />
+
             <TransactionLedger
               rows={filteredAllTransactions as TransactionLedgerRow[]}
+              totalRows={allTransactions?.length}
               onEdit={canManageTransactions ? (tx) => {
                 setEditingTransaction(tx);
                 setIsEditDialogOpen(true);

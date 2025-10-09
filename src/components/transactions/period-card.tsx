@@ -1,14 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TransactionLedger, type TransactionLedgerRow } from "./transaction-ledger";
+import { SearchFilterBar, type FilterOption } from "@/components/common/search-filter-bar";
 import { formatPeriodLabel, type Period } from "@/lib/periods";
 import { useQuery } from "convex/react";
 import { api, type Id, type Doc } from "@/lib/convexGenerated";
+
+const TRANSACTION_FILTER_OPTIONS: FilterOption<"all" | "income" | "expense" | "reconciled" | "unreconciled">[] = [
+  { value: "all", label: "All" },
+  { value: "income", label: "Income" },
+  { value: "expense", label: "Expense" },
+  { value: "reconciled", label: "Reconciled" },
+  { value: "unreconciled", label: "Unreconciled" },
+];
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -47,6 +55,8 @@ export function PeriodCard({
   onSuggestCategory,
 }: PeriodCardProps) {
   const [loadLimit, setLoadLimit] = useState(100);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [transactionFilter, setTransactionFilter] = useState<"all" | "income" | "expense" | "reconciled" | "unreconciled">("all");
 
   // Only load full transactions if expanded
   const ledger = useQuery(
@@ -59,46 +69,51 @@ export function PeriodCard({
     } : "skip"
   );
 
-  const net = summary.income - summary.expense;
-  const isPositive = net >= 0;
+  // Filter transactions based on search and filter
+  const filteredLedger = useMemo(() => {
+    if (!ledger) return ledger;
+
+    let filtered = ledger;
+
+    // Apply type filter
+    if (transactionFilter === "income") {
+      filtered = filtered.filter((tx) => tx.transaction.type === "income");
+    } else if (transactionFilter === "expense") {
+      filtered = filtered.filter((tx) => tx.transaction.type === "expense");
+    } else if (transactionFilter === "reconciled") {
+      filtered = filtered.filter((tx) => tx.transaction.reconciled === true);
+    } else if (transactionFilter === "unreconciled") {
+      filtered = filtered.filter((tx) => tx.transaction.reconciled !== true);
+    }
+
+    // Apply search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((tx) =>
+        tx.transaction.description.toLowerCase().includes(query) ||
+        tx.transaction.reference?.toLowerCase().includes(query) ||
+        tx.fund?.name?.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [ledger, transactionFilter, searchQuery]);
 
   return (
     <Card className="border-ledger bg-paper">
       <CardHeader className="pb-3">
         <button
           onClick={onToggle}
-          className="flex items-center justify-between w-full text-left hover:bg-highlight rounded-md p-2 -m-2 transition-colors"
+          className="flex items-center gap-3 w-full text-left hover:bg-highlight rounded-md p-2 -m-2 transition-colors"
         >
-          <div className="flex items-center gap-3">
-            {isExpanded ? (
-              <ChevronDown className="h-5 w-5 text-grey-mid" />
-            ) : (
-              <ChevronRight className="h-5 w-5 text-grey-mid" />
-            )}
-            <h3 className="text-lg font-semibold text-ink font-primary">
-              {formatPeriodLabel(period)}
-            </h3>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm">
-              <Badge variant="secondary" className="font-primary text-xs">
-                {summary.count} transactions
-              </Badge>
-              {summary.unreconciled > 0 && (
-                <Badge variant="destructive" className="font-primary text-xs">
-                  ⚠️ {summary.unreconciled} unreconciled
-                </Badge>
-              )}
-            </div>
-
-            <div className="text-right min-w-[100px]">
-              <div className="text-sm text-grey-mid font-primary">Net</div>
-              <div className={`text-lg font-bold font-primary ${isPositive ? "text-success" : "text-error"}`}>
-                {isPositive ? "+" : ""}{currency.format(net)}
-              </div>
-            </div>
-          </div>
+          {isExpanded ? (
+            <ChevronDown className="h-5 w-5 text-grey-mid" />
+          ) : (
+            <ChevronRight className="h-5 w-5 text-grey-mid" />
+          )}
+          <h3 className="text-lg font-semibold text-ink font-primary">
+            {formatPeriodLabel(period)}
+          </h3>
         </button>
 
         {/* Summary row - always visible */}
@@ -130,9 +145,20 @@ export function PeriodCard({
               No transactions in this period
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
+              {/* Search and Filter */}
+              <SearchFilterBar
+                searchValue={searchQuery}
+                onSearchChange={setSearchQuery}
+                searchPlaceholder="Search transactions..."
+                filterValue={transactionFilter}
+                onFilterChange={setTransactionFilter}
+                filterOptions={TRANSACTION_FILTER_OPTIONS}
+              />
+
               <TransactionLedger
-                rows={ledger as TransactionLedgerRow[]}
+                rows={filteredLedger as TransactionLedgerRow[]}
+                totalRows={ledger.length}
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onToggleReconciled={onToggleReconciled}
