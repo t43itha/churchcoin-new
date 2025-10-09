@@ -115,22 +115,22 @@ export default function TransactionsPage() {
 
     // Apply type filter
     if (transactionFilter === "income") {
-      filtered = filtered.filter((tx) => tx.type === "income");
+      filtered = filtered.filter((tx) => tx.transaction.type === "income");
     } else if (transactionFilter === "expense") {
-      filtered = filtered.filter((tx) => tx.type === "expense");
+      filtered = filtered.filter((tx) => tx.transaction.type === "expense");
     } else if (transactionFilter === "reconciled") {
-      filtered = filtered.filter((tx) => tx.reconciled === true);
+      filtered = filtered.filter((tx) => tx.transaction.reconciled === true);
     } else if (transactionFilter === "unreconciled") {
-      filtered = filtered.filter((tx) => tx.reconciled !== true);
+      filtered = filtered.filter((tx) => tx.transaction.reconciled !== true);
     }
 
     // Apply search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter((tx) =>
-        tx.description.toLowerCase().includes(query) ||
-        tx.reference?.toLowerCase().includes(query) ||
-        tx.fundName?.toLowerCase().includes(query)
+        tx.transaction.description.toLowerCase().includes(query) ||
+        tx.transaction.reference?.toLowerCase().includes(query) ||
+        tx.fund?.name?.toLowerCase().includes(query)
       );
     }
 
