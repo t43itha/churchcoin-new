@@ -31,24 +31,37 @@ export function WorkflowStepper({ steps, onStepClick }: WorkflowStepperProps) {
               className={cn(
                 "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition",
                 step.status === "complete" && "border-success/40 bg-success/10 text-success hover:border-success",
-                step.status === "active" && "border-ink bg-paper text-ink shadow-sm",
+                step.status === "active" && "border-success/40 bg-success/10 text-success shadow-sm",
                 step.status === "upcoming" && "border-ledger bg-paper text-grey-mid hover:border-ink hover:text-ink"
               )}
+              aria-current={step.status === "active" ? "step" : undefined}
             >
               <span
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-full border text-sm font-semibold",
-                  step.status === "complete" && "border-success bg-success text-paper",
-                  step.status === "active" && "border-ink text-ink",
+                  (step.status === "complete" || step.status === "active") && "border-success bg-success text-paper",
                   step.status === "upcoming" && "border-ledger text-grey-mid"
                 )}
               >
-                {step.status === "complete" ? <Check className="h-4 w-4" /> : step.id}
+                {step.status === "complete" || step.status === "active" ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  step.id
+                )}
               </span>
               <span className="flex flex-col">
-                <span className="text-sm font-medium uppercase tracking-wide">{step.label}</span>
+                <span
+                  className={cn(
+                    "text-sm font-medium uppercase tracking-wide",
+                    (step.status === "complete" || step.status === "active") && "text-success"
+                  )}
+                >
+                  {step.label}
+                </span>
                 {step.description ? (
-                  <span className="text-xs text-grey-mid">{step.description}</span>
+                  <span className={cn("text-xs", step.status === "upcoming" ? "text-grey-mid" : "text-success")}>
+                    {step.description}
+                  </span>
                 ) : null}
               </span>
             </button>
