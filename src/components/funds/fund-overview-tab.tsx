@@ -1,12 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
-
 import { FundLedger } from "@/components/funds/fund-ledger";
 import { type FundOverview } from "@/components/funds/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatUkDateNumeric } from "@/lib/dates";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -21,11 +18,6 @@ type FundOverviewTabProps = {
 };
 
 export function FundOverviewTab({ overview, onNavigateToLedger, onNavigateToFundraising }: FundOverviewTabProps) {
-  const recentEntries = useMemo(() => {
-    const sorted = [...overview.runningBalance].sort((a, b) => (a.date < b.date ? 1 : -1));
-    return sorted.slice(0, 5);
-  }, [overview.runningBalance]);
-
   return (
     <div className="space-y-8">
       <div className="grid gap-4 md:grid-cols-3">
@@ -33,17 +25,6 @@ export function FundOverviewTab({ overview, onNavigateToLedger, onNavigateToFund
         <MetricCard title="Income" value={`+${currency.format(overview.incomeTotal)}`} tone="text-success" />
         <MetricCard title="Expense" value={`-${currency.format(overview.expenseTotal)}`} tone="text-error" />
       </div>
-
-      {overview.fund.description ? (
-        <Card className="border-ledger bg-paper">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs uppercase tracking-wide text-grey-mid">Fund description</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm leading-relaxed text-ink">{overview.fund.description}</p>
-          </CardContent>
-        </Card>
-      ) : null}
 
       {overview.fund.restrictions ? (
         <Card className="border border-dashed border-ledger bg-paper">
@@ -55,46 +36,6 @@ export function FundOverviewTab({ overview, onNavigateToLedger, onNavigateToFund
           </CardContent>
         </Card>
       ) : null}
-
-      <Card className="border-ledger bg-paper">
-        <CardHeader className="flex flex-col gap-2 pb-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-xs uppercase tracking-wide text-grey-mid">Recent activity</CardTitle>
-            <p className="text-sm text-grey-mid">Most recent transactions with running balance snapshot.</p>
-          </div>
-          <Button variant="outline" size="sm" className="font-primary" onClick={onNavigateToLedger}>
-            View full ledger
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {recentEntries.length > 0 ? (
-            <ul className="divide-y divide-ledger">
-              {recentEntries.map((entry) => (
-                <li key={entry.transactionId} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-                  <div className="space-y-1">
-                    <p className="font-medium text-ink">{entry.description}</p>
-                    <p className="text-xs uppercase tracking-wide text-grey-mid">
-                      {formatUkDateNumeric(entry.date) || "—"}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className={entry.type === "income" ? "text-success" : "text-error"}>
-                      {entry.type === "income"
-                        ? `+${currency.format(entry.amount)}`
-                        : `-${currency.format(entry.amount)}`}
-                    </p>
-                    <p className="text-xs uppercase tracking-wide text-grey-mid">
-                      Balance {currency.format(entry.balance)}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-grey-mid">No transactions recorded yet.</p>
-          )}
-        </CardContent>
-      </Card>
 
       {overview.fundraising ? (
         <Card className="border-ledger bg-paper">
@@ -152,9 +93,20 @@ export function FundOverviewTab({ overview, onNavigateToLedger, onNavigateToFund
         </Card>
       ) : null}
 
-      <section aria-label="Ledger preview">
-        <FundLedger entries={overview.runningBalance.slice(0, 10)} />
-      </section>
+      <Card className="border-ledger bg-paper">
+        <CardHeader className="flex flex-col gap-2 pb-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle className="text-xs uppercase tracking-wide text-grey-mid">Ledger preview</CardTitle>
+            <p className="text-sm text-grey-mid">Recent transactions with running balance.</p>
+          </div>
+          <Button size="sm" variant="outline" className="font-primary" onClick={onNavigateToLedger}>
+            View full ledger
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <FundLedger entries={overview.runningBalance.slice(0, 10)} />
+        </CardContent>
+      </Card>
     </div>
   );
 }
