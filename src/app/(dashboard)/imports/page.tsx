@@ -281,9 +281,9 @@ export default function ImportsPage() {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter((row) =>
-        row.description?.toLowerCase().includes(query) ||
-        row.date?.toLowerCase().includes(query) ||
-        row.amount?.toString().includes(query)
+        row.raw.description?.toLowerCase().includes(query) ||
+        row.raw.date?.toLowerCase().includes(query) ||
+        row.raw.amount?.toString().includes(query)
       );
     }
 
