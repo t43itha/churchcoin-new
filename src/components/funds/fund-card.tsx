@@ -50,11 +50,11 @@ export type FundCardSummary = {
 
 type FundCardProps = {
   fund: FundCardSummary;
-  onViewLedger?: () => void;
+  onSelect?: () => void;
   onEdit?: () => void;
 };
 
-export function FundCard({ fund, onViewLedger, onEdit }: FundCardProps) {
+export function FundCard({ fund, onSelect, onEdit }: FundCardProps) {
   const type = typeLabels[fund.type];
   const hasFundraising = fund.isFundraising;
   const target = fund.fundraisingTarget;
@@ -64,7 +64,24 @@ export function FundCard({ fund, onViewLedger, onEdit }: FundCardProps) {
   const progress = target && target > 0 ? Math.min(raised / target, 1) : null;
 
   return (
-    <Card className="h-full border-ledger bg-paper shadow-sm">
+    <Card
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (!onSelect) {
+          return;
+        }
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+      role={onSelect ? "button" : undefined}
+      tabIndex={onSelect ? 0 : undefined}
+      className={cn(
+        "h-full border-ledger bg-paper shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink",
+        onSelect ? "cursor-pointer hover:bg-highlight/40" : undefined
+      )}
+    >
       <CardHeader className="space-y-2">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
@@ -137,20 +154,21 @@ export function FundCard({ fund, onViewLedger, onEdit }: FundCardProps) {
           )}
         </div>
       </CardContent>
-      {(onViewLedger || onEdit) && (
+      {onEdit ? (
         <CardFooter className="flex items-center justify-end gap-2 border-t border-ledger pt-4">
-          {onViewLedger ? (
-            <Button variant="outline" size="sm" className="font-primary" onClick={onViewLedger}>
-              View Ledger
-            </Button>
-          ) : null}
-          {onEdit ? (
-            <Button size="sm" className="font-primary" onClick={onEdit}>
-              Edit Fund
-            </Button>
-          ) : null}
+          <Button
+            size="sm"
+            variant="outline"
+            className="font-primary"
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit();
+            }}
+          >
+            Edit Fund
+          </Button>
         </CardFooter>
-      )}
+      ) : null}
     </Card>
   );
 }
