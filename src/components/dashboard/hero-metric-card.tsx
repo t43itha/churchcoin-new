@@ -44,23 +44,23 @@ export function HeroMetricCard({
 }: HeroMetricCardProps) {
   return (
     <Card className="border-ledger bg-white shadow-sm transition-shadow hover:shadow-md">
-      <CardHeader className="flex flex-wrap items-start justify-between gap-4 pb-2">
-        <div className="space-y-1">
-          <CardTitle className="font-primary text-[11px] uppercase tracking-[0.2em] text-grey-mid">
-            {title}
-          </CardTitle>
-          <div className="text-3xl font-semibold text-ink">{value}</div>
-        </div>
+      <CardHeader className="relative pb-2">
         {status && (
           <span
             className={cn(
-              "inline-flex shrink-0 items-center rounded-full border px-3 py-1 text-[11px] font-medium uppercase",
+              "absolute right-4 top-2 inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase",
               STATUS_STYLES[status]
             )}
           >
             {statusLabel ?? STATUS_LABELS[status]}
           </span>
         )}
+        <div className="max-w-[calc(100%-100px)] space-y-1">
+          <CardTitle className="font-primary text-[11px] uppercase tracking-[0.2em] text-grey-mid">
+            {title}
+          </CardTitle>
+          <div className="text-3xl font-semibold text-ink">{value}</div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-2 pt-0">
         {trend && (

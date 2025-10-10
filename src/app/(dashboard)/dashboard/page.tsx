@@ -67,6 +67,7 @@ interface DateRangeResult {
   comparisonEnd: Date;
   label: string;
   comparisonLabel: string;
+  shortComparisonLabel: string;
 }
 
 type PeriodKey =
@@ -147,7 +148,21 @@ function buildRange(option: PeriodKey, anchor: Date): DateRangeResult {
     year: "numeric",
   })}`;
 
-  return { start, end, comparisonStart, comparisonEnd, label, comparisonLabel };
+  let shortComparisonLabel = "";
+  if (option === "this-month") {
+    shortComparisonLabel = "Last Month";
+  } else if (option === "last-month") {
+    shortComparisonLabel = comparisonStart.toLocaleDateString("en-GB", {
+      month: "long",
+    });
+  } else if (option === "this-quarter") {
+    const quarter = Math.floor(comparisonStart.getMonth() / 3) + 1;
+    shortComparisonLabel = `Q${quarter}`;
+  } else if (option === "this-year" || option === "ytd") {
+    shortComparisonLabel = comparisonStart.getFullYear().toString();
+  }
+
+  return { start, end, comparisonStart, comparisonEnd, label, comparisonLabel, shortComparisonLabel };
 }
 
 function formatCurrency(value: number) {
@@ -521,7 +536,7 @@ export default function DashboardPage() {
         trend: {
           direction: "down",
           valueLabel: `${lapsedRate.toFixed(1)}% of base`,
-          comparisonLabel: "Threshold 20%",
+          comparisonLabel: `Threshold ${Math.round(donorActivity.activeDonors * 0.2)} donors`,
         },
       };
     }
@@ -535,7 +550,7 @@ export default function DashboardPage() {
         trend: {
           direction: "down",
           valueLabel: `${Math.abs(givingChangePercent).toFixed(1)}% drop`,
-          comparisonLabel: `vs ${dateRange.comparisonLabel}`,
+          comparisonLabel: `vs ${dateRange.shortComparisonLabel}`,
         },
       };
     }
@@ -549,7 +564,7 @@ export default function DashboardPage() {
         trend: {
           direction: "down",
           valueLabel: `${formatCurrency(netResult - previousNet)}`,
-          comparisonLabel: `vs ${dateRange.comparisonLabel}`,
+          comparisonLabel: `vs ${dateRange.shortComparisonLabel}`,
         },
       };
     }
@@ -580,11 +595,12 @@ export default function DashboardPage() {
         valueLabel: `${netDirection === "up" ? "+" : ""}${(
           calculatePercentageChange(netResult, previousNet)
         ).toFixed(1)}%`,
-        comparisonLabel: `vs ${dateRange.comparisonLabel}`,
+        comparisonLabel: `vs ${dateRange.shortComparisonLabel}`,
       },
     };
   }, [
-    dateRange.comparisonLabel,
+    dateRange.shortComparisonLabel,
+    donorActivity.activeDonors,
     donorActivity.lapsedDonors,
     givingChangePercent,
     importantFundsAtRisk,
@@ -616,8 +632,6 @@ export default function DashboardPage() {
     {
       title: "Total Income",
       value: formatCurrency(income),
-      description:
-        PERIOD_OPTIONS.find((opt) => opt.id === selectedPeriod)?.label ?? "Period",
       status: income >= expenses ? "healthy" : "warning",
       trend: {
         direction:
@@ -629,7 +643,7 @@ export default function DashboardPage() {
         valueLabel: `${incomeChangePercent >= 0 ? "+" : ""}${incomeChangePercent.toFixed(
           1
         )}%`,
-        comparisonLabel: `vs ${dateRange.comparisonLabel}`,
+        comparisonLabel: `vs ${dateRange.shortComparisonLabel}`,
       },
     },
     {
@@ -644,20 +658,25 @@ export default function DashboardPage() {
             : donorActivity.activeDonors > previousActiveDonors
             ? "up"
             : "down",
-        valueLabel:
-          previousActiveDonors > 0
-            ? `${calculatePercentageChange(
-                donorActivity.activeDonors,
-                previousActiveDonors
-              ).toFixed(1)}%`
-            : `${
-                donorActivity.activeDonors - previousActiveDonors >= 0
-                  ? "+"
-                  : ""
-              }${donorActivity.activeDonors - previousActiveDonors}`,
+        valueLabel: (() => {
+          if (previousActiveDonors === 0) {
+            const change = donorActivity.activeDonors - previousActiveDonors;
+            return `${change >= 0 ? "+" : ""}${change} donors`;
+          }
+          const percentChange = calculatePercentageChange(
+            donorActivity.activeDonors,
+            previousActiveDonors
+          );
+          // Show absolute count if percentage change is extreme (> 500%)
+          if (Math.abs(percentChange) > 500) {
+            const change = donorActivity.activeDonors - previousActiveDonors;
+            return `${change >= 0 ? "+" : ""}${change} donors`;
+          }
+          return `${percentChange >= 0 ? "+" : ""}${percentChange.toFixed(1)}%`;
+        })(),
         comparisonLabel:
           previousActiveDonors > 0
-            ? `vs ${dateRange.comparisonLabel}`
+            ? `vs ${dateRange.shortComparisonLabel}`
             : "First period benchmark",
       },
     },
@@ -718,7 +737,7 @@ export default function DashboardPage() {
       {
         title: "Giving Growth Rate",
         value: `${incomeChangePercent.toFixed(1)}%`,
-        hint: `vs ${dateRange.comparisonLabel}`,
+        hint: `vs ${dateRange.shortComparisonLabel}`,
       },
       {
         title: "Income Concentration",
@@ -760,7 +779,7 @@ export default function DashboardPage() {
     ];
   }, [
     categories,
-    dateRange.comparisonLabel,
+    dateRange.shortComparisonLabel,
     designatedFundBalance,
     donorActivity.activeDonors,
     donorActivity.recurringDonors,
