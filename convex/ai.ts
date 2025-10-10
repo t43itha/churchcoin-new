@@ -40,7 +40,7 @@ const buildCacheKey = (
 type SuggestionPayload = {
   categoryId: string | null;
   confidence: number;
-  source: "feedback" | "cache" | "model";
+  source: "feedback" | "cache" | "model" | "manual";
   reason?: string;
 };
 
@@ -149,6 +149,21 @@ export const suggestCategoryInternal = internalMutation({
       args.amount
     );
 
+    const church = await ctx.db.get(args.churchId);
+    if (!church) {
+      throw new ConvexError("Church not found");
+    }
+
+    const allowAi = church.settings.importsAllowAi ?? church.settings.enableAiCategorization ?? true;
+    if (!allowAi) {
+      return { categoryId: null, confidence: 0, source: "manual" } satisfies SuggestionPayload;
+    }
+
+    const storedDeepSeekKey = church.settings.aiApiKey;
+    if (!storedDeepSeekKey) {
+      throw new ConvexError("DeepSeek API key is not configured");
+    }
+
     const learned = await ctx.db
       .query("aiFeedback")
       .withIndex("by_church_input", (q) =>
@@ -179,16 +194,11 @@ export const suggestCategoryInternal = internalMutation({
       }
     }
 
-    const apiKey = process.env.DEEPSEEK_API_KEY;
-    if (!apiKey) {
-      throw new ConvexError("DEEPSEEK_API_KEY not configured");
-    }
-
     const response = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${storedDeepSeekKey}`,
       },
       body: JSON.stringify({
         model: MODEL_NAME,
@@ -301,16 +311,26 @@ export const suggestCategory = mutation({
       }
     }
 
-    const apiKey = process.env.DEEPSEEK_API_KEY;
-    if (!apiKey) {
-      throw new ConvexError("DEEPSEEK_API_KEY not configured");
+    const church = await ctx.db.get(args.churchId);
+    if (!church) {
+      throw new ConvexError("Church not found");
+    }
+
+    const allowAi = church.settings.importsAllowAi ?? church.settings.enableAiCategorization ?? true;
+    if (!allowAi) {
+      return { categoryId: null, confidence: 0, source: "manual" } satisfies SuggestionPayload;
+    }
+
+    const deepSeekKeyForChurch = church.settings.aiApiKey;
+    if (!deepSeekKeyForChurch) {
+      throw new ConvexError("DeepSeek API key is not configured");
     }
 
     const response = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${deepSeekKeyForChurch}`,
       },
       body: JSON.stringify({
         model: MODEL_NAME,

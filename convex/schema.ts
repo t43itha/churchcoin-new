@@ -16,6 +16,8 @@ export default defineSchema({
       defaultFundId: v.optional(v.id("funds")),
       autoApproveThreshold: v.optional(v.number()), // 0-1, default 0.95
       enableAiCategorization: v.optional(v.boolean()), // default true
+      importsAllowAi: v.optional(v.boolean()),
+      aiApiKey: v.optional(v.string()),
     }),
   }),
 

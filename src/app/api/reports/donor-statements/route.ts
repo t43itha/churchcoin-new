@@ -73,6 +73,43 @@ type BuildingRenderContext = {
 
 type BuildingTableContext = BuildingRenderContext & { page: PDFPage };
 
+function formatDateForPdf(value?: string | number | null) {
+  if (!value) {
+    return "";
+  }
+
+  if (typeof value === "number") {
+    const numericDate = new Date(value);
+    if (!Number.isNaN(numericDate.getTime())) {
+      const day = String(numericDate.getDate()).padStart(2, "0");
+      const month = String(numericDate.getMonth() + 1).padStart(2, "0");
+      return `${day}-${month}-${numericDate.getFullYear()}`;
+    }
+  }
+
+  const text = String(value);
+  const parsed = new Date(text);
+  if (!Number.isNaN(parsed.getTime())) {
+    const day = String(parsed.getDate()).padStart(2, "0");
+    const month = String(parsed.getMonth() + 1).padStart(2, "0");
+    return `${day}-${month}-${parsed.getFullYear()}`;
+  }
+
+  const delimiterMatch = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (delimiterMatch) {
+    const [, year, month, day] = delimiterMatch;
+    return `${day.padStart(2, "0")}-${month.padStart(2, "0")}-${year}`;
+  }
+
+  const reversedMatch = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (reversedMatch) {
+    const [, day, month, year] = reversedMatch;
+    return `${day.padStart(2, "0")}-${month.padStart(2, "0")}-${year}`;
+  }
+
+  return text;
+}
+
 function wrapText(
   text: string,
   font: PDFFont,
@@ -172,7 +209,10 @@ function drawBuildingHeader(
     color: buildingPalette.secondary,
   });
 
-  page.drawText(`Period: ${fromDate} – ${toDate}`, {
+  const formattedFrom = formatDateForPdf(fromDate);
+  const formattedTo = formatDateForPdf(toDate);
+
+  page.drawText(`Period: ${formattedFrom} – ${formattedTo}`, {
     x: titleX,
     y: height - margin - 32,
     size: 11,
@@ -559,7 +599,7 @@ function drawTransactionsTable(
       });
     }
 
-    page.drawText(txn.date, {
+    page.drawText(formatDateForPdf(txn.date), {
       x: columnPositions.date,
       y: rowY + rowHeight - 16,
       size: 10,
@@ -656,11 +696,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
-    const { churchId, fromDate, toDate, fundType } = body as {
+    const { churchId, fromDate, toDate, fundType, donorIds } = body as {
       churchId: string;
       fromDate: string;
       toDate: string;
       fundType?: "general" | "restricted" | "designated" | "all";
+      donorIds?: string[];
     };
 
     if (!churchId || !fromDate || !toDate) {
@@ -670,21 +711,48 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log("Fetching donor statements:", { churchId, fromDate, toDate, fundType });
+    if (donorIds && (!Array.isArray(donorIds) || donorIds.some((id) => typeof id !== "string"))) {
+      return NextResponse.json(
+        { error: "donorIds must be an array of strings" },
+        { status: 400 }
+      );
+    }
+
+    const donorIdList = donorIds?.length ? (donorIds as Id<"donors">[]) : undefined;
+
+    console.log("Fetching donor statements:", {
+      churchId,
+      fromDate,
+      toDate,
+      fundType,
+      donorIds: donorIdList?.length ?? 0,
+    });
     console.log("Convex URL:", process.env.NEXT_PUBLIC_CONVEX_URL);
 
     if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
       throw new Error("NEXT_PUBLIC_CONVEX_URL is not configured");
     }
 
+    const queryArgs: {
+      churchId: Id<"churches">;
+      fromDate: string;
+      toDate: string;
+      fundType?: "general" | "restricted" | "designated" | "all";
+      donorIds?: Id<"donors">[];
+    } = {
+      churchId: churchId as Id<"churches">,
+      fromDate,
+      toDate,
+      fundType: fundType || "all",
+    };
+
+    if (donorIdList) {
+      queryArgs.donorIds = donorIdList;
+    }
+
     const statements = await convexServerClient.query(
       api.reports.getDonorStatementBatch,
-      { 
-        churchId: churchId as Id<"churches">, 
-        fromDate, 
-        toDate,
-        fundType: fundType || "all"
-      }
+      queryArgs
     );
 
     console.log(`Found ${statements?.length || 0} donor statements`);
@@ -782,7 +850,10 @@ export async function POST(request: Request) {
       });
 
       yPosition -= 40;
-      page.drawText(`Period: ${fromDate} to ${toDate}`, {
+      const formattedFromDate = formatDateForPdf(fromDate);
+      const formattedToDate = formatDateForPdf(toDate);
+
+      page.drawText(`Period: ${formattedFromDate} to ${formattedToDate}`, {
         x: margin,
         y: yPosition,
         size: 12,
@@ -843,7 +914,7 @@ export async function POST(request: Request) {
             break;
           }
 
-          page.drawText(`${txn.date} - ${txn.description.substring(0, 50)}`, {
+          page.drawText(`${formatDateForPdf(txn.date)} - ${txn.description.substring(0, 50)}`, {
             x: margin,
             y: yPosition,
             size: 11,

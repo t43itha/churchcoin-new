@@ -15,7 +15,6 @@ import {
   Settings,
   LogOut,
   Sparkles,
-  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getRoleDisplayName, getRolePermissions } from "@/lib/rbac";
@@ -65,9 +64,9 @@ const baseNavigation = [
 
 const adminNavigation = [
   {
-    name: "Team",
-    href: "/settings/users",
-    icon: ShieldCheck,
+    name: "Settings",
+    href: "/settings",
+    icon: Settings,
   },
 ];
 
@@ -193,7 +192,7 @@ export function Sidebar({ className }: SidebarProps) {
               className="flex-1 font-primary border-ledger text-grey-mid hover:text-ink"
               asChild
             >
-              <Link href="/settings/users" className="flex items-center justify-center gap-1">
+              <Link href="/settings" className="flex items-center justify-center gap-1">
                 <Settings className="h-3 w-3" />
                 Settings
               </Link>
