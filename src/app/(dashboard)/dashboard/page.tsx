@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import {
-  Calendar,
   BarChart3,
   Layers,
   Plus,
@@ -31,10 +30,7 @@ import {
   type HeroMetricCardProps,
 } from "@/components/dashboard/hero-metric-card";
 import { CollapsibleSection } from "@/components/dashboard/collapsible-section";
-import {
-  PeriodSelector,
-  type PeriodOption,
-} from "@/components/dashboard/period-selector";
+import { PeriodSelector, type PeriodOption } from "@/components/dashboard/period-selector";
 import { api, type Id } from "@/lib/convexGenerated";
 import {
   Bar,
@@ -166,9 +162,18 @@ function calculatePercentageChange(current: number, previous: number) {
   if (!previous) return 0;
   return ((current - previous) / previous) * 100;
 }
+
+function monthYearLabel(d: Date) {
+  return d.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+}
+
+function quarterLabel(d: Date) {
+  const q = Math.floor(d.getMonth() / 3) + 1;
+  return `Q${q} ${d.getFullYear()}`;
+}
 export default function DashboardPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodKey>("this-month");
-  const [periodOffset, setPeriodOffset] = useState(0);
+  const [periodOffset] = useState(0);
 
   const churches = useQuery(api.churches.listChurches, {});
   const churchId = churches?.[0]?._id;
@@ -807,6 +812,27 @@ export default function DashboardPage() {
                 Decision-ready insights prioritise important funds, donor momentum, and urgent follow-up so your team can act with confidence.
               </p>
             </div>
+            <div />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <PeriodSelector
+              options={PERIOD_OPTIONS}
+              selected={selectedPeriod}
+              onSelect={(value) => setSelectedPeriod(value as PeriodKey)}
+              label={(() => {
+                switch (selectedPeriod) {
+                  case "this-quarter":
+                    return `${quarterLabel(dateRange.start)} vs ${quarterLabel(dateRange.comparisonStart)}`;
+                  case "this-year":
+                    return `${dateRange.end.getFullYear()} vs ${dateRange.comparisonEnd.getFullYear()}`;
+                  case "ytd":
+                    return `YTD ${dateRange.end.getFullYear()} vs YTD ${dateRange.comparisonEnd.getFullYear()}`;
+                  default:
+                    return `${monthYearLabel(dateRange.start)} vs ${monthYearLabel(dateRange.comparisonStart)}`;
+                }
+              })()}
+              onCustomRange={() => window.alert("Custom range coming soon")}
+            />
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" className="border-ledger font-primary" asChild>
                 <Link href="/reports">
@@ -828,26 +854,7 @@ export default function DashboardPage() {
               </Button>
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-ledger bg-white p-4">
-            <div className="flex items-center gap-2 text-sm font-primary text-grey-mid">
-              <Calendar className="h-4 w-4" />
-              {dateRange.label}
-              <span className="text-grey-dark">•</span>
-              <span className="text-grey-mid">Comparison {dateRange.comparisonLabel}</span>
-            </div>
-            <PeriodSelector
-              options={PERIOD_OPTIONS}
-              selected={selectedPeriod}
-              onSelect={(value) => setSelectedPeriod(value as PeriodKey)}
-              onNavigate={(direction) => {
-                setPeriodOffset((prev) =>
-                  prev + (direction === "previous" ? -1 : 1)
-                );
-              }}
-              comparisonLabel={`vs ${dateRange.comparisonLabel}`}
-              onCustomRange={() => window.alert("Custom range coming soon")}
-            />
-          </div>
+          
         </header>
 
         {churchId && <InsightsWidget churchId={churchId} />}
