@@ -524,6 +524,11 @@ type GenerateStatementsDialogProps = {
   onError: (message: string) => void;
 };
 
+type RangePreset = "thisYear" | "lastYear" | "custom";
+
+const formatDateString = (year: number, month: number, day: number) =>
+  `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
 function GenerateStatementsDialog({
   open,
   onOpenChange,
@@ -538,15 +543,49 @@ function GenerateStatementsDialog({
   const [fromDate, setFromDate] = useState(defaultFromDate);
   const [toDate, setToDate] = useState(defaultToDate);
   const [fundType, setFundType] = useState<"general" | "restricted">("restricted");
+  const [rangePreset, setRangePreset] = useState<RangePreset>("thisYear");
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const presetToRange = useCallback((preset: RangePreset) => {
+    const currentYear = new Date().getFullYear();
+    if (preset === "thisYear") {
+      return {
+        from: formatDateString(currentYear, 1, 1),
+        to: formatDateString(currentYear, 12, 31),
+      };
+    }
+    if (preset === "lastYear") {
+      const lastYear = currentYear - 1;
+      return {
+        from: formatDateString(lastYear, 1, 1),
+        to: formatDateString(lastYear, 12, 31),
+      };
+    }
+    return {
+      from: defaultFromDate,
+      to: defaultToDate,
+    };
+  }, [defaultFromDate, defaultToDate]);
 
   useEffect(() => {
     if (open) {
-      setFromDate(defaultFromDate);
-      setToDate(defaultToDate);
+      setRangePreset("thisYear");
+      const { from, to } = presetToRange("thisYear");
+      setFromDate(from);
+      setToDate(to);
       setFundType("restricted");
     }
-  }, [open, defaultFromDate, defaultToDate]);
+  }, [open, presetToRange]);
+
+  const handlePresetChange = (value: RangePreset) => {
+    setRangePreset(value);
+    if (value === "custom") {
+      return;
+    }
+    const { from, to } = presetToRange(value);
+    setFromDate(from);
+    setToDate(to);
+  };
 
   const handleGenerate = async () => {
     if (!churchId) {
@@ -635,11 +674,25 @@ function GenerateStatementsDialog({
 
         <div className="space-y-4">
           <div className="grid gap-2">
+            <Label>Period</Label>
+            <Select value={rangePreset} onValueChange={(value) => handlePresetChange(value as RangePreset)}>
+              <SelectTrigger className="font-primary">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="font-primary text-sm">
+                <SelectItem value="thisYear">This year</SelectItem>
+                <SelectItem value="lastYear">Last year</SelectItem>
+                <SelectItem value="custom">Custom period</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
             <Label htmlFor="statement-from">From date</Label>
             <Input
               id="statement-from"
               type="date"
               value={fromDate}
+              disabled={rangePreset !== "custom"}
               max={toDate}
               onChange={(event) => setFromDate(event.target.value)}
             />
@@ -650,6 +703,7 @@ function GenerateStatementsDialog({
               id="statement-to"
               type="date"
               value={toDate}
+              disabled={rangePreset !== "custom"}
               min={fromDate}
               onChange={(event) => setToDate(event.target.value)}
             />

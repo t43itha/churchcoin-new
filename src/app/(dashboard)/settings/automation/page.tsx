@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
-import { Settings2, Sparkles, Target } from "lucide-react";
+import { AlertTriangle, KeyRound, Settings2, Sparkles, Target } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { api, type Id } from "@/lib/convexGenerated";
 
 const currency = new Intl.NumberFormat("en-GB", {
@@ -39,13 +40,17 @@ export default function AutomationSettingsPage() {
 
   const setDefaultFund = useMutation(api.churches.setDefaultFund);
   const updateAutoApproveThreshold = useMutation(api.churches.setAutoApproveThreshold);
-  const updateEnableAiCategorization = useMutation(api.churches.setEnableAiCategorization);
+  const updateImportsAllowAi = useMutation(api.churches.setImportsAllowAi);
+  const updateAiApiKey = useMutation(api.churches.updateAiApiKey);
   const seedAllCategories = useMutation(api.seedCategories.seedAllCategories);
 
   const [selectedFundId, setSelectedFundId] = useState<string>("");
   const [autoApproveThreshold, setAutoApproveThreshold] = useState(95);
   const [enableAI, setEnableAI] = useState(true);
+  const [hasAiKey, setHasAiKey] = useState(false);
+  const [aiKeyInput, setAiKeyInput] = useState("");
   const [saving, setSaving] = useState<"fund" | "threshold" | "ai" | "categories" | null>(null);
+  const [savingAiKey, setSavingAiKey] = useState<"save" | "remove" | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,12 +60,30 @@ export default function AutomationSettingsPage() {
   }, [churches, churchId]);
 
   useEffect(() => {
-    if (church) {
-      setSelectedFundId(church.settings.defaultFundId || "");
-      setAutoApproveThreshold((church.settings.autoApproveThreshold || 0.95) * 100);
-      setEnableAI(church.settings.enableAiCategorization ?? true);
+    if (!church) {
+      return;
     }
+
+    setSelectedFundId((previous) => {
+      const next = church.settings.defaultFundId || "";
+      return previous === next ? previous : next;
+    });
+
+    setAutoApproveThreshold((previous) => {
+      const next = Math.round((church.settings.autoApproveThreshold || 0.95) * 100);
+      return previous === next ? previous : next;
+    });
+
+    const nextEnableAi = church.settings.importsAllowAi ?? church.settings.enableAiCategorization ?? true;
+    setEnableAI((previous) => (previous === nextEnableAi ? previous : nextEnableAi));
+
+    const hasKey = Boolean(church.settings.aiApiKey);
+    setHasAiKey((previous) => (previous === hasKey ? previous : hasKey));
   }, [church]);
+
+  useEffect(() => {
+    setAiKeyInput("");
+  }, [churchId]);
 
   const handleSaveDefaultFund = async () => {
     if (!churchId || !selectedFundId) return;
@@ -105,12 +128,17 @@ export default function AutomationSettingsPage() {
   const handleToggleAI = async () => {
     if (!churchId || !church) return;
 
+    const newValue = !enableAI;
+    if (newValue && !hasAiKey && !aiKeyInput.trim()) {
+      setFeedback("Add a DeepSeek API key before enabling AI categorisation.");
+      return;
+    }
+
     setSaving("ai");
     setFeedback(null);
 
     try {
-      const newValue = !enableAI;
-      await updateEnableAiCategorization({
+      await updateImportsAllowAi({
         churchId,
         enabled: newValue,
       });
@@ -121,6 +149,55 @@ export default function AutomationSettingsPage() {
       setFeedback("Failed to update AI settings");
     } finally {
       setSaving(null);
+    }
+  };
+
+  const handleSaveApiKey = async () => {
+    if (!churchId) return;
+
+    const trimmed = aiKeyInput.trim();
+    if (!trimmed) {
+      setFeedback("Enter a valid API key before saving.");
+      return;
+    }
+
+    setSavingAiKey("save");
+    setFeedback(null);
+
+    try {
+      await updateAiApiKey({
+        churchId,
+        apiKey: trimmed,
+      });
+      setHasAiKey(true);
+      setAiKeyInput("");
+      setFeedback("AI API key saved successfully");
+    } catch (error) {
+      console.error("Failed to save AI API key:", error);
+      setFeedback("Failed to save AI API key");
+    } finally {
+      setSavingAiKey(null);
+    }
+  };
+
+  const handleRemoveApiKey = async () => {
+    if (!churchId) return;
+
+    setSavingAiKey("remove");
+    setFeedback(null);
+
+    try {
+      await updateAiApiKey({
+        churchId,
+        apiKey: "",
+      });
+      setHasAiKey(false);
+      setFeedback("AI API key removed");
+    } catch (error) {
+      console.error("Failed to remove AI API key:", error);
+      setFeedback("Failed to remove AI API key");
+    } finally {
+      setSavingAiKey(null);
     }
   };
 
@@ -327,6 +404,58 @@ export default function AutomationSettingsPage() {
               >
                 {saving === "ai" ? "Updating..." : enableAI ? "Enabled" : "Disabled"}
               </Button>
+            </div>
+
+            {enableAI && !hasAiKey && !aiKeyInput.trim() ? (
+              <div className="flex items-center gap-2 rounded-md border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">
+                <AlertTriangle className="h-4 w-4" />
+                <span>Add a DeepSeek API key to activate AI categorisation for imports.</span>
+              </div>
+            ) : null}
+
+            <div className="rounded-md border border-ledger bg-paper p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 font-medium text-ink">
+                    <KeyRound className="h-4 w-4" />
+                    DeepSeek API key
+                  </div>
+                  <div className="text-sm text-grey-mid">
+                    {hasAiKey ? "Key stored securely. Enter a new key to replace it." : "No key saved yet."}
+                  </div>
+                </div>
+                <Badge variant={hasAiKey ? "outline" : "secondary"} className={hasAiKey ? "border-success/40 bg-success/10 text-success" : "border-error/30 bg-error/10 text-error"}>
+                  {hasAiKey ? "Configured" : "Missing"}
+                </Badge>
+              </div>
+
+              <Input
+                type="password"
+                placeholder={hasAiKey ? "Enter new key to replace existing" : "sk-..."}
+                value={aiKeyInput}
+                onChange={(event) => setAiKeyInput(event.target.value)}
+                className="font-mono"
+              />
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={handleSaveApiKey}
+                  disabled={savingAiKey === "save" || !aiKeyInput.trim()}
+                  className="bg-ink text-paper hover:bg-ink/90"
+                >
+                  {savingAiKey === "save" ? "Saving..." : hasAiKey ? "Update key" : "Save key"}
+                </Button>
+                {hasAiKey ? (
+                  <Button
+                    variant="outline"
+                    onClick={handleRemoveApiKey}
+                    disabled={savingAiKey === "remove"}
+                    className="border-ledger"
+                  >
+                    {savingAiKey === "remove" ? "Removing..." : "Remove key"}
+                  </Button>
+                ) : null}
+              </div>
             </div>
 
             {aiUsage && (

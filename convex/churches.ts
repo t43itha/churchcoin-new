@@ -4,7 +4,8 @@ import { v } from "convex/values";
 export const listChurches = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db.query("churches").collect();
+    const churches = await ctx.db.query("churches").collect();
+    return churches.map((church) => sanitizeChurch(church));
   },
 });
 
@@ -12,9 +13,30 @@ export const listChurches = query({
 export const getChurch = query({
   args: { churchId: v.id("churches") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.churchId);
+    const church = await ctx.db.get(args.churchId);
+    return church ? sanitizeChurch(church) : null;
   },
 });
+
+type ChurchWithSettings = {
+  settings?: {
+    aiApiKey?: string;
+    [key: string]: unknown;
+  };
+};
+
+const sanitizeChurch = <T extends ChurchWithSettings | null>(church: T): T => {
+  if (!church) return church;
+  const settings = church.settings ?? {};
+  const { aiApiKey, ...restSettings } = settings;
+  return {
+    ...church,
+    settings: {
+      ...restSettings,
+      aiApiKey: aiApiKey ? "********" : undefined,
+    },
+  } as T;
+};
 
 // Create a new church
 export const createChurch = mutation({
@@ -29,7 +51,13 @@ export const createChurch = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    const churchId = await ctx.db.insert("churches", args);
+    const churchId = await ctx.db.insert("churches", {
+      ...args,
+      settings: {
+        ...args.settings,
+        importsAllowAi: true,
+      },
+    });
 
     // Create default funds for the church
     await ctx.db.insert("funds", {
@@ -110,11 +138,20 @@ export const updateChurchSettings = mutation({
       defaultFundId: v.optional(v.id("funds")),
       autoApproveThreshold: v.optional(v.number()),
       enableAiCategorization: v.optional(v.boolean()),
+      importsAllowAi: v.optional(v.boolean()),
     }),
   },
   handler: async (ctx, args) => {
+    const church = await ctx.db.get(args.churchId);
+    if (!church) {
+      throw new Error("Church not found");
+    }
+
     await ctx.db.patch(args.churchId, {
-      settings: args.settings,
+      settings: {
+        ...(church.settings ?? {}),
+        ...args.settings,
+      },
     });
   },
 });
@@ -134,7 +171,7 @@ export const setDefaultFund = mutation({
 
     await ctx.db.patch(args.churchId, {
       settings: {
-        ...church.settings,
+        ...(church.settings ?? {}),
         defaultFundId: args.fundId,
       },
     });
@@ -157,7 +194,7 @@ export const setAutoApproveThreshold = mutation({
 
     await ctx.db.patch(args.churchId, {
       settings: {
-        ...church.settings,
+        ...(church.settings ?? {}),
         autoApproveThreshold: args.threshold,
       },
     });
@@ -180,10 +217,58 @@ export const setEnableAiCategorization = mutation({
 
     await ctx.db.patch(args.churchId, {
       settings: {
-        ...church.settings,
+        ...(church.settings ?? {}),
         enableAiCategorization: args.enabled,
+        importsAllowAi: args.enabled,
       },
     });
+    return null;
+  },
+});
+
+export const setImportsAllowAi = mutation({
+  args: {
+    churchId: v.id("churches"),
+    enabled: v.boolean(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const church = await ctx.db.get(args.churchId);
+    if (!church) {
+      throw new Error("Church not found");
+    }
+
+    await ctx.db.patch(args.churchId, {
+      settings: {
+        ...(church.settings ?? {}),
+        importsAllowAi: args.enabled,
+      },
+    });
+    return null;
+  },
+});
+
+export const updateAiApiKey = mutation({
+  args: {
+    churchId: v.id("churches"),
+    apiKey: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const church = await ctx.db.get(args.churchId);
+    if (!church) {
+      throw new Error("Church not found");
+    }
+
+    const trimmed = args.apiKey.trim();
+
+    await ctx.db.patch(args.churchId, {
+      settings: {
+        ...(church.settings ?? {}),
+        aiApiKey: trimmed.length > 0 ? trimmed : undefined,
+      },
+    });
+
     return null;
   },
 });

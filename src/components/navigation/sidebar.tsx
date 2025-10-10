@@ -69,6 +69,11 @@ const adminNavigation = [
     href: "/settings/users",
     icon: ShieldCheck,
   },
+  {
+    name: "Automation",
+    href: "/settings/automation",
+    icon: Settings,
+  },
 ];
 
 interface SidebarProps {

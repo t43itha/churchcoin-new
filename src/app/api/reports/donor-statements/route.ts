@@ -73,6 +73,43 @@ type BuildingRenderContext = {
 
 type BuildingTableContext = BuildingRenderContext & { page: PDFPage };
 
+function formatDateForPdf(value?: string | number | null) {
+  if (!value) {
+    return "";
+  }
+
+  if (typeof value === "number") {
+    const numericDate = new Date(value);
+    if (!Number.isNaN(numericDate.getTime())) {
+      const day = String(numericDate.getDate()).padStart(2, "0");
+      const month = String(numericDate.getMonth() + 1).padStart(2, "0");
+      return `${day}-${month}-${numericDate.getFullYear()}`;
+    }
+  }
+
+  const text = String(value);
+  const parsed = new Date(text);
+  if (!Number.isNaN(parsed.getTime())) {
+    const day = String(parsed.getDate()).padStart(2, "0");
+    const month = String(parsed.getMonth() + 1).padStart(2, "0");
+    return `${day}-${month}-${parsed.getFullYear()}`;
+  }
+
+  const delimiterMatch = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (delimiterMatch) {
+    const [, year, month, day] = delimiterMatch;
+    return `${day.padStart(2, "0")}-${month.padStart(2, "0")}-${year}`;
+  }
+
+  const reversedMatch = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (reversedMatch) {
+    const [, day, month, year] = reversedMatch;
+    return `${day.padStart(2, "0")}-${month.padStart(2, "0")}-${year}`;
+  }
+
+  return text;
+}
+
 function wrapText(
   text: string,
   font: PDFFont,
@@ -172,7 +209,10 @@ function drawBuildingHeader(
     color: buildingPalette.secondary,
   });
 
-  page.drawText(`Period: ${fromDate} – ${toDate}`, {
+  const formattedFrom = formatDateForPdf(fromDate);
+  const formattedTo = formatDateForPdf(toDate);
+
+  page.drawText(`Period: ${formattedFrom} – ${formattedTo}`, {
     x: titleX,
     y: height - margin - 32,
     size: 11,
@@ -559,7 +599,7 @@ function drawTransactionsTable(
       });
     }
 
-    page.drawText(txn.date, {
+    page.drawText(formatDateForPdf(txn.date), {
       x: columnPositions.date,
       y: rowY + rowHeight - 16,
       size: 10,
@@ -810,7 +850,10 @@ export async function POST(request: Request) {
       });
 
       yPosition -= 40;
-      page.drawText(`Period: ${fromDate} to ${toDate}`, {
+      const formattedFromDate = formatDateForPdf(fromDate);
+      const formattedToDate = formatDateForPdf(toDate);
+
+      page.drawText(`Period: ${formattedFromDate} to ${formattedToDate}`, {
         x: margin,
         y: yPosition,
         size: 12,
@@ -871,7 +914,7 @@ export async function POST(request: Request) {
             break;
           }
 
-          page.drawText(`${txn.date} - ${txn.description.substring(0, 50)}`, {
+          page.drawText(`${formatDateForPdf(txn.date)} - ${txn.description.substring(0, 50)}`, {
             x: margin,
             y: yPosition,
             size: 11,

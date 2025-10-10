@@ -214,6 +214,7 @@ async function detectCategoryWithAI(
   description: string,
   amount: number,
   enableAI: boolean = true,
+  apiKey?: string,
   cache?: ImportDetectionCache
 ): Promise<{ categoryId: Id<"categories"> | null; confidence: number; source: string }> {
   // Tier 1: Keyword matching (free, fast)
@@ -223,7 +224,7 @@ async function detectCategoryWithAI(
   }
 
   // Tier 2: AI categorization (paid, only if enabled)
-  if (!enableAI) {
+  if (!enableAI || !apiKey) {
     return { categoryId: null, confidence: 0, source: "none" };
   }
 
@@ -311,6 +312,10 @@ export const createImportWithRows = mutation({
     if (!church) {
       throw new Error("Church not found");
     }
+
+    const importsAllowAi = church.settings.importsAllowAi ?? church.settings.enableAiCategorization ?? true;
+    const aiApiKey = church.settings.aiApiKey;
+    const canUseAi = (importsAllowAi ?? true) && Boolean(aiApiKey);
 
     // Get default fund (either configured or first general fund)
     let defaultFund = null;
@@ -418,13 +423,13 @@ export const createImportWithRows = mutation({
       }
 
       // 4. Auto-detect category using multi-tier detection (keyword → AI) with cached data
-      const enableAI = church.settings.enableAiCategorization ?? true;
       const categoryResult = await detectCategoryWithAI(
         ctx,
         args.churchId,
         row.description,
         Math.abs(row.amount),
-        enableAI,
+        canUseAi,
+        aiApiKey,
         detectionCache
       );
 
