@@ -266,8 +266,8 @@ export default function DashboardPage() {
   }, [churchId, generateInsights]);
 
   const fundLookup = useMemo(() => {
-    if (!funds) return new Map<string, (typeof funds)[number]>();
-    return new Map(funds.map((fund) => [fund._id, fund]));
+    const list = funds ?? [];
+    return new Map(list.map((fund) => [fund._id, fund]));
   }, [funds]);
 
   const generalFundBalance = useMemo(() => {
@@ -299,7 +299,8 @@ export default function DashboardPage() {
   const generalFundMovement = useMemo(() => {
     const transactions = incomeExpenseReport?.transactions ?? [];
     return transactions.reduce((sum, txn) => {
-      const fund = txn.fundId ? fundLookup.get(txn.fundId as string) : undefined;
+      const fundId = txn.fundId as Id<"funds"> | null;
+      const fund = fundId ? fundLookup.get(fundId) : undefined;
       if (!fund || fund.type !== "general") return sum;
       return sum + (txn.type === "income" ? txn.amount : -txn.amount);
     }, 0);
@@ -462,10 +463,8 @@ export default function DashboardPage() {
   }, [donorRetentionSeries]);
 
   const sortedFunds = useMemo(() => {
-    if (!funds) return [] as Array<
-      (typeof funds)[number] & { isImportant: boolean }
-    >;
-    return [...funds]
+    const list = funds ?? [];
+    return [...list]
       .map((fund) => ({
         ...fund,
         isImportant: fund.balance >= IMPORTANT_FUND_THRESHOLD,
