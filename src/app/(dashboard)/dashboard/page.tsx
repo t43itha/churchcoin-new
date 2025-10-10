@@ -4,15 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import {
-  ArrowDownRight,
   BarChart3,
-  Calendar,
-  ChevronRight,
-  Church,
   Layers,
   Plus,
   Receipt,
   Target,
+  Church,
+  ChevronRight,
+  UserCheck,
+  UserMinus,
+  UserPlus,
 } from "lucide-react";
 import {
   Card,
@@ -21,45 +22,29 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import { formatUkDateNumeric } from "@/lib/dates";
+import { Button } from "@/components/ui/button";
 import { InsightsWidget } from "@/components/ai/insights-widget";
 import {
-  KpiCard,
-  type KpiDelta,
-  type TrendPoint,
-  type KpiCardProps,
-} from "@/components/dashboard/kpi-card";
+  HeroMetricCard,
+  type HeroMetricCardProps,
+} from "@/components/dashboard/hero-metric-card";
+import { CollapsibleSection } from "@/components/dashboard/collapsible-section";
+import { PeriodSelector, type PeriodOption } from "@/components/dashboard/period-selector";
+import { api, type Id } from "@/lib/convexGenerated";
 import {
-  PeriodSelector,
-  type PeriodOption,
-} from "@/components/dashboard/period-selector";
-import { api, type Doc, type Id } from "@/lib/convexGenerated";
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
-interface DateRangeResult {
-  start: Date;
-  end: Date;
-  comparisonStart: Date;
-  comparisonEnd: Date;
-  label: string;
-  comparisonLabel: string;
-}
-
-type PeriodKey =
-  | "this-month"
-  | "last-month"
-  | "this-quarter"
-  | "this-year"
-  | "ytd";
-
-type DashboardKpi = {
-  key: string;
-} & Pick<
-  KpiCardProps,
-  "title" | "value" | "subtitle" | "delta" | "sparkline" | "status"
->;
+const IMPORTANT_FUND_THRESHOLD = 5000;
 
 const PERIOD_OPTIONS: PeriodOption[] = [
   { id: "this-month", label: "This Month", shortcut: "M" },
@@ -74,6 +59,23 @@ const currency = new Intl.NumberFormat("en-GB", {
   currency: "GBP",
   minimumFractionDigits: 2,
 });
+
+interface DateRangeResult {
+  start: Date;
+  end: Date;
+  comparisonStart: Date;
+  comparisonEnd: Date;
+  label: string;
+  comparisonLabel: string;
+  shortComparisonLabel: string;
+}
+
+type PeriodKey =
+  | "this-month"
+  | "last-month"
+  | "this-quarter"
+  | "this-year"
+  | "ytd";
 
 function startOfMonth(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -121,7 +123,11 @@ function buildRange(option: PeriodKey, anchor: Date): DateRangeResult {
       end = new Date(base.getFullYear(), base.getMonth(), base.getDate());
     }
     comparisonStart = new Date(start.getFullYear() - 1, 0, 1);
-    comparisonEnd = new Date(start.getFullYear() - 1, end.getMonth(), end.getDate());
+    comparisonEnd = new Date(
+      start.getFullYear() - 1,
+      end.getMonth(),
+      end.getDate()
+    );
   }
 
   const label = `${start.toLocaleDateString("en-GB", {
@@ -142,7 +148,21 @@ function buildRange(option: PeriodKey, anchor: Date): DateRangeResult {
     year: "numeric",
   })}`;
 
-  return { start, end, comparisonStart, comparisonEnd, label, comparisonLabel };
+  let shortComparisonLabel = "";
+  if (option === "this-month") {
+    shortComparisonLabel = "Last Month";
+  } else if (option === "last-month") {
+    shortComparisonLabel = comparisonStart.toLocaleDateString("en-GB", {
+      month: "long",
+    });
+  } else if (option === "this-quarter") {
+    const quarter = Math.floor(comparisonStart.getMonth() / 3) + 1;
+    shortComparisonLabel = `Q${quarter}`;
+  } else if (option === "this-year" || option === "ytd") {
+    shortComparisonLabel = comparisonStart.getFullYear().toString();
+  }
+
+  return { start, end, comparisonStart, comparisonEnd, label, comparisonLabel, shortComparisonLabel };
 }
 
 function formatCurrency(value: number) {
@@ -158,10 +178,17 @@ function calculatePercentageChange(current: number, previous: number) {
   return ((current - previous) / previous) * 100;
 }
 
+function monthYearLabel(d: Date) {
+  return d.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+}
+
+function quarterLabel(d: Date) {
+  const q = Math.floor(d.getMonth() / 3) + 1;
+  return `Q${q} ${d.getFullYear()}`;
+}
 export default function DashboardPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodKey>("this-month");
-  const [showGrowthMetrics, setShowGrowthMetrics] = useState(false);
-  const [periodOffset, setPeriodOffset] = useState(0);
+  const [periodOffset] = useState(0);
 
   const churches = useQuery(api.churches.listChurches, {});
   const churchId = churches?.[0]?._id;
@@ -175,8 +202,6 @@ export default function DashboardPage() {
     api.donors.getDonors,
     churchId ? { churchId } : "skip"
   );
-  const recentTransactions = useQuery(api.transactions.getRecent, { limit: 25 });
-  const totalFunds = useQuery(api.funds.getTotalBalance);
   const generateInsights = useMutation(api.aiInsights.generateInsights);
 
   const currentPeriod = useQuery(
@@ -186,10 +211,6 @@ export default function DashboardPage() {
   const periodMetrics = useQuery(
     api.financialPeriods.getPeriodMetrics,
     currentPeriod?._id ? { periodId: currentPeriod._id } : "skip"
-  );
-  const periodHistory = useQuery(
-    api.financialPeriods.listPeriods,
-    churchId ? { churchId } : "skip"
   );
 
   const periodAnchor = useMemo(() => {
@@ -222,6 +243,24 @@ export default function DashboardPage() {
     };
   }, [churchId, dateRange]);
 
+  const rollingRange = useMemo(() => {
+    if (!dateRange) return null;
+    const end = new Date(dateRange.end);
+    const start = new Date(end);
+    start.setMonth(start.getMonth() - 11);
+    start.setDate(1);
+    return { start, end };
+  }, [dateRange]);
+
+  const rollingArgs = useMemo(() => {
+    if (!churchId || !rollingRange) return "skip" as const;
+    return {
+      churchId,
+      startDate: isoDate(rollingRange.start),
+      endDate: isoDate(rollingRange.end),
+    };
+  }, [churchId, rollingRange]);
+
   const incomeExpenseReport = useQuery(
     api.reports.getIncomeExpenseReport,
     incomeExpenseArgs
@@ -230,6 +269,10 @@ export default function DashboardPage() {
     api.reports.getIncomeExpenseReport,
     comparisonArgs
   );
+  const rollingReport = useQuery(
+    api.reports.getIncomeExpenseReport,
+    rollingArgs
+  );
 
   useEffect(() => {
     if (churchId) {
@@ -237,10 +280,10 @@ export default function DashboardPage() {
     }
   }, [churchId, generateInsights]);
 
-  const categoryLookup = useMemo(() => {
-    if (!categories) return new Map<string, Doc<"categories">>();
-    return new Map(categories.map((category) => [category._id, category]));
-  }, [categories]);
+  const fundLookup = useMemo(() => {
+    const list = funds ?? [];
+    return new Map(list.map((fund) => [fund._id, fund]));
+  }, [funds]);
 
   const generalFundBalance = useMemo(() => {
     if (!funds) return 0;
@@ -268,13 +311,26 @@ export default function DashboardPage() {
   const netResult = incomeExpenseReport?.net ?? 0;
   const previousNet = comparisonReport?.net ?? 0;
 
-  const giftAidEligible = useMemo(() => {
-    return (
-      incomeExpenseReport?.transactions
-        ?.filter((transaction) => transaction.giftAid)
-        .reduce((sum, transaction) => sum + transaction.amount, 0) ?? 0
-    );
-  }, [incomeExpenseReport?.transactions]);
+  const generalFundMovement = useMemo(() => {
+    const transactions = incomeExpenseReport?.transactions ?? [];
+    return transactions.reduce((sum, txn) => {
+      const fundId = txn.fundId as Id<"funds"> | null;
+      const fund = fundId ? fundLookup.get(fundId) : undefined;
+      if (!fund || fund.type !== "general") return sum;
+      return sum + (txn.type === "income" ? txn.amount : -txn.amount);
+    }, 0);
+  }, [incomeExpenseReport?.transactions, fundLookup]);
+
+  const previousGeneralBalance = generalFundBalance - generalFundMovement;
+  const generalTrendPercent = calculatePercentageChange(
+    generalFundBalance,
+    previousGeneralBalance
+  );
+
+  const incomeChangePercent = calculatePercentageChange(
+    income,
+    comparisonReport?.income ?? 0
+  );
 
   const donorActivity = useMemo(() => {
     const transactions = incomeExpenseReport?.transactions ?? [];
@@ -283,16 +339,12 @@ export default function DashboardPage() {
     transactions
       .filter((txn) => txn.donorId)
       .forEach((txn) => {
-        const donorId = txn.donorId as string;
+        const donorId = (txn.donorId as Id<"donors">).toString();
         const existing = groupedByDonor.get(donorId) ?? { total: 0, count: 0 };
         existing.total += txn.amount;
         existing.count += 1;
         groupedByDonor.set(donorId, existing);
       });
-
-    const recurringDonors = Array.from(groupedByDonor.values()).filter(
-      (entry) => entry.count >= 2
-    ).length;
 
     const incomeTransactions = transactions.filter((txn) => txn.type === "income");
     const incomeTransactionCount = incomeTransactions.length;
@@ -308,8 +360,6 @@ export default function DashboardPage() {
         }).length
       : 0;
 
-    const activeDonors = donors?.length ?? 0;
-
     const donorsWithGifts = new Set(
       transactions
         .filter((txn) => txn.donorId)
@@ -321,312 +371,326 @@ export default function DashboardPage() {
       : 0;
 
     return {
-      recurringDonors,
+      recurringDonors: Array.from(groupedByDonor.values()).filter(
+        (entry) => entry.count >= 2
+      ).length,
       averageDonation,
       newDonors,
-      activeDonors,
+      activeDonors: donors?.length ?? 0,
       lapsedDonors,
     };
-  }, [
-    incomeExpenseReport?.transactions,
-    donors,
-    dateRange.start,
-    dateRange.end,
-  ]);
+  }, [incomeExpenseReport?.transactions, donors, dateRange.start, dateRange.end]);
+  const previousActiveDonors = useMemo(() => {
+    const transactions = comparisonReport?.transactions ?? [];
+    const donorSet = new Set<string>();
+    transactions
+      .filter((txn) => txn.donorId)
+      .forEach((txn) => donorSet.add((txn.donorId as Id<"donors">).toString()));
+    return donorSet.size;
+  }, [comparisonReport?.transactions]);
 
-  const donorRetentionRate = useMemo(() => {
-    const transactions = incomeExpenseReport?.transactions ?? [];
-    const previousTransactions = comparisonReport?.transactions ?? [];
-    const currentDonorIds = new Set(
-      transactions
-        .filter((txn) => txn.donorId)
-        .map((txn) => txn.donorId as string)
+  const giftAidEligible = useMemo(() => {
+    return (
+      incomeExpenseReport?.transactions
+        ?.filter((transaction) => transaction.giftAid)
+        .reduce((sum, transaction) => sum + transaction.amount, 0) ?? 0
     );
-    const previousDonorIds = new Set(
-      previousTransactions
-        .filter((txn) => txn.donorId)
-        .map((txn) => txn.donorId as string)
-    );
+  }, [incomeExpenseReport?.transactions]);
 
-    if (previousDonorIds.size === 0) return 0;
-    let retained = 0;
-    previousDonorIds.forEach((id) => {
-      if (currentDonorIds.has(id)) retained += 1;
+  const rollingMonths = useMemo(() => {
+    if (!rollingRange) return [] as { key: string; label: string }[];
+    const months: { key: string; label: string }[] = [];
+    for (let i = 0; i < 12; i += 1) {
+      const month = new Date(rollingRange.start);
+      month.setMonth(month.getMonth() + i);
+      const key = `${month.getFullYear()}-${month.getMonth()}`;
+      months.push({
+        key,
+        label: month.toLocaleDateString("en-GB", { month: "short" }),
+      });
+    }
+    return months;
+  }, [rollingRange]);
+
+  const monthlyIncomeExpense = useMemo(() => {
+    const transactions = rollingReport?.transactions ?? [];
+    const buckets = new Map<string, { income: number; expense: number }>();
+
+    transactions.forEach((txn) => {
+      const date = new Date(txn.date);
+      const key = `${date.getFullYear()}-${date.getMonth()}`;
+      const bucket = buckets.get(key) ?? { income: 0, expense: 0 };
+      if (txn.type === "income") {
+        bucket.income += txn.amount;
+      } else {
+        bucket.expense += txn.amount;
+      }
+      buckets.set(key, bucket);
     });
-    return (retained / previousDonorIds.size) * 100;
-  }, [incomeExpenseReport?.transactions, comparisonReport?.transactions]);
 
-  const transactionSparkline: TrendPoint[] = useMemo(() => {
-    if (!recentTransactions) return [];
-    const sorted = [...recentTransactions].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-    let running = 0;
-    return sorted.map((transaction) => {
-      running += transaction.type === "income" ? transaction.amount : -transaction.amount;
+    return rollingMonths.map(({ key, label }) => {
+      const bucket = buckets.get(key) ?? { income: 0, expense: 0 };
+      return { month: label, income: bucket.income, expense: bucket.expense };
+    });
+  }, [rollingReport?.transactions, rollingMonths]);
+
+  const donorSetsByMonth = useMemo(() => {
+    const transactions = rollingReport?.transactions ?? [];
+    const map = new Map<string, Set<string>>();
+    transactions.forEach((txn) => {
+      if (!txn.donorId) return;
+      const date = new Date(txn.date);
+      const key = `${date.getFullYear()}-${date.getMonth()}`;
+      const set = map.get(key) ?? new Set<string>();
+      set.add((txn.donorId as Id<"donors">).toString());
+      map.set(key, set);
+    });
+    return map;
+  }, [rollingReport?.transactions]);
+
+  const donorRetentionSeries = useMemo(() => {
+    return rollingMonths.map(({ key, label }, index) => {
+      if (index === 0) {
+        return { month: label, retention: 100 };
+      }
+      const current = donorSetsByMonth.get(key) ?? new Set<string>();
+      const previousKey = rollingMonths[index - 1]?.key;
+      const previous = previousKey
+        ? donorSetsByMonth.get(previousKey) ?? new Set<string>()
+        : new Set<string>();
+      if (previous.size === 0) {
+        return { month: label, retention: current.size > 0 ? 100 : 0 };
+      }
+      let retained = 0;
+      previous.forEach((id) => {
+        if (current.has(id)) retained += 1;
+      });
       return {
-        label: formatUkDateNumeric(transaction.date) ?? transaction.date,
-        value: running,
+        month: label,
+        retention: previous.size ? (retained / previous.size) * 100 : 0,
       };
     });
-  }, [recentTransactions]);
+  }, [donorSetsByMonth, rollingMonths]);
 
-  const growthSparkline: TrendPoint[] = useMemo(() => {
-    if (!periodHistory) return [];
-    const reversed = [...periodHistory].reverse().slice(0, 6);
-    return reversed.map((period) => ({
-      label: period.periodName,
-      value: period.reviewedCount ?? 0,
-    }));
-  }, [periodHistory]);
+  const donorRetentionRate = useMemo(() => {
+    if (!donorRetentionSeries.length) return 0;
+    return donorRetentionSeries[donorRetentionSeries.length - 1].retention;
+  }, [donorRetentionSeries]);
 
-  const financialKpis = useMemo<DashboardKpi[]>(() => {
-    const delta: KpiDelta | undefined = comparisonReport
-      ? {
-          value: Math.round(netResult - previousNet),
-          percentage: calculatePercentageChange(netResult, previousNet),
-          isPositive: netResult >= previousNet,
-          comparisonLabel: `vs ${dateRange.comparisonLabel}`,
+  const sortedFunds = useMemo(() => {
+    const list = funds ?? [];
+    return [...list]
+      .map((fund) => ({
+        ...fund,
+        isImportant: fund.balance >= IMPORTANT_FUND_THRESHOLD,
+      }))
+      .sort((a, b) => {
+        if (a.isImportant !== b.isImportant) {
+          return a.isImportant ? -1 : 1;
         }
-      : undefined;
+        return b.balance - a.balance;
+      });
+  }, [funds]);
 
-    return [
-      {
-        key: "general-balance",
-        title: "General Fund Balance",
-        value: formatCurrency(generalFundBalance),
-        subtitle: "Core operational reserves",
-        status: generalFundBalance >= 0 ? "positive" : "negative",
-        delta,
-        sparkline: transactionSparkline,
-      },
-      {
-        key: "income",
-        title: "Total Income",
-        value: formatCurrency(income),
-        subtitle: `${PERIOD_OPTIONS.find((opt) => opt.id === selectedPeriod)?.label ?? "Period"}`,
-        status: income >= previousNet ? "positive" : "neutral",
-        delta: comparisonReport
-          ? {
-              value: Math.round(income - (comparisonReport?.income ?? 0)),
-              percentage: calculatePercentageChange(
-                income,
-                comparisonReport?.income ?? 0
-              ),
-              isPositive: income >= (comparisonReport?.income ?? 0),
-              comparisonLabel: `vs ${dateRange.comparisonLabel}`,
-            }
-          : undefined,
-        sparkline: transactionSparkline,
-      },
-      {
-        key: "expenses",
-        title: "Total Expenses",
-        value: formatCurrency(expenses),
-        subtitle: `${PERIOD_OPTIONS.find((opt) => opt.id === selectedPeriod)?.label ?? "Period"}`,
-        status: expenses <= income ? "positive" : "negative",
-        delta: comparisonReport
-          ? {
-              value: Math.round(expenses - (comparisonReport?.expense ?? 0)),
-              percentage: calculatePercentageChange(
-                expenses,
-                comparisonReport?.expense ?? 0
-              ),
-              isPositive: expenses <= (comparisonReport?.expense ?? 0),
-              comparisonLabel: `vs ${dateRange.comparisonLabel}`,
-            }
-          : undefined,
-        sparkline: transactionSparkline,
-      },
-      {
-        key: "surplus",
-        title: "Operational Surplus/Deficit",
-        value: formatCurrency(netResult),
-        subtitle: "Income minus expenses",
-        status: netResult >= 0 ? "positive" : "negative",
-        delta,
-        sparkline: transactionSparkline,
-      },
-      {
-        key: "budget",
-        title: "Budget Variance",
-        value: formatCurrency(netResult - previousNet),
-        subtitle: "Actual vs previous period",
-        status: netResult >= previousNet ? "positive" : "negative",
-        delta,
-        sparkline: growthSparkline,
-      },
-      {
-        key: "restricted",
-        title: "Restricted & Designated",
-        value: formatCurrency(restrictedFundBalance + designatedFundBalance),
-        subtitle: "Funds earmarked for ministries",
-        status: "neutral" as const,
-        delta: comparisonReport
-          ? {
-              value: Math.round(
-                restrictedFundBalance + designatedFundBalance - generalFundBalance
-              ),
-              percentage: undefined,
-              isPositive: restrictedFundBalance + designatedFundBalance >= generalFundBalance,
-              comparisonLabel: "Fund mix",
-            }
-          : undefined,
-        sparkline: growthSparkline,
-      },
-    ];
-  }, [
-    comparisonReport,
-    dateRange.comparisonLabel,
-    designatedFundBalance,
-    generalFundBalance,
-    growthSparkline,
-    income,
-    netResult,
-    previousNet,
-    restrictedFundBalance,
-    selectedPeriod,
-    transactionSparkline,
-    expenses,
-  ]);
+  const totalFundBalance = useMemo(
+    () => sortedFunds.reduce((sum, fund) => sum + fund.balance, 0),
+    [sortedFunds]
+  );
 
-  const donorKpis = useMemo<DashboardKpi[]>(() => {
-    return [
-      {
-        key: "active-donors",
-        title: "Total Active Donors",
-        value: donorActivity.activeDonors.toString(),
-        subtitle: "Supporters in the current year",
-        status: donorActivity.activeDonors > 0 ? "positive" : "neutral",
-        delta: donors
-          ? {
-              value: donorActivity.newDonors,
-              percentage: donors.length
-                ? (donorActivity.newDonors / donors.length) * 100
-                : 0,
-              isPositive: donorActivity.newDonors >= 0,
-              comparisonLabel: "New this period",
-            }
-          : undefined,
-        sparkline: growthSparkline,
-      },
-      {
-        key: "recurring-donors",
-        title: "Recurring Donors",
-        value: donorActivity.recurringDonors.toString(),
-        subtitle: "Multiple gifts in the period",
-        status: donorActivity.recurringDonors > 0 ? "positive" : "neutral",
-        delta: donors
-          ? {
-              value: donorActivity.recurringDonors,
-              percentage: donors.length
-                ? (donorActivity.recurringDonors / donors.length) * 100
-                : 0,
-              isPositive: true,
-              comparisonLabel: "Share of total",
-            }
-          : undefined,
-        sparkline: growthSparkline,
-      },
-      {
-        key: "new-donors",
-        title: "New Donors",
-        value: donorActivity.newDonors.toString(),
-        subtitle: "First-time supporters",
-        status: donorActivity.newDonors > 0 ? "positive" : "neutral",
-        delta: donors
-          ? {
-              value: donorActivity.newDonors,
-              percentage: donors.length
-                ? (donorActivity.newDonors / donors.length) * 100
-                : 0,
-              isPositive: true,
-              comparisonLabel: "Growth",
-            }
-          : undefined,
-        sparkline: growthSparkline,
-      },
-      {
-        key: "lapsed-donors",
+  const budgetRows = useMemo(() => {
+    return sortedFunds.map((fund) => {
+      const budget = fund.fundraisingTarget ?? fund.balance;
+      const variance = fund.balance - (budget ?? 0);
+      const progress = budget ? (fund.balance / budget) * 100 : 0;
+      const variancePercent = budget ? (variance / budget) * 100 : 0;
+      const varianceAlert =
+        fund.isImportant && Math.abs(variancePercent) >= 20 ? "warning" : null;
+      return {
+        id: fund._id,
+        name: fund.name,
+        budget,
+        actual: fund.balance,
+        variance,
+        progress,
+        variancePercent,
+        isImportant: fund.isImportant,
+        varianceAlert,
+      };
+    });
+  }, [sortedFunds]);
+
+  const givingChangePercent = incomeChangePercent;
+  const lapsedRate = donorActivity.activeDonors
+    ? (donorActivity.lapsedDonors / donorActivity.activeDonors) * 100
+    : 0;
+  const importantFundsAtRisk = sortedFunds.filter(
+    (fund) => fund.isImportant && fund.balance < IMPORTANT_FUND_THRESHOLD * 1.1
+  );
+  const criticalMetric: HeroMetricCardProps = useMemo(() => {
+    if (donorActivity.lapsedDonors > 30 || lapsedRate >= 20) {
+      return {
         title: "Lapsed Donors",
         value: donorActivity.lapsedDonors.toString(),
-        subtitle: "No gift this period",
-        status: donorActivity.lapsedDonors === 0 ? "positive" : "negative",
-        delta: donors
-          ? {
-              value: donorActivity.lapsedDonors,
-              percentage: donors.length
-                ? (donorActivity.lapsedDonors / donors.length) * 100
-                : 0,
-              isPositive: donorActivity.lapsedDonors === 0,
-              comparisonLabel: "Require follow up",
-            }
-          : undefined,
-        sparkline: growthSparkline,
-      },
-      {
-        key: "average-donation",
-        title: "Average Donation Size",
-        value: formatCurrency(donorActivity.averageDonation),
-        subtitle: "Per gift this period",
-        status: "neutral" as const,
-        delta: comparisonReport
-          ? {
-              value: Math.round(
-                donorActivity.averageDonation -
-                  ((comparisonReport?.transactions ?? [])
-                    .filter((txn) => txn.type === "income")
-                    .reduce((sum, txn) => sum + txn.amount, 0) /
-                    Math.max(
-                      (comparisonReport?.transactions ?? []).filter(
-                        (txn) => txn.type === "income"
-                      ).length,
-                      1
-                    ))
-              ),
-              percentage: undefined,
-              isPositive: true,
-              comparisonLabel: "vs prior period",
-            }
-          : undefined,
-        sparkline: transactionSparkline,
-      },
-      {
-        key: "gift-aid",
-        title: "Gift Aid Eligible & Claimed",
-        value: `${formatCurrency(giftAidEligible)} eligible`,
-        subtitle: "Claim progress",
-        status: giftAidEligible > 0 ? "positive" : "neutral",
-        delta: {
-          value: giftAidEligible * 0.25,
-          percentage: giftAidEligible ? 25 : 0,
-          isPositive: true,
-          comparisonLabel: "Estimated claim",
+        description: "Follow-up required",
+        status: lapsedRate >= 30 ? "critical" : "warning",
+        trend: {
+          direction: "down",
+          valueLabel: `${lapsedRate.toFixed(1)}% of base`,
+          comparisonLabel: `Threshold ${Math.round(donorActivity.activeDonors * 0.2)} donors`,
         },
-        sparkline: transactionSparkline,
+      };
+    }
+
+    if (givingChangePercent < -15) {
+      return {
+        title: "Giving Momentum",
+        value: `${givingChangePercent.toFixed(1)}%`,
+        description: "Giving declined vs prior period",
+        status: givingChangePercent < -30 ? "critical" : "warning",
+        trend: {
+          direction: "down",
+          valueLabel: `${Math.abs(givingChangePercent).toFixed(1)}% drop`,
+          comparisonLabel: `vs ${dateRange.shortComparisonLabel}`,
+        },
+      };
+    }
+
+    if (netResult < 0) {
+      return {
+        title: "Operational Surplus",
+        value: formatCurrency(netResult),
+        description: "Expenses outpaced income this period",
+        status: Math.abs(netResult) > income * 0.1 ? "critical" : "warning",
+        trend: {
+          direction: "down",
+          valueLabel: `${formatCurrency(netResult - previousNet)}`,
+          comparisonLabel: `vs ${dateRange.shortComparisonLabel}`,
+        },
+      };
+    }
+
+    if (importantFundsAtRisk.length > 0) {
+      const lowest = importantFundsAtRisk[importantFundsAtRisk.length - 1];
+      return {
+        title: "Important Fund Cushion",
+        value: formatCurrency(lowest.balance),
+        description: `${lowest.name} nearing reserve limit`,
+        status: "warning",
+        trend: {
+          direction: "down",
+          valueLabel: "Monitor reserves",
+          comparisonLabel: "Target ≥ £5K",
+        },
+      };
+    }
+
+    const netDirection = netResult >= previousNet ? "up" : "down";
+    return {
+      title: "Critical Issue",
+      value: formatCurrency(netResult),
+      description: "No critical alerts — maintain momentum",
+      status: "healthy",
+      trend: {
+        direction: netDirection,
+        valueLabel: `${netDirection === "up" ? "+" : ""}${(
+          calculatePercentageChange(netResult, previousNet)
+        ).toFixed(1)}%`,
+        comparisonLabel: `vs ${dateRange.shortComparisonLabel}`,
       },
-    ];
+    };
   }, [
-    comparisonReport,
+    dateRange.shortComparisonLabel,
     donorActivity.activeDonors,
-    donorActivity.averageDonation,
     donorActivity.lapsedDonors,
-    donorActivity.newDonors,
-    donorActivity.recurringDonors,
-    donors,
-    giftAidEligible,
-    growthSparkline,
-    transactionSparkline,
+    givingChangePercent,
+    importantFundsAtRisk,
+    income,
+    lapsedRate,
+    netResult,
+    previousNet,
   ]);
 
-  const advancedKpis = useMemo<DashboardKpi[]>(() => {
+  const heroMetrics: HeroMetricCardProps[] = [
+    {
+      title: "General Fund Balance",
+      value: formatCurrency(generalFundBalance),
+      description: "Core operational reserves",
+      status: generalFundBalance >= IMPORTANT_FUND_THRESHOLD ? "healthy" : "warning",
+      trend: {
+        direction:
+          generalTrendPercent === 0
+            ? "flat"
+            : generalTrendPercent > 0
+            ? "up"
+            : "down",
+        valueLabel: `${generalTrendPercent >= 0 ? "+" : ""}${generalTrendPercent.toFixed(
+          1
+        )}%`,
+        comparisonLabel: "vs period start",
+      },
+    },
+    {
+      title: "Total Income",
+      value: formatCurrency(income),
+      status: income >= expenses ? "healthy" : "warning",
+      trend: {
+        direction:
+          incomeChangePercent === 0
+            ? "flat"
+            : incomeChangePercent > 0
+            ? "up"
+            : "down",
+        valueLabel: `${incomeChangePercent >= 0 ? "+" : ""}${incomeChangePercent.toFixed(
+          1
+        )}%`,
+        comparisonLabel: `vs ${dateRange.shortComparisonLabel}`,
+      },
+    },
+    {
+      title: "Active Donors",
+      value: donorActivity.activeDonors.toString(),
+      description: "Supporters giving this year",
+      status: donorActivity.activeDonors > 0 ? "healthy" : "warning",
+      trend: {
+        direction:
+          donorActivity.activeDonors === previousActiveDonors
+            ? "flat"
+            : donorActivity.activeDonors > previousActiveDonors
+            ? "up"
+            : "down",
+        valueLabel: (() => {
+          if (previousActiveDonors === 0) {
+            const change = donorActivity.activeDonors - previousActiveDonors;
+            return `${change >= 0 ? "+" : ""}${change} donors`;
+          }
+          const percentChange = calculatePercentageChange(
+            donorActivity.activeDonors,
+            previousActiveDonors
+          );
+          // Show absolute count if percentage change is extreme (> 500%)
+          if (Math.abs(percentChange) > 500) {
+            const change = donorActivity.activeDonors - previousActiveDonors;
+            return `${change >= 0 ? "+" : ""}${change} donors`;
+          }
+          return `${percentChange >= 0 ? "+" : ""}${percentChange.toFixed(1)}%`;
+        })(),
+        comparisonLabel:
+          previousActiveDonors > 0
+            ? `vs ${dateRange.shortComparisonLabel}`
+            : "First period benchmark",
+      },
+    },
+    criticalMetric,
+  ];
+  const advancedMetrics = useMemo(() => {
+    const transactions = incomeExpenseReport?.transactions ?? [];
+    const incomes = transactions.filter((txn) => txn.type === "income");
+
     const topDonorContribution = (() => {
-      const transactions = incomeExpenseReport?.transactions ?? [];
-      const incomes = transactions.filter((txn) => txn.type === "income");
       if (incomes.length === 0) return 0;
       const totals = new Map<string, number>();
       incomes.forEach((txn) => {
-        const donorId = txn.donorId as string | undefined;
+        const donorId = txn.donorId ? (txn.donorId as Id<"donors">).toString() : null;
         if (!donorId) return;
         totals.set(donorId, (totals.get(donorId) ?? 0) + txn.amount);
       });
@@ -637,13 +701,12 @@ export default function DashboardPage() {
     })();
 
     const incomeDiversity = (() => {
-      const transactions = incomeExpenseReport?.transactions ?? [];
       if (!transactions.length) return { regular: 0, fundraising: 0, grants: 0 };
       const totals = { regular: 0, fundraising: 0, grants: 0 };
       transactions.forEach((txn) => {
         if (txn.type !== "income") return;
         const category = txn.categoryId
-          ? categoryLookup.get(txn.categoryId as string)
+          ? categories?.find((cat) => cat._id === txn.categoryId)
           : undefined;
         if (category?.name?.toLowerCase().includes("grant")) {
           totals.grants += txn.amount;
@@ -662,99 +725,85 @@ export default function DashboardPage() {
       };
     })();
 
-    const fundHealthIndex = (() => {
-      const restrictedRatio = generalFundBalance
-        ? (restrictedFundBalance + designatedFundBalance) / generalFundBalance
-        : 0;
-      return restrictedRatio;
-    })();
+    const fundHealthIndex = generalFundBalance
+      ? (restrictedFundBalance + designatedFundBalance) / generalFundBalance
+      : 0;
+
+    const givingPerAttender = donorActivity.activeDonors
+      ? income / donorActivity.activeDonors
+      : 0;
 
     return [
       {
-        key: "giving-growth",
         title: "Giving Growth Rate",
-        value: `${calculatePercentageChange(
-          income,
-          comparisonReport?.income ?? 0
-        ).toFixed(1)}%`,
-        subtitle: "Period-over-period",
-        status: income >= (comparisonReport?.income ?? 0) ? "positive" : "negative",
-        sparkline: transactionSparkline,
+        value: `${incomeChangePercent.toFixed(1)}%`,
+        hint: `vs ${dateRange.shortComparisonLabel}`,
       },
       {
-        key: "income-concentration",
         title: "Income Concentration",
         value: `${topDonorContribution.toFixed(1)}% from top 10 donors`,
-        subtitle: "Monitor dependency",
-        status: topDonorContribution <= 60 ? "positive" : "negative",
-        sparkline: transactionSparkline,
+        hint: "Monitor donor dependency",
       },
       {
-        key: "income-diversity",
         title: "Income Diversity",
-        value: `${incomeDiversity.regular.toFixed(0)}% regular · ${incomeDiversity.fundraising.toFixed(0)}% events · ${incomeDiversity.grants.toFixed(0)}% grants`,
-        subtitle: "Mix of giving sources",
-        status: "neutral" as const,
-        sparkline: growthSparkline,
+        value: `${incomeDiversity.regular.toFixed(0)}% regular · ${incomeDiversity.fundraising.toFixed(
+          0
+        )}% events · ${incomeDiversity.grants.toFixed(0)}% grants`,
+        hint: "Spread of giving sources",
       },
       {
-        key: "fund-health",
         title: "Fund Health Index",
-        value: `${(fundHealthIndex * 100).toFixed(0)}% of general balance restricted`,
-        subtitle: "Ensure operational coverage",
-        status: fundHealthIndex < 1 ? "positive" : "negative",
-        sparkline: growthSparkline,
+        value: `${(fundHealthIndex * 100).toFixed(0)}% restricted vs general`,
+        hint: "Aim for < 100% restricted",
       },
       {
-        key: "donor-retention",
         title: "Donor Retention",
         value: `${donorRetentionRate.toFixed(1)}% retained`,
-        subtitle: "Returning donors vs prior period",
-        status: donorRetentionRate >= 60 ? "positive" : "negative",
-        sparkline: transactionSparkline,
+        hint: "Return donors vs prior month",
       },
       {
-        key: "giving-per-attender",
-        title: "Giving Per Attender",
-        value: formatCurrency(
-          income / Math.max(donorActivity.activeDonors || 1, 1)
-        ),
-        subtitle: "Income divided by active donors",
-        status: "neutral" as const,
-        sparkline: growthSparkline,
+        title: "Giving per Attender",
+        value: formatCurrency(givingPerAttender),
+        hint: "Income divided by active donors",
+      },
+      {
+        title: "Gift Aid Eligible",
+        value: formatCurrency(giftAidEligible),
+        hint: "Potential reclaim (est. 25%)",
+      },
+      {
+        title: "Recurring Donors",
+        value: donorActivity.recurringDonors.toString(),
+        hint: "Multiple gifts this period",
       },
     ];
   }, [
-    categoryLookup,
-    comparisonReport?.income,
-    donorRetentionRate,
-    generalFundBalance,
-    growthSparkline,
-    income,
-    incomeExpenseReport?.transactions,
-    restrictedFundBalance,
+    categories,
+    dateRange.shortComparisonLabel,
     designatedFundBalance,
     donorActivity.activeDonors,
-    transactionSparkline,
+    donorActivity.recurringDonors,
+    donorRetentionRate,
+    giftAidEligible,
+    generalFundBalance,
+    income,
+    incomeChangePercent,
+    incomeExpenseReport?.transactions,
+    restrictedFundBalance,
   ]);
 
-
-  if (
-    funds === undefined ||
-    recentTransactions === undefined ||
-    totalFunds === undefined
-  ) {
+  if (funds === undefined || incomeExpenseReport === undefined) {
     return (
       <div className="space-y-8 p-6">
-        <div className="space-y-2">
-          <div className="h-6 w-60 rounded bg-grey-light" />
-          <div className="h-4 w-80 rounded bg-grey-light" />
+        <div className="space-y-3">
+          <div className="h-6 w-56 rounded bg-grey-light" />
+          <div className="h-4 w-72 rounded bg-grey-light" />
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, index) => (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
             <Card key={index} className="border-ledger bg-paper">
               <CardHeader>
-                <div className="h-4 w-32 rounded bg-grey-light" />
+                <div className="h-3 w-24 rounded bg-grey-light" />
               </CardHeader>
               <CardContent>
                 <div className="h-10 w-24 rounded bg-grey-light" />
@@ -765,245 +814,390 @@ export default function DashboardPage() {
       </div>
     );
   }
-
   return (
-    <div className="space-y-8 p-6">
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="font-primary text-xs uppercase">
-                Live finance view
+    <div className="flex min-h-screen flex-col bg-paper">
+      <div className="flex-1 space-y-8 p-6 pb-32">
+        <header className="space-y-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-2">
+              <Badge variant="outline" className="font-primary text-xs uppercase tracking-[0.2em]">
+                Finance &amp; Donor Health Dashboard
               </Badge>
-              <span className="flex items-center gap-1 text-xs font-primary text-grey-mid">
-                <Calendar className="h-3 w-3" />
-                {dateRange.label}
-              </span>
+              <h1 className="text-3xl font-semibold text-ink">
+                Finance &amp; Donor Health Dashboard
+              </h1>
+              <p className="max-w-3xl text-sm font-primary leading-relaxed text-grey-mid">
+                Decision-ready insights prioritise important funds, donor momentum, and urgent follow-up so your team can act with confidence.
+              </p>
             </div>
-            <h1 className="text-3xl font-semibold text-ink">
-              Finance & Donor Health Dashboard
-            </h1>
-            <p className="max-w-3xl text-sm font-primary text-grey-mid">
-              Instantly understand your fund balances, income trends, donor engagement, and growth metrics. AI highlights urgent issues while quick actions keep your ledger up to date.
-            </p>
+            <div />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <PeriodSelector
+              options={PERIOD_OPTIONS}
+              selected={selectedPeriod}
+              onSelect={(value) => setSelectedPeriod(value as PeriodKey)}
+              label={(() => {
+                switch (selectedPeriod) {
+                  case "this-quarter":
+                    return `${quarterLabel(dateRange.start)} vs ${quarterLabel(dateRange.comparisonStart)}`;
+                  case "this-year":
+                    return `${dateRange.end.getFullYear()} vs ${dateRange.comparisonEnd.getFullYear()}`;
+                  case "ytd":
+                    return `YTD ${dateRange.end.getFullYear()} vs YTD ${dateRange.comparisonEnd.getFullYear()}`;
+                  default:
+                    return `${monthYearLabel(dateRange.start)} vs ${monthYearLabel(dateRange.comparisonStart)}`;
+                }
+              })()}
+              onCustomRange={() => window.alert("Custom range coming soon")}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" className="border-ledger font-primary" asChild>
+                <Link href="/reports">
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  Run Report
+                </Link>
+              </Button>
+              <Button variant="outline" className="border-ledger font-primary" asChild>
+                <Link href="/funds">
+                  <Layers className="mr-2 h-4 w-4" />
+                  Manage Funds
+                </Link>
+              </Button>
+              <Button className="font-primary" asChild>
+                <Link href="/transactions">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Transaction
+                </Link>
+              </Button>
+            </div>
+          </div>
+          
+        </header>
+
+        {churchId && <InsightsWidget churchId={churchId} />}
+
+        <section aria-label="Key metrics" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {heroMetrics.map((metric) => (
+            <HeroMetricCard key={metric.title} {...metric} />
+          ))}
+        </section>
+
+        <CollapsibleSection
+          id="financial-details"
+          title="Financial Details"
+          description="Track income, spending, and fund balances at a glance"
+          defaultOpen
+        >
+          <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+            <Card className="border-ledger bg-white">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-ink">Income vs Expense (12 months)</CardTitle>
+                <CardDescription className="font-primary text-grey-mid">
+                  Bars highlight the balance between income and expenditure each month.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="h-64">
+                {monthlyIncomeExpense.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthlyIncomeExpense}>
+                      <CartesianGrid stroke="#E5E7EB" strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="month"
+                        stroke="#6B7280"
+                        fontSize={12}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        stroke="#6B7280"
+                        fontSize={12}
+                        tickFormatter={(value) => `£${(value / 1000).toFixed(0)}k`}
+                        width={60}
+                      />
+                      <Tooltip
+                        cursor={{ fill: "rgba(16, 185, 129, 0.1)" }}
+                        formatter={(value: number) => formatCurrency(value)}
+                      />
+                      <Bar dataKey="income" fill="#10B981" radius={4} name="Income" />
+                      <Bar dataKey="expense" fill="#F59E0B" radius={4} name="Expenses" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-grey-mid">
+                    Not enough transaction history yet.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-ledger bg-white">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-ink">
+                  <Church className="h-5 w-5" /> Fund Balances
+                </CardTitle>
+                <CardDescription className="font-primary text-grey-mid">
+                  Important funds (≥£5,000) appear first and display a ⭐ marker.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  {sortedFunds.map((fund) => {
+                    const percent = totalFundBalance
+                      ? (fund.balance / totalFundBalance) * 100
+                      : 0;
+                    return (
+                      <div key={fund._id} className="space-y-2">
+                        <div className="flex items-center justify-between font-primary text-sm">
+                          <span
+                            className={
+                              fund.isImportant
+                                ? "font-semibold text-ink"
+                                : "text-grey-dark"
+                            }
+                          >
+                            {fund.name} {fund.isImportant && <span aria-label="Important fund">⭐</span>}
+                          </span>
+                          <span className="text-grey-mid">{formatCurrency(fund.balance)}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-grey-light">
+                          <div
+                            className={
+                              fund.isImportant
+                                ? "h-full rounded-full bg-success"
+                                : "h-full rounded-full bg-grey-mid"
+                            }
+                            style={{ width: `${Math.max(percent, 4)}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs font-primary text-grey-mid">
+                  ⭐ Important funds monitored for alerts. Total balance {formatCurrency(totalFundBalance)}.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="border-ledger bg-white">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-ink">Budget Variance</CardTitle>
+              <CardDescription className="font-primary text-grey-mid">
+                Important funds appear first and highlight variances greater than 20%.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-sm font-primary">
+                <thead className="text-left text-xs uppercase tracking-[0.2em] text-grey-mid">
+                  <tr>
+                    <th className="py-2">Fund</th>
+                    <th className="py-2">Budget</th>
+                    <th className="py-2">Actual</th>
+                    <th className="py-2">Variance</th>
+                    <th className="py-2">% of Budget</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-ledger/60">
+                  {budgetRows.map((row) => {
+                    const varianceTone =
+                      row.variance > 0 ? "text-success" : row.variance < 0 ? "text-error" : "text-grey-mid";
+                    return (
+                      <tr
+                        key={row.id}
+                        className={row.varianceAlert ? "bg-amber-50/60" : undefined}
+                      >
+                        <td className="py-3 font-medium text-ink">
+                          {row.name} {row.isImportant && <span aria-label="Important fund">⭐</span>}
+                        </td>
+                        <td className="py-3 text-grey-mid">{formatCurrency(row.budget ?? 0)}</td>
+                        <td className="py-3 text-grey-mid">{formatCurrency(row.actual)}</td>
+                        <td className={`py-3 ${varianceTone}`}>{formatCurrency(row.variance)}</td>
+                        <td className="py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="h-2 flex-1 rounded-full bg-grey-light">
+                              <div
+                                className={`h-full rounded-full ${row.progress >= 100 ? "bg-error" : "bg-success"}`}
+                                style={{ width: `${Math.min(Math.max(row.progress, 4), 120)}%` }}
+                              />
+                            </div>
+                            <span className="w-12 text-right text-sm text-grey-mid">
+                              {row.progress.toFixed(0)}%
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          id="donor-health"
+          title="Donor Health"
+          description="Understand donor engagement, retention, and growth"
+          defaultOpen
+        >
+          <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-3">
+                {[{
+                  title: "Active Donors",
+                  value: donorActivity.activeDonors,
+                  change: donorActivity.newDonors,
+                  icon: UserCheck,
+                  tone: "text-success",
+                }, {
+                  title: "Lapsed Donors",
+                  value: donorActivity.lapsedDonors,
+                  change: Math.max(donorActivity.lapsedDonors - donorActivity.newDonors, 0),
+                  icon: UserMinus,
+                  tone: donorActivity.lapsedDonors > 0 ? "text-error" : "text-grey-mid",
+                }, {
+                  title: "New Donors",
+                  value: donorActivity.newDonors,
+                  change: donorActivity.newDonors,
+                  icon: UserPlus,
+                  tone: donorActivity.newDonors > 0 ? "text-success" : "text-grey-mid",
+                }].map((card) => {
+                  const Icon = card.icon;
+                  return (
+                    <Card key={card.title} className="border-ledger bg-white">
+                      <CardHeader className="flex flex-row items-start justify-between pb-2">
+                        <CardTitle className="font-primary text-xs uppercase tracking-[0.2em] text-grey-mid">
+                          {card.title}
+                        </CardTitle>
+                        <Icon className={`h-4 w-4 ${card.tone}`} />
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="text-2xl font-semibold text-ink">{card.value}</div>
+                        <p className="text-xs font-primary text-grey-mid">
+                          {card.title === "Lapsed Donors"
+                            ? lapsedRate.toFixed(1) + "% of base"
+                            : card.change >= 0
+                            ? `+${card.change} this period`
+                            : `${card.change}`}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+              <Card className="border-ledger bg-white">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-ink">Donor Retention Trend</CardTitle>
+                  <CardDescription className="font-primary text-grey-mid">
+                    Measures returning donors month over month.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="h-60">
+                  {donorRetentionSeries.length > 1 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={donorRetentionSeries}>
+                        <CartesianGrid stroke="#E5E7EB" strokeDasharray="3 3" />
+                        <XAxis dataKey="month" stroke="#6B7280" fontSize={12} tickLine={false} />
+                        <YAxis domain={[0, 100]} stroke="#6B7280" fontSize={12} tickFormatter={(value) => `${value}%`} />
+                        <Tooltip formatter={(value: number) => `${value.toFixed(1)}%`} />
+                        <Line type="monotone" dataKey="retention" stroke="#6366F1" strokeWidth={2} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-grey-mid">
+                      Not enough donor history yet.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+            <Card className="border-ledger bg-white">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-ink">Average Gift This Period</CardTitle>
+                <CardDescription className="font-primary text-grey-mid">
+                  Compare to the previous period to spot momentum shifts.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-3xl font-semibold text-ink">
+                  {formatCurrency(donorActivity.averageDonation)}
+                </div>
+                <p className="text-sm font-primary text-grey-mid">
+                  New donors added: {donorActivity.newDonors}. Recurring donors: {donorActivity.recurringDonors}.
+                </p>
+                <Button variant="outline" className="w-full border-ledger font-primary" asChild>
+                  <Link href="/donors">
+                    Review donor list
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          id="advanced-metrics"
+          title="Advanced Metrics"
+          description="Deeper analysis on giving concentration and diversification"
+          defaultOpen={false}
+        >
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {advancedMetrics.map((metric) => (
+              <Card key={metric.title} className="border-ledger bg-white">
+                <CardHeader className="pb-2">
+                  <CardTitle className="font-primary text-xs uppercase tracking-[0.2em] text-grey-mid">
+                    {metric.title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="text-2xl font-semibold text-ink">{metric.value}</div>
+                  <p className="text-xs font-primary text-grey-mid">{metric.hint}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </CollapsibleSection>
+      </div>
+
+      <div className="sticky bottom-0 border-t border-ledger bg-white/95 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="text-sm font-primary text-grey-mid">
+              {currentPeriod ? currentPeriod.periodName : "Current period"}
+            </div>
+            {periodMetrics && (
+              <div className="flex items-center gap-2 text-sm font-primary text-grey-mid">
+                <span>Ledger progress</span>
+                <div className="h-2 w-36 rounded-full bg-grey-light">
+                  <div
+                    className="h-full rounded-full bg-success"
+                    style={{ width: `${periodMetrics.percentComplete}%` }}
+                  />
+                </div>
+                <span className="text-ink font-semibold">
+                  {periodMetrics.percentComplete}% ({periodMetrics.categorized} of {periodMetrics.total})
+                </span>
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" className="border-ledger font-primary" asChild>
               <Link href="/reports">
-                <BarChart3 className="mr-2 h-4 w-4" />
-                Run Report
+                <Target className="mr-2 h-4 w-4" />
+                Review Month-End Checklist
               </Link>
             </Button>
-            <Button variant="outline" className="border-ledger font-primary" asChild>
-              <Link href="/funds">
-                <Layers className="mr-2 h-4 w-4" />
-                Manage Funds
-              </Link>
-            </Button>
-            <Button className="font-primary" asChild>
-              <Link href="/transactions">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Transaction
+            <Button variant="ghost" className="font-primary text-xs uppercase tracking-[0.2em] text-grey-mid" asChild>
+              <Link href="/reconciliation">
+                <Receipt className="mr-2 h-4 w-4" />
+                Reconcile Accounts
               </Link>
             </Button>
           </div>
         </div>
-        <PeriodSelector
-          options={PERIOD_OPTIONS}
-          selected={selectedPeriod}
-          onSelect={(value) => setSelectedPeriod(value as PeriodKey)}
-          onNavigate={(direction) => {
-            setPeriodOffset((prev) =>
-              prev + (direction === "previous" ? -1 : 1)
-            );
-          }}
-          comparisonLabel={`vs ${dateRange.comparisonLabel}`}
-          onCustomRange={() => window.alert("Custom range coming soon")}
-        />
       </div>
-
-      <section aria-label="Key performance indicators" className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-ink">Financial Health KPIs</h2>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={showGrowthMetrics ? "outline" : "default"}
-              className={cn(
-                "border-ledger font-primary text-xs uppercase tracking-wide",
-                showGrowthMetrics ? "bg-paper" : ""
-              )}
-              onClick={() => setShowGrowthMetrics(false)}
-            >
-              Finance & Donors
-            </Button>
-            <Button
-              variant={showGrowthMetrics ? "default" : "outline"}
-              className={cn(
-                "border-ledger font-primary text-xs uppercase tracking-wide",
-                showGrowthMetrics ? "" : "bg-paper"
-              )}
-              onClick={() => setShowGrowthMetrics(true)}
-            >
-              Growth Metrics
-            </Button>
-          </div>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-3 xl:grid-cols-6">
-          {(showGrowthMetrics ? advancedKpis : financialKpis).map((kpi) => (
-            <KpiCard
-              key={kpi.key}
-              title={kpi.title}
-              value={kpi.value}
-              subtitle={kpi.subtitle}
-              delta={kpi.delta}
-              status={kpi.status as "positive" | "negative" | "neutral"}
-              sparkline={kpi.sparkline}
-            />
-          ))}
-        </div>
-        {!showGrowthMetrics && (
-          <div className="grid gap-4 lg:grid-cols-3 xl:grid-cols-6">
-            {donorKpis.map((kpi) => (
-              <KpiCard
-                key={kpi.key}
-                title={kpi.title}
-                value={kpi.value}
-                subtitle={kpi.subtitle}
-                delta={kpi.delta}
-                status={kpi.status as "positive" | "negative" | "neutral"}
-                sparkline={kpi.sparkline}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-3" aria-label="Insights and period status">
-        <div className="lg:col-span-2 space-y-6">
-          {currentPeriod && (
-            <Card className="border-ledger bg-paper">
-              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-ink">
-                    <Calendar className="h-5 w-5" />
-                    {currentPeriod.periodName}
-                  </CardTitle>
-                  <CardDescription className="font-primary text-grey-mid">
-                    {periodMetrics
-                      ? `${periodMetrics.categorized} of ${periodMetrics.total} transactions categorised`
-                      : "Categorisation progress"}
-                  </CardDescription>
-                </div>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "font-primary text-xs uppercase tracking-wide",
-                    currentPeriod.status === "completed" && "border-success text-success",
-                    currentPeriod.status === "overdue" && "border-error text-error"
-                  )}
-                >
-                  {currentPeriod.status === "overdue"
-                    ? `Overdue (${currentPeriod.overdueDays ?? 0} days)`
-                    : currentPeriod.status}
-                </Badge>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {periodMetrics && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs font-primary text-grey-mid">
-                      <span>Ledger progress</span>
-                      <span className="text-ink font-semibold">
-                        {periodMetrics.percentComplete}% complete
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-grey-light">
-                      <div
-                        className="h-full rounded-full bg-success"
-                        style={{ width: `${periodMetrics.percentComplete}%` }}
-                      />
-                    </div>
-                    {periodMetrics.needsReview > 0 && (
-                      <div className="flex items-center gap-2 rounded border border-error/30 bg-error/10 p-2 text-xs font-primary text-error">
-                        <ArrowDownRight className="h-3 w-3" />
-                        {periodMetrics.needsReview} transactions flagged for review
-                      </div>
-                    )}
-                  </div>
-                )}
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button variant="outline" className="border-ledger font-primary" asChild>
-                    <Link href="/reports">
-                      <Target className="mr-2 h-4 w-4" />
-                      Review Month-End Checklist
-                    </Link>
-                  </Button>
-                  <Button variant="ghost" className="font-primary text-xs uppercase tracking-wide text-grey-mid" asChild>
-                    <Link href="/reconciliation">
-                      <Receipt className="mr-2 h-3 w-3" />
-                      Reconcile Accounts
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          {churchId && <InsightsWidget churchId={churchId} />}
-        </div>
-        <Card className="border-ledger bg-paper">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-ink">
-              <Church className="h-5 w-5" /> Fund Health Overview
-            </CardTitle>
-            <CardDescription className="font-primary text-grey-mid">
-              Balance distribution across general, restricted, and designated funds.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3">
-              {[
-                {
-                  label: "General funds",
-                  amount: generalFundBalance,
-                  tone: "text-success",
-                },
-                {
-                  label: "Restricted funds",
-                  amount: restrictedFundBalance,
-                  tone: "text-grey-dark",
-                },
-                {
-                  label: "Designated funds",
-                  amount: designatedFundBalance,
-                  tone: "text-grey-dark",
-                },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="flex items-center justify-between rounded border border-ledger bg-highlight/50 px-4 py-3"
-                >
-                  <span className="font-primary text-xs uppercase tracking-wide text-grey-mid">
-                    {item.label}
-                  </span>
-                  <span className={cn("font-primary text-sm font-semibold", item.tone)}>
-                    {formatCurrency(item.amount)}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className="rounded border border-ledger bg-highlight/40 p-3 text-xs font-primary text-grey-mid">
-              <p>
-                Maintain at least three months of operating costs in your general fund. Restricted balances show obligations to ministries and grant conditions.
-              </p>
-            </div>
-            <Button variant="outline" className="w-full border-ledger font-primary" asChild>
-              <Link href="/funds">
-                View fund breakdown
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </section>
     </div>
   );
 }

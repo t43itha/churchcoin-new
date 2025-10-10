@@ -39,7 +39,7 @@ export function Header({ children }: HeaderProps) {
               <Menu className="h-4 w-4" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64">
+          <SheetContent side="left" className="p-0 w-64" aria-label="Main navigation">
             <Sidebar />
           </SheetContent>
         </Sheet>
