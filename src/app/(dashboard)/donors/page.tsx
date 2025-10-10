@@ -546,6 +546,20 @@ function GenerateStatementsDialog({
   const [rangePreset, setRangePreset] = useState<RangePreset>("thisYear");
   const [isGenerating, setIsGenerating] = useState(false);
 
+  const eligible = useQuery(
+    api.reports.getDonorStatementCount,
+    open && churchId
+      ? {
+          churchId,
+          fromDate,
+          toDate,
+          fundType,
+          donorIds: donorIds && donorIds.length > 0 ? donorIds : undefined,
+        }
+      : "skip",
+  );
+  const eligibleCount = eligible?.count ?? 0;
+
   const presetToRange = useCallback((preset: RangePreset) => {
     const currentYear = new Date().getFullYear();
     if (preset === "thisYear") {
@@ -595,6 +609,11 @@ function GenerateStatementsDialog({
 
     if (!fromDate || !toDate) {
       onError("Please choose both start and end dates.");
+      return;
+    }
+
+    if (eligibleCount === 0) {
+      onError("No eligible transactions for the selected period and scope.");
       return;
     }
 
@@ -723,6 +742,13 @@ function GenerateStatementsDialog({
           <p className="text-xs text-grey-mid">
             Building Fund statements reuse the dedicated PDF design already configured for legacy projects.
           </p>
+          <p className="text-xs text-grey-mid">
+            {eligible
+              ? eligibleCount > 0
+                ? `${eligibleCount} statement${eligibleCount === 1 ? "" : "s"} will be generated.`
+                : "No eligible transactions in this period/scope."
+              : null}
+          </p>
         </div>
 
         <DialogFooter>
@@ -732,7 +758,7 @@ function GenerateStatementsDialog({
           <Button
             className="border-ledger bg-ink text-paper hover:bg-ink/90"
             onClick={handleGenerate}
-            disabled={isGenerating || !churchId}
+            disabled={isGenerating || !churchId || eligibleCount === 0}
           >
             {isGenerating ? "Preparing…" : "Generate PDF"}
           </Button>

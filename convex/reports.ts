@@ -182,6 +182,76 @@ export const getDonorStatementBatch = query({
   },
 });
 
+export const getDonorStatementCount = query({
+  args: {
+    churchId: v.id("churches"),
+    fromDate: v.string(),
+    toDate: v.string(),
+    fundType: v.optional(
+      v.union(
+        v.literal("general"),
+        v.literal("restricted"),
+        v.literal("designated"),
+        v.literal("all"),
+      ),
+    ),
+    donorIds: v.optional(v.array(v.id("donors"))),
+  },
+  handler: async (ctx, args) => {
+    const donors = await ctx.db
+      .query("donors")
+      .withIndex("by_church", (q) => q.eq("churchId", args.churchId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    const donorIdSet = args.donorIds ? new Set<Id<"donors">>(args.donorIds) : null;
+    const targetDonors = donorIdSet
+      ? donors.filter((donor) => donorIdSet.has(donor._id))
+      : donors;
+
+    const funds = await ctx.db
+      .query("funds")
+      .withIndex("by_church", (q) => q.eq("churchId", args.churchId))
+      .collect();
+
+    const fundLookup = new Map(funds.map((fund) => [fund._id, fund] as const));
+
+    const transactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_church_date", (q) => q.eq("churchId", args.churchId))
+      .collect();
+
+    let filtered = transactions.filter(
+      (txn) => txn.date >= args.fromDate && txn.date <= args.toDate,
+    );
+
+    if (args.fundType && args.fundType !== "all") {
+      filtered = filtered.filter((txn) => {
+        const fund = fundLookup.get(txn.fundId);
+        return fund?.type === args.fundType;
+      });
+    }
+
+    if (donorIdSet) {
+      filtered = filtered.filter((txn) => txn.donorId && donorIdSet.has(txn.donorId));
+    }
+
+    const totalsByDonor = new Map<Id<"donors">, number>();
+    for (const txn of filtered) {
+      if (!txn.donorId) continue;
+      const prev = totalsByDonor.get(txn.donorId) ?? 0;
+      totalsByDonor.set(txn.donorId, prev + txn.amount);
+    }
+
+    const count = targetDonors.reduce((acc, donor) => {
+      const total = totalsByDonor.get(donor._id) ?? 0;
+      return acc + (total > 0 ? 1 : 0);
+    }, 0);
+
+    return { count };
+  },
+});
+
 export const getGiftAidClaimReport = query({
   args: {
     churchId: v.id("churches"),
