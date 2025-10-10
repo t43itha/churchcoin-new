@@ -531,7 +531,7 @@ export default function DashboardPage() {
       return {
         title: "Lapsed Donors",
         value: donorActivity.lapsedDonors.toString(),
-        description: "Require follow-up from stewardship team",
+        description: "Follow-up required",
         status: lapsedRate >= 30 ? "critical" : "warning",
         trend: {
           direction: "down",
