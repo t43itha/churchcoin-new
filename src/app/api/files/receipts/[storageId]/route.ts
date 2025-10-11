@@ -11,9 +11,10 @@ import {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { storageId: string } }
+  context: { params: Promise<{ storageId: string }> }
 ) {
   try {
+    const { storageId } = await context.params;
     const sessionResult = await requireSessionUser().catch((error: Error) => error);
     if (sessionResult instanceof Error) {
       const status = (sessionResult as { status?: number }).status ?? 500;
@@ -44,7 +45,7 @@ export async function GET(
     const url = await convexServerClient.query(api.files.getReceiptUrl, {
       sessionToken,
       churchId: resolvedChurchId,
-      storageId: params.storageId as Id<"_storage">,
+      storageId: storageId as Id<"_storage">,
     });
 
     return NextResponse.json({ url });
