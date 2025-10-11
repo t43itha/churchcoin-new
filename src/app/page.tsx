@@ -35,11 +35,11 @@ export default function Home() {
     <div className="min-h-screen bg-paper font-primary">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-paper/90 backdrop-blur-md border-b border-ledger">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex w-full flex-wrap items-center gap-3 md:gap-8 py-3 md:py-4">
-            <div className="flex items-center gap-2">
-              <Calculator className="h-8 w-8 text-ink" />
-              <h1 className="text-xl font-bold text-ink font-primary">ChurchCoin</h1>
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex w-full items-center gap-2 md:gap-8 py-2 md:py-4">
+            <div className="flex items-center gap-1.5 md:gap-2">
+              <Calculator className="h-6 w-6 md:h-8 md:w-8 text-ink" />
+              <h1 className="text-lg md:text-xl font-bold text-ink font-primary">ChurchCoin</h1>
             </div>
 
             <nav className="hidden md:flex flex-1 items-center justify-center space-x-8 font-primary">
@@ -109,7 +109,7 @@ export default function Home() {
       </header>
 
       {/* Hero Section with Scroll Animation */}
-      <div className="pt-28 md:pt-24 lg:pt-20">
+      <div className="pt-32 md:pt-20">
         <HeroSection />
       </div>
 

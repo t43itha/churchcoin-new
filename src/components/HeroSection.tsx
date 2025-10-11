@@ -12,7 +12,7 @@ export function HeroSection() {
         titleComponent={
           <>
             <div className="flex flex-col items-center justify-center">
-              <div className="mt-2 md:mt-0 mb-4 inline-flex items-center rounded-full border border-ledger bg-paper px-3 py-1 text-sm">
+              <div className="mb-4 inline-flex items-center rounded-full border border-ledger bg-paper px-3 py-1 text-sm">
                 <Shield className="mr-2 h-4 w-4 text-ink" />
                 <span className="text-grey-mid">Built with UK treasurers</span>
               </div>
