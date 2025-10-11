@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { HeroSection } from "@/components/HeroSection";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,10 +7,8 @@ import {
   Calculator,
   PoundSterling,
   Shield,
-  Zap,
   TrendingUp,
   Clock,
-  Users,
   CheckCircle,
   Star,
   ArrowRight,
@@ -68,7 +67,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-ink mb-4 font-primary">
-              Your church treasurer shouldn't spend weekends wrestling with spreadsheets
+              Your church treasurer shouldn&apos;t spend weekends wrestling with spreadsheets
             </h2>
             <p className="text-xl text-grey-mid max-w-3xl mx-auto font-primary">
               ChurchCoin transforms financial chaos into clarity in minutes, not months.
@@ -158,9 +157,11 @@ export default function Home() {
               </ul>
             </div>
             <div className="bg-paper rounded-2xl p-8 h-80 border border-ledger flex items-center justify-center">
-              <img
+              <Image
                 src="/fund-card.png"
                 alt="Fund Management - Charity Fund Card showing balance and transactions"
+                width={600}
+                height={400}
                 className="w-full h-auto max-h-full object-contain rounded-lg"
               />
             </div>
@@ -168,9 +169,11 @@ export default function Home() {
 
           <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
             <div className="order-2 md:order-1 bg-paper rounded-2xl p-8 h-80 border border-ledger flex items-center justify-center">
-              <img
+              <Image
                 src="/gift-aid-status.png"
                 alt="Gift Aid Automation - Status tracking and declaration management"
+                width={600}
+                height={400}
                 className="w-full h-auto max-h-full object-contain rounded-lg"
               />
             </div>
@@ -180,7 +183,7 @@ export default function Home() {
                 <h3 className="text-2xl font-bold text-ink font-primary">Gift Aid Automation</h3>
               </div>
               <p className="text-lg font-semibold text-grey-mid mb-3 font-primary">
-                Reclaim what's rightfully yours
+                Reclaim what&apos;s rightfully yours
               </p>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">
@@ -218,12 +221,12 @@ export default function Home() {
                     <Star key={i} className="h-5 w-5 fill-ink text-ink" />
                   ))}
                 </div>
-                <CardTitle className="text-lg font-primary text-ink">St. Mary's, Birmingham</CardTitle>
+                <CardTitle className="text-lg font-primary text-ink">St. Mary&apos;s, Birmingham</CardTitle>
                 <CardDescription className="font-primary">150 members</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-grey-mid italic mb-4 font-primary">
-                  "We've reclaimed £4,200 more in Gift Aid this year alone. What took our treasurer entire weekends now takes 30 minutes."
+                  &ldquo;We&apos;ve reclaimed £4,200 more in Gift Aid this year alone. What took our treasurer entire weekends now takes 30 minutes.&rdquo;
                 </p>
                 <p className="text-sm font-semibold text-grey-mid font-primary">
                   — Rev. Sarah Mitchell
@@ -243,7 +246,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <p className="text-grey-mid italic mb-4 font-primary">
-                  "ChurchCoin paid for itself in the first month. Our trustees finally understand our finances without me translating spreadsheets."
+                  &ldquo;ChurchCoin paid for itself in the first month. Our trustees finally understand our finances without me translating spreadsheets.&rdquo;
                 </p>
                 <p className="text-sm font-semibold text-grey-mid font-primary">
                   — James Chen, Treasurer
@@ -263,7 +266,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <p className="text-grey-mid italic mb-4 font-primary">
-                  "Switching from paper ledgers to ChurchCoin felt like jumping from 1985 to 2025. Absolutely transformative."
+                  &ldquo;Switching from paper ledgers to ChurchCoin felt like jumping from 1985 to 2025. Absolutely transformative.&rdquo;
                 </p>
                 <p className="text-sm font-semibold text-grey-mid font-primary">
                   — Margaret Brown, Finance Lead
