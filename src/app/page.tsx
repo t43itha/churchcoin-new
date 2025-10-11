@@ -43,11 +43,8 @@ export default function Home() {
             </nav>
 
             <div className="flex w-full items-center justify-between gap-2 sm:gap-4 md:w-auto md:ml-auto md:justify-end">
-              <Button asChild variant="ghost" className="hidden md:inline-flex font-primary">
+              <Button asChild variant="ghost" className="font-primary">
                 <Link href="/login">Sign In</Link>
-              </Button>
-              <Button className="flex-1 md:flex-none md:w-auto h-auto px-4 py-2 text-sm md:text-base bg-ink text-paper hover:bg-grey-dark font-primary">
-                Start Free Trial
               </Button>
               <Button variant="ghost" size="icon" className="md:hidden">
                 <Menu className="h-5 w-5" />
