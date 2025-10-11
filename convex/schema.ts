@@ -132,7 +132,8 @@ export default defineSchema({
     .index("by_donor", ["donorId"])
     .index("by_reconciled", ["churchId", "reconciled"])
     .index("by_period", ["churchId", "periodYear", "periodMonth"])
-    .index("by_review_status", ["churchId", "needsReview"]),
+    .index("by_review_status", ["churchId", "needsReview"])
+    .index("by_receipt_storage_id", ["receiptStorageId"]),
 
   // CSV Imports
   csvImports: defineTable({

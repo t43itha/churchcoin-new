@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import { fetchQuery } from "convex/nextjs";
+
+import type { Id } from "@/lib/convexGenerated";
 import { api } from "@/lib/convexGenerated";
+import { convexServerClient } from "@/lib/convexServerClient";
+import { assertUserInChurch, requireSessionUser } from "@/lib/server-auth";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -150,25 +153,34 @@ const tools: OpenAI.Chat.ChatCompletionTool[] = [
 async function executeFunctionCall(
   functionName: string,
   args: Record<string, unknown>,
-  churchId: string
+  churchId: Id<"churches">
 ) {
   // Currency formatter is defined in formatResponse function
 
   try {
     switch (functionName) {
       case "get_fund_balance": {
-        if (args.fundId) {
-          const fund = await fetchQuery(api.funds.getFund, {
-            fundId: args.fundId as string & { __tableName: "funds" },
+        if (typeof args.fundId === "string" && args.fundId) {
+          const fund = await convexServerClient.query(api.funds.getFund, {
+            fundId: args.fundId as Id<"funds">,
           });
+
+          if (!fund || fund.churchId !== churchId) {
+            return { error: "Fund not found" };
+          }
           return {
             fundName: fund?.name,
             balance: fund?.balance,
             type: fund?.type,
           };
         } else {
-          const funds = await fetchQuery(api.funds.list, {});
-          const total = await fetchQuery(api.funds.getTotalBalance, {});
+          const funds = await convexServerClient.query(api.funds.list, {
+            churchId,
+          });
+          const total = await convexServerClient.query(
+            api.funds.getTotalBalance,
+            { churchId }
+          );
           return {
             totalBalance: total,
             funds: funds?.map((f) => ({
@@ -183,9 +195,13 @@ async function executeFunctionCall(
 
       case "get_recent_transactions": {
         const limit = (args.limit as number) || 10;
-        const transactions = await fetchQuery(api.transactions.getRecent, {
-          limit,
-        });
+        const transactions = await convexServerClient.query(
+          api.transactions.getRecent,
+          {
+            churchId,
+            limit,
+          }
+        );
 
         let filtered = transactions || [];
         if (args.type) {
@@ -204,8 +220,8 @@ async function executeFunctionCall(
       }
 
       case "search_donors": {
-        const donors = await fetchQuery(api.donors.getDonors, {
-          churchId: churchId as string & { __tableName: "churches" },
+        const donors = await convexServerClient.query(api.donors.getDonors, {
+          churchId,
         });
 
 
@@ -220,7 +236,7 @@ async function executeFunctionCall(
         if (args.sortByAmount) {
           const donorsWithGiving = await Promise.all(
             filtered.map(async (donor) => {
-              const history = await fetchQuery(
+              const history = await convexServerClient.query(
                 api.donors.getDonorGivingHistory,
                 { donorId: donor._id }
               );
@@ -250,11 +266,14 @@ async function executeFunctionCall(
         const { startDate, endDate, reportType } = args;
 
         if (reportType === "gift-aid") {
-          const report = await fetchQuery(api.reports.getGiftAidClaimReport, {
-            churchId: churchId as string & { __tableName: "churches" },
-            startDate: startDate as string,
-            endDate: endDate as string,
-          });
+          const report = await convexServerClient.query(
+            api.reports.getGiftAidClaimReport,
+            {
+              churchId,
+              startDate: startDate as string,
+              endDate: endDate as string,
+            }
+          );
           return {
             claimableAmount: report?.claimableAmount,
             giftAidValue: report?.giftAidValue,
@@ -262,10 +281,10 @@ async function executeFunctionCall(
             transactionCount: report?.transactionCount,
           };
         } else if (reportType === "monthly") {
-          const report = await fetchQuery(
+          const report = await convexServerClient.query(
             api.reports.getMonthlyIncomeExpenseReport,
             {
-              churchId: churchId as string & { __tableName: "churches" },
+              churchId,
               startDate: startDate as string,
               endDate: endDate as string,
             }
@@ -277,11 +296,14 @@ async function executeFunctionCall(
             monthlyBreakdown: report?.monthlyBreakdown,
           };
         } else {
-          const report = await fetchQuery(api.reports.getIncomeExpenseReport, {
-            churchId: churchId as string & { __tableName: "churches" },
-            startDate: startDate as string,
-            endDate: endDate as string,
-          });
+          const report = await convexServerClient.query(
+            api.reports.getIncomeExpenseReport,
+            {
+              churchId,
+              startDate: startDate as string,
+              endDate: endDate as string,
+            }
+          );
           return {
             income: report?.income,
             expense: report?.expense,
@@ -440,7 +462,7 @@ function formatResponse(content: string, functionResults?: Record<string, unknow
   return `${content}\n\n${supplements.join("\n\n")}`;
 }
 
-async function buildFinancialSnapshot(churchId: string) {
+async function buildFinancialSnapshot(churchId: Id<"churches">) {
   try {
     const endDate = new Date();
     const end = endDate.toISOString().slice(0, 10);
@@ -449,11 +471,11 @@ async function buildFinancialSnapshot(churchId: string) {
     const start = startDate.toISOString().slice(0, 10);
 
     const [fundSummary, monthlyReport] = await Promise.all([
-      fetchQuery(api.reports.getFundBalanceSummary, {
-        churchId: churchId as string & { __tableName: "churches" },
+      convexServerClient.query(api.reports.getFundBalanceSummary, {
+        churchId,
       }),
-      fetchQuery(api.reports.getMonthlyIncomeExpenseReport, {
-        churchId: churchId as string & { __tableName: "churches" },
+      convexServerClient.query(api.reports.getMonthlyIncomeExpenseReport, {
+        churchId,
         startDate: start,
         endDate: end,
       }),
@@ -509,10 +531,15 @@ async function buildFinancialSnapshot(churchId: string) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireSessionUser();
     const body: ChatRequest = await request.json();
     const { message, context, history } = body;
 
-    const churchId = body.churchId;
+    const requestedChurchId =
+      typeof body.churchId === "string" ? body.churchId : undefined;
+    const effectiveChurchId = (requestedChurchId ?? user.churchId ?? null) as
+      | Id<"churches">
+      | null;
 
     if (!message) {
       return NextResponse.json(
@@ -521,7 +548,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!churchId) {
+    if (!effectiveChurchId) {
       return NextResponse.json(
         {
           error: "Church context is required",
@@ -532,11 +559,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (requestedChurchId) {
+      assertUserInChurch(user, requestedChurchId as Id<"churches">);
+    }
+
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: "system", content: systemPrompt },
     ];
 
-    const snapshot = await buildFinancialSnapshot(churchId);
+    const snapshot = await buildFinancialSnapshot(effectiveChurchId);
     if (snapshot) {
       messages.push({ role: "system", content: snapshot });
     }
@@ -584,7 +615,7 @@ export async function POST(request: NextRequest) {
       const functionResult = await executeFunctionCall(
         functionName,
         functionArgs,
-        churchId
+        effectiveChurchId
       );
 
       const secondMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -623,13 +654,26 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Chat API error:", error);
+    const status =
+      typeof (error as { status?: number })?.status === "number"
+        ? (error as { status: number }).status
+        : 500;
+
+    if (status === 401) {
+      return NextResponse.json({ error: "Unauthorised" }, { status });
+    }
+
+    if (status === 403) {
+      return NextResponse.json({ error: "Forbidden" }, { status });
+    }
+
     return NextResponse.json(
       {
         error: "Failed to process chat message",
         message:
           "I'm experiencing technical difficulties. Please try again in a moment.",
       },
-      { status: 500 }
+      { status }
     );
   }
 }

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useMutation } from "convex/react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
@@ -10,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { api, type Doc, type Id } from "@/lib/convexGenerated";
+import type { Doc, Id } from "@/lib/convexGenerated";
 
 const transactionSchema = z.object({
   churchId: z.string().min(1, "Select a church"),
@@ -76,7 +75,23 @@ export function TransactionForm({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
 
-  const generateUploadUrl = useMutation(api.files.generateReceiptUploadUrl);
+  const requestUploadUrl = useCallback(async () => {
+    const response = await fetch("/api/files/receipts/upload-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ churchId }),
+    });
+
+    const payload = (await response.json().catch(() => null)) as
+      | { uploadUrl?: string; error?: string }
+      | null;
+
+    if (!response.ok || !payload?.uploadUrl) {
+      throw new Error(payload?.error ?? "Failed to generate upload URL");
+    }
+
+    return payload.uploadUrl;
+  }, [churchId]);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema) as Resolver<TransactionFormValues>,
@@ -163,7 +178,7 @@ export function TransactionForm({
 
     try {
       if (receiptFile) {
-        const uploadUrl = await generateUploadUrl({});
+        const uploadUrl = await requestUploadUrl();
         const uploadResponse = await fetch(uploadUrl, {
           method: "POST",
           headers: {

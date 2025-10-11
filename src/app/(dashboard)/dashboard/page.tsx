@@ -193,7 +193,10 @@ export default function DashboardPage() {
   const churches = useQuery(api.churches.listChurches, {});
   const churchId = churches?.[0]?._id;
 
-  const funds = useQuery(api.funds.list);
+  const funds = useQuery(
+    api.funds.list,
+    churchId ? { churchId } : "skip"
+  );
   const categories = useQuery(
     api.categories.getCategories,
     churchId ? { churchId } : "skip"

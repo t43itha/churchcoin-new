@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import type { Id } from "@/lib/convexGenerated";
 import { api, convexServerClient } from "@/lib/convexServerClient";
+import { assertUserInChurch, requireSessionUser } from "@/lib/server-auth";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -17,15 +18,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const { type, churchId, startDate, endDate } = body as {
+  const sessionResult = await requireSessionUser().catch((error: Error) => error);
+  if (sessionResult instanceof Error) {
+    const status = (sessionResult as { status?: number }).status ?? 500;
+    return NextResponse.json({ error: sessionResult.message }, { status });
+  }
+  const user = sessionResult;
+
+  const { type, churchId: rawChurchId, startDate, endDate } = body as {
     type: "fund-balance" | "income-expense";
-    churchId: string;
+    churchId?: string;
     startDate?: string;
     endDate?: string;
   };
 
-  if (!type || !churchId) {
-    return NextResponse.json({ error: "type and churchId are required" }, { status: 400 });
+  const resolvedChurchId = (rawChurchId ?? user.churchId ?? null) as
+    | Id<"churches">
+    | null;
+
+  if (!type || !resolvedChurchId) {
+    return NextResponse.json(
+      { error: "type and church context are required" },
+      { status: 400 }
+    );
+  }
+
+  if (rawChurchId) {
+    assertUserInChurch(user, resolvedChurchId);
   }
 
   let reportTitle = "Report";
@@ -35,14 +54,14 @@ export async function POST(request: Request) {
     reportTitle = "Fund balance summary";
     const summary = await convexServerClient.query(
       api.reports.getFundBalanceSummary,
-      { churchId: churchId as Id<"churches"> }
+      { churchId: resolvedChurchId }
     );
 
     buildSections = async () => {
       const sections: string[] = [];
       sections.push("Fund balance summary");
       sections.push(`Generated ${new Date(summary.generatedAt).toLocaleString("en-GB")}`);
-      sections.push(`Church ID: ${churchId}`);
+      sections.push(`Church ID: ${resolvedChurchId}`);
       sections.push("");
       sections.push(`Total balance: ${currency.format(summary.total)}`);
       sections.push("");
@@ -59,7 +78,7 @@ export async function POST(request: Request) {
     const to = endDate ?? new Date().toISOString().slice(0, 10);
     const report = await convexServerClient.query(
       api.reports.getIncomeExpenseReport,
-      { churchId: churchId as Id<"churches">, startDate: from, endDate: to }
+      { churchId: resolvedChurchId, startDate: from, endDate: to }
     );
 
     buildSections = async () => {

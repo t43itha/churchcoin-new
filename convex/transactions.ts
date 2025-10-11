@@ -971,7 +971,7 @@ export const getPeriodTrends = query({
 
 // Get recent transactions for dashboard
 export const getRecent = query({
-  args: { limit: v.optional(v.number()) },
+  args: { churchId: v.id("churches"), limit: v.optional(v.number()) },
   returns: v.array(v.object({
     _id: v.id("transactions"),
     date: v.string(),
@@ -1007,6 +1007,7 @@ export const getRecent = query({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("transactions")
+      .withIndex("by_church_date", (q) => q.eq("churchId", args.churchId))
       .order("desc")
       .take(args.limit || 10);
   },
