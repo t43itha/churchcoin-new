@@ -21,13 +21,13 @@ export default function Home() {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-paper/90 backdrop-blur-md border-b border-ledger">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-2">
+          <div className="flex w-full flex-wrap items-center gap-4 md:gap-8 py-4">
+            <div className="flex items-center gap-2">
               <Calculator className="h-8 w-8 text-ink" />
               <h1 className="text-xl font-bold text-ink font-primary">ChurchCoin</h1>
             </div>
 
-            <nav className="hidden md:flex items-center space-x-8 font-primary">
+            <nav className="hidden md:flex flex-1 items-center justify-center space-x-8 font-primary">
               <Link href="#features" className="text-grey-mid hover:text-ink font-medium">
                 Features
               </Link>
@@ -42,11 +42,11 @@ export default function Home() {
               </Link>
             </nav>
 
-            <div className="flex items-center space-x-4">
+            <div className="flex w-full items-center justify-between gap-2 sm:gap-4 md:w-auto md:ml-auto md:justify-end">
               <Button asChild variant="ghost" className="hidden md:inline-flex font-primary">
                 <Link href="/login">Sign In</Link>
               </Button>
-              <Button className="bg-ink text-paper hover:bg-grey-dark font-primary">
+              <Button className="flex-1 md:flex-none md:w-auto h-auto px-4 py-2 text-sm md:text-base bg-ink text-paper hover:bg-grey-dark font-primary">
                 Start Free Trial
               </Button>
               <Button variant="ghost" size="icon" className="md:hidden">
@@ -63,9 +63,9 @@ export default function Home() {
       </div>
 
       {/* Problem/Solution Section */}
-      <section className="py-24 bg-highlight">
+      <section className="py-16 sm:py-20 lg:py-24 bg-highlight">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12 sm:mb-14 md:mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-ink mb-4 font-primary">
               Your church treasurer shouldn&apos;t spend weekends wrestling with spreadsheets
             </h2>
@@ -74,7 +74,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
             <Card className="border-ledger bg-paper">
               <CardHeader>
                 <Clock className="h-10 w-10 text-ink mb-2" />
@@ -124,15 +124,15 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-24 bg-paper">
+      <section id="features" className="py-16 sm:py-20 lg:py-24 bg-paper">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12 sm:mb-14 md:mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-ink mb-4 font-primary">
               Built for churches, by people who understand ministry
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-12 items-center mb-12 sm:mb-14 md:mb-16">
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <TrendingUp className="h-8 w-8 text-ink" />
@@ -156,7 +156,7 @@ export default function Home() {
                 </li>
               </ul>
             </div>
-            <div className="bg-paper rounded-2xl p-8 h-80 border border-ledger flex items-center justify-center">
+            <div className="bg-paper rounded-2xl p-6 sm:p-8 h-60 sm:h-72 md:h-80 border border-ledger flex items-center justify-center">
               <Image
                 src="/fund-card.png"
                 alt="Fund Management - Charity Fund Card showing balance and transactions"
@@ -167,8 +167,8 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
-            <div className="order-2 md:order-1 bg-paper rounded-2xl p-8 h-80 border border-ledger flex items-center justify-center">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-12 items-center mb-12 sm:mb-14 md:mb-16">
+            <div className="order-2 md:order-1 bg-paper rounded-2xl p-6 sm:p-8 h-60 sm:h-72 md:h-80 border border-ledger flex items-center justify-center">
               <Image
                 src="/gift-aid-status.png"
                 alt="Gift Aid Automation - Status tracking and declaration management"
@@ -205,15 +205,15 @@ export default function Home() {
       </section>
 
       {/* Testimonials Section */}
-      <section id="testimonials" className="py-24 bg-highlight">
+      <section id="testimonials" className="py-16 sm:py-20 lg:py-24 bg-highlight">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12 sm:mb-14 md:mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-ink mb-4 font-primary">
               Trusted by churches across the UK
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8">
             <Card className="border-ledger bg-paper">
               <CardHeader>
                 <div className="flex items-center gap-1 mb-3">
@@ -278,9 +278,9 @@ export default function Home() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-24 bg-paper">
+      <section id="pricing" className="py-16 sm:py-20 lg:py-24 bg-paper">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12 sm:mb-14 md:mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-ink mb-4 font-primary">
               Transparent pricing that scales with your ministry
             </h2>
@@ -289,7 +289,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
             <Card className="relative border-ledger bg-paper">
               <CardHeader>
                 <CardTitle className="font-primary text-ink">Starter</CardTitle>
@@ -430,22 +430,22 @@ export default function Home() {
       </section>
 
       {/* Final CTA Section */}
-      <section className="py-24 bg-ink">
+      <section className="py-16 sm:py-20 lg:py-24 bg-ink">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-paper mb-4 font-primary">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-paper mb-4 font-primary">
             Your congregation trusts you with their giving.
             <br />
             Trust ChurchCoin with your finances.
           </h2>
-          <p className="text-xl text-paper/80 mb-8 max-w-3xl mx-auto font-primary">
+          <p className="text-lg sm:text-xl text-paper/80 mb-8 max-w-3xl mx-auto font-primary">
             Join 500+ UK churches saving 15 hours monthly while maximizing every pound for ministry.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="bg-paper text-ink hover:bg-paper/90 px-8 py-6 text-lg font-semibold font-primary">
+            <Button size="lg" className="w-full sm:w-auto bg-paper text-ink hover:bg-paper/90 px-6 sm:px-8 py-5 text-base sm:text-lg font-semibold font-primary">
               Start Free Trial
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-            <Button size="lg" variant="outline" className="border-paper text-paper hover:bg-paper/10 px-8 py-6 text-lg font-semibold font-primary">
+            <Button size="lg" variant="outline" className="w-full sm:w-auto border-paper text-paper hover:bg-paper/10 px-6 sm:px-8 py-5 text-base sm:text-lg font-semibold font-primary">
               Book a Demo
             </Button>
           </div>
@@ -459,9 +459,9 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-grey-dark text-grey-mid py-16 font-primary">
+      <footer className="bg-grey-dark text-grey-mid py-12 sm:py-16 font-primary">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 mb-8">
             <div>
               <h3 className="text-paper font-semibold mb-4 font-primary">Product</h3>
               <ul className="space-y-2">
@@ -503,8 +503,8 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="border-t border-ledger pt-8 flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-2 mb-4 md:mb-0">
+          <div className="border-t border-ledger pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-2">
               <Calculator className="h-6 w-6 text-paper" />
               <span className="text-paper font-semibold font-primary">ChurchCoin</span>
             </div>
