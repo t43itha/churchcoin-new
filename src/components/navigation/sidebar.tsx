@@ -72,9 +72,10 @@ const adminNavigation = [
 
 interface SidebarProps {
   className?: string;
+  onNavigate?: () => void;
 }
 
-export function Sidebar({ className }: SidebarProps) {
+export function Sidebar({ className, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const { user, signOut } = useSession();
   const [chatOpen, setChatOpen] = useState(false);
@@ -136,6 +137,7 @@ export function Sidebar({ className }: SidebarProps) {
               <li key={item.name}>
                 <Link
                   href={item.href}
+                  onClick={onNavigate}
                   className={cn(
                     "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium font-primary transition-colors",
                     isActive
@@ -192,7 +194,7 @@ export function Sidebar({ className }: SidebarProps) {
               className="flex-1 font-primary border-ledger text-grey-mid hover:text-ink"
               asChild
             >
-              <Link href="/settings" className="flex items-center justify-center gap-1">
+              <Link href="/settings" onClick={onNavigate} className="flex items-center justify-center gap-1">
                 <Settings className="h-3 w-3" />
                 Settings
               </Link>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,12 +25,13 @@ interface HeaderProps {
 export function Header({ children }: HeaderProps) {
   const pathname = usePathname();
   const breadcrumbs = breadcrumbMap[pathname] || ["Dashboard"];
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   return (
     <header className="border-b border-ledger bg-paper">
       <div className="flex h-16 items-center gap-4 px-6">
         {/* Mobile menu trigger */}
-        <Sheet>
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
             <Button
               variant="outline"
@@ -43,7 +45,7 @@ export function Header({ children }: HeaderProps) {
             <SheetHeader className="sr-only">
               <SheetTitle>Navigation Menu</SheetTitle>
             </SheetHeader>
-            <Sidebar />
+            <Sidebar onNavigate={() => setSheetOpen(false)} />
           </SheetContent>
         </Sheet>
 
