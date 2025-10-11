@@ -4,6 +4,14 @@ import { HeroSection } from "@/components/HeroSection";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
   Calculator,
   PoundSterling,
   Shield,
@@ -12,8 +20,15 @@ import {
   CheckCircle,
   Star,
   ArrowRight,
-  Menu
+  Menu,
 } from "lucide-react";
+
+const navigationLinks = [
+  { href: "#features", label: "Features" },
+  { href: "#pricing", label: "Pricing" },
+  { href: "#testimonials", label: "Testimonials" },
+  { href: "#resources", label: "Resources" },
+];
 
 export default function Home() {
   return (
@@ -28,27 +43,66 @@ export default function Home() {
             </div>
 
             <nav className="hidden md:flex flex-1 items-center justify-center space-x-8 font-primary">
-              <Link href="#features" className="text-grey-mid hover:text-ink font-medium">
-                Features
-              </Link>
-              <Link href="#pricing" className="text-grey-mid hover:text-ink font-medium">
-                Pricing
-              </Link>
-              <Link href="#testimonials" className="text-grey-mid hover:text-ink font-medium">
-                Testimonials
-              </Link>
-              <Link href="#resources" className="text-grey-mid hover:text-ink font-medium">
-                Resources
-              </Link>
+              {navigationLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-grey-mid hover:text-ink font-medium"
+                >
+                  {link.label}
+                </Link>
+              ))}
             </nav>
 
-            <div className="flex w-full items-center justify-between gap-2 sm:gap-4 md:w-auto md:ml-auto md:justify-end">
-              <Button asChild variant="ghost" className="font-primary">
+            <div className="flex w-full items-center justify-end gap-2 sm:gap-4 md:w-auto md:ml-auto">
+              <Button asChild variant="ghost" className="hidden md:inline-flex font-primary">
                 <Link href="/login">Sign In</Link>
               </Button>
-              <Button variant="ghost" size="icon" className="md:hidden">
-                <Menu className="h-5 w-5" />
-              </Button>
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden"
+                    aria-label="Open navigation menu"
+                  >
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent
+                  side="right"
+                  className="bg-paper border-l border-ledger p-0"
+                  aria-label="Mobile navigation"
+                >
+                  <SheetHeader className="border-b border-ledger p-6">
+                    <div className="flex items-center gap-2">
+                      <Calculator className="h-6 w-6 text-ink" />
+                      <SheetTitle className="text-lg font-bold text-ink font-primary">
+                        ChurchCoin
+                      </SheetTitle>
+                    </div>
+                  </SheetHeader>
+                  <nav className="flex flex-col gap-1 px-6 py-6 font-primary text-lg">
+                    {navigationLinks.map((link) => (
+                      <SheetClose asChild key={link.href}>
+                        <Link
+                          href={link.href}
+                          className="rounded-md px-2 py-2 text-grey-mid transition hover:bg-highlight hover:text-ink"
+                        >
+                          {link.label}
+                        </Link>
+                      </SheetClose>
+                    ))}
+                  </nav>
+                  <div className="mt-auto border-t border-ledger p-6">
+                    <SheetClose asChild>
+                      <Button asChild className="w-full font-primary">
+                        <Link href="/login">Sign In</Link>
+                      </Button>
+                    </SheetClose>
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
         </div>
