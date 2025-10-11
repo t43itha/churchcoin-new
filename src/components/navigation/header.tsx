@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Menu, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./sidebar";
 
 // Navigation breadcrumb mapping
@@ -39,7 +39,10 @@ export function Header({ children }: HeaderProps) {
               <Menu className="h-4 w-4" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64" aria-label="Main navigation">
+          <SheetContent side="left" className="p-0 w-64">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Navigation Menu</SheetTitle>
+            </SheetHeader>
             <Sidebar />
           </SheetContent>
         </Sheet>
