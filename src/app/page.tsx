@@ -55,7 +55,7 @@ export default function Home() {
       </header>
 
       {/* Hero Section with Scroll Animation */}
-      <div className="pt-20">
+      <div className="pt-32 md:pt-24 lg:pt-20">
         <HeroSection />
       </div>
 
