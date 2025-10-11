@@ -68,12 +68,12 @@
   --ink: #000000;          /* Primary text */
   --paper: #FAFAF8;        /* Background */
   --ledger: #E8E8E6;       /* Ledger lines */
-  --grey-dark: #1A1A1A;    /* Headers */
-  --grey-mid: #666666;     /* Secondary text */
-  --grey-light: #999999;   /* Disabled */
+  --grey-dark: #4A4A4A;    /* Headers and secondary text */
+  --grey-mid: #6B6B6B;     /* Muted text */
+  --grey-light: #F5F5F5;   /* Light backgrounds */
   --success: #0A5F38;      /* Positive amounts */
   --error: #8B0000;        /* Negative amounts */
-  --highlight: #FFE4B5;    /* Subtle selection */
+  --highlight: #F0F0EE;    /* Subtle selection */
 
   /* Core theme variables mapped to ChurchCoin palette */
   --background: var(--paper);
@@ -124,7 +124,7 @@
   --grey-light: #666666;   /* Darker disabled */
   --success: #4CAF50;      /* Brighter green for dark mode */
   --error: #F44336;        /* Brighter red for dark mode */
-  --highlight: #FFF3E0;    /* Light highlight */
+  --highlight: #2A2A2A;    /* Subtle dark highlight */
 
   /* Update mappings for dark mode */
   --background: var(--paper);

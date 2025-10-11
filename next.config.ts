@@ -8,6 +8,16 @@ const nextConfig: NextConfig = {
       "@/convex": "./convex",
     },
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'ui.aceternity.com',
+        port: '',
+        pathname: '/**',
+      },
+    ],
+  },
   webpack(config) {
     config.resolve.alias = {
       ...(config.resolve.alias ?? {}),
