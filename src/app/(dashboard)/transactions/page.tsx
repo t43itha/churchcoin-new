@@ -324,13 +324,30 @@ export default function TransactionsPage() {
       return;
     }
 
-    const url = await convex.query(api.files.getReceiptUrl, {
-      storageId: transaction.receiptStorageId,
-    });
+    try {
+      const params = new URLSearchParams();
+      if (churchId) {
+        params.set("churchId", churchId);
+      }
 
-    if (url) {
-      window.open(url, "_blank", "noopener,noreferrer");
-    } else {
+      const query = params.toString();
+      const response = await fetch(
+        query.length > 0
+          ? `/api/files/receipts/${transaction.receiptStorageId}?${query}`
+          : `/api/files/receipts/${transaction.receiptStorageId}`
+      );
+      const payload = (await response.json().catch(() => null)) as
+        | { url?: string; error?: string }
+        | null;
+
+      if (response.ok && payload?.url) {
+        window.open(payload.url, "_blank", "noopener,noreferrer");
+      } else {
+        const message = payload?.error ?? "Receipt could not be found.";
+        setFeedback({ type: "error", message });
+      }
+    } catch (error) {
+      console.error("Failed to fetch receipt URL", error);
       setFeedback({ type: "error", message: "Receipt could not be found." });
     }
   };

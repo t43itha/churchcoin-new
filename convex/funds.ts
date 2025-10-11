@@ -152,7 +152,7 @@ export const archiveFund = mutation({
 
 // Simple list for dashboard without church context (for demo)
 export const list = query({
-  args: {},
+  args: { churchId: v.id("churches") },
   returns: v.array(v.object({
     _id: v.id("funds"),
     name: v.string(),
@@ -166,9 +166,10 @@ export const list = query({
     isFundraising: v.optional(v.boolean()),
     fundraisingTarget: v.optional(v.number()),
   })),
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
     return await ctx.db
       .query("funds")
+      .withIndex("by_church", (q) => q.eq("churchId", args.churchId))
       .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
   },
@@ -176,11 +177,12 @@ export const list = query({
 
 // Get total balance across all funds
 export const getTotalBalance = query({
-  args: {},
+  args: { churchId: v.id("churches") },
   returns: v.number(),
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
     const funds = await ctx.db
       .query("funds")
+      .withIndex("by_church", (q) => q.eq("churchId", args.churchId))
       .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
 

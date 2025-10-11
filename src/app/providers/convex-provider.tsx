@@ -3,9 +3,13 @@
 import { ConvexProvider } from "convex/react";
 import { ConvexReactClient } from "convex/react";
 
-const convex = new ConvexReactClient(
-  process.env.NEXT_PUBLIC_CONVEX_URL || "https://placeholder-url.convex.cloud"
-);
+const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+
+if (!convexUrl) {
+  throw new Error("NEXT_PUBLIC_CONVEX_URL must be set to initialise Convex");
+}
+
+const convex = new ConvexReactClient(convexUrl);
 
 export function ConvexClientProvider({
   children,

@@ -1,31 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+
+import type { Id } from "@/lib/convexGenerated";
 import { api } from "@/lib/convexGenerated";
-import { fetchQuery } from "convex/nextjs";
+import { convexServerClient } from "@/lib/convexServerClient";
+import { assertUserInChurch, requireSessionUser } from "@/lib/server-auth";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { churchId, startDate, endDate } = body;
+    const sessionResult = await requireSessionUser().catch((error: Error) => error);
+    if (sessionResult instanceof Error) {
+      const status = (sessionResult as { status?: number }).status ?? 500;
+      return NextResponse.json({ error: sessionResult.message }, { status });
+    }
+    const user = sessionResult;
 
-    if (!churchId || !startDate || !endDate) {
+    const { churchId, startDate, endDate } = body as {
+      churchId?: string;
+      startDate?: string;
+      endDate?: string;
+    };
+
+    const resolvedChurchId = (churchId ?? user.churchId ?? null) as
+      | Id<"churches">
+      | null;
+
+    if (!resolvedChurchId || !startDate || !endDate) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    const report = await fetchQuery(api.reports.getGiftAidClaimReport, {
-      churchId,
-      startDate,
-      endDate,
-    });
+    if (churchId) {
+      assertUserInChurch(user, resolvedChurchId);
+    }
+
+    const report = await convexServerClient.query(
+      api.reports.getGiftAidClaimReport,
+      {
+        churchId: resolvedChurchId,
+        startDate,
+        endDate,
+      }
+    );
 
     const pdfDoc = await PDFDocument.create();
     const timesRomanFont = await pdfDoc.embedFont(StandardFonts.TimesRoman);
     const timesRomanBold = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
 
-    const page = pdfDoc.addPage([595, 842]);
+    let page = pdfDoc.addPage([595, 842]);
     const { width, height } = page.getSize();
     const margin = 50;
     let yPosition = height - margin;
@@ -131,7 +156,7 @@ export async function POST(request: NextRequest) {
 
     for (const donor of report.donorBreakdown) {
       if (yPosition < margin + 50) {
-        pdfDoc.addPage([595, 842]);
+        page = pdfDoc.addPage([595, 842]);
         yPosition = height - margin;
       }
 
@@ -172,7 +197,7 @@ export async function POST(request: NextRequest) {
 
     yPosition -= 30;
     if (yPosition < margin + 50) {
-      pdfDoc.addPage([595, 842]);
+      page = pdfDoc.addPage([595, 842]);
       yPosition = height - margin;
     }
 
@@ -199,9 +224,23 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error generating Gift Aid report:", error);
+
+    const status =
+      typeof (error as { status?: number })?.status === "number"
+        ? (error as { status: number }).status
+        : 500;
+
+    if (status === 401) {
+      return NextResponse.json({ error: "Unauthorised" }, { status });
+    }
+
+    if (status === 403) {
+      return NextResponse.json({ error: "Forbidden" }, { status });
+    }
+
     return NextResponse.json(
       { error: "Failed to generate Gift Aid report" },
-      { status: 500 }
+      { status }
     );
   }
 }

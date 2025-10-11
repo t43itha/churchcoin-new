@@ -13,6 +13,7 @@ import {
 
 import type { Id } from "@/lib/convexGenerated";
 import { api, convexServerClient } from "@/lib/convexServerClient";
+import { assertUserInChurch, requireSessionUser } from "@/lib/server-auth";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -696,17 +697,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
+    const sessionResult = await requireSessionUser().catch((error: Error) => error);
+    if (sessionResult instanceof Error) {
+      const status = (sessionResult as { status?: number }).status ?? 500;
+      return NextResponse.json({ error: sessionResult.message }, { status });
+    }
+    const user = sessionResult;
+
     const { churchId, fromDate, toDate, fundType, donorIds } = body as {
-      churchId: string;
+      churchId?: string;
       fromDate: string;
       toDate: string;
       fundType?: "general" | "restricted" | "designated" | "all";
       donorIds?: string[];
     };
 
-    if (!churchId || !fromDate || !toDate) {
+    const resolvedChurchId = (churchId ?? user.churchId ?? null) as
+      | Id<"churches">
+      | null;
+
+    if (!resolvedChurchId || !fromDate || !toDate) {
       return NextResponse.json(
-        { error: "churchId, fromDate and toDate are required" },
+        { error: "Church context, fromDate and toDate are required" },
         { status: 400 }
       );
     }
@@ -718,20 +730,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const donorIdList = donorIds?.length ? (donorIds as Id<"donors">[]) : undefined;
-
-    console.log("Fetching donor statements:", {
-      churchId,
-      fromDate,
-      toDate,
-      fundType,
-      donorIds: donorIdList?.length ?? 0,
-    });
-    console.log("Convex URL:", process.env.NEXT_PUBLIC_CONVEX_URL);
-
-    if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
-      throw new Error("NEXT_PUBLIC_CONVEX_URL is not configured");
+    if (churchId) {
+      assertUserInChurch(user, resolvedChurchId);
     }
+
+    const donorIdList = donorIds?.length
+      ? donorIds.map((id) => id as Id<"donors">)
+      : undefined;
 
     const queryArgs: {
       churchId: Id<"churches">;
@@ -740,7 +745,7 @@ export async function POST(request: Request) {
       fundType?: "general" | "restricted" | "designated" | "all";
       donorIds?: Id<"donors">[];
     } = {
-      churchId: churchId as Id<"churches">,
+      churchId: resolvedChurchId,
       fromDate,
       toDate,
       fundType: fundType || "all",
@@ -754,8 +759,6 @@ export async function POST(request: Request) {
       api.reports.getDonorStatementBatch,
       queryArgs
     );
-
-    console.log(`Found ${statements?.length || 0} donor statements`);
 
     if (!statements || statements.length === 0) {
       return NextResponse.json(
@@ -953,8 +956,6 @@ export async function POST(request: Request) {
     }
 
     const pdfBytes = await pdfDoc.save();
-    console.log(`Generated PDF: ${pdfBytes.length} bytes`);
-  
     return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
         "Content-Type": "application/pdf",
@@ -964,23 +965,28 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Error generating donor statements:", error);
-    
+
+    const status =
+      typeof (error as { status?: number })?.status === "number"
+        ? (error as { status: number }).status
+        : 500;
+
+    if (status === 401) {
+      return NextResponse.json({ error: "Unauthorised" }, { status });
+    }
+
+    if (status === 403) {
+      return NextResponse.json({ error: "Forbidden" }, { status });
+    }
+
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    const errorStack = error instanceof Error ? error.stack : "";
-    
-    console.error("Full error details:", {
-      message: errorMessage,
-      stack: errorStack,
-      error: error,
-    });
-    
+
     return NextResponse.json(
-      { 
+      {
         error: "Failed to generate donor statements",
         details: errorMessage,
-        type: error instanceof Error ? error.constructor.name : typeof error,
       },
-      { status: 500 }
+      { status }
     );
   }
 }
