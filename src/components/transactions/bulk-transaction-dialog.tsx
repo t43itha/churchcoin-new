@@ -70,8 +70,8 @@ const bulkTransactionSchema = z.object({
   rows: z.array(transactionRowSchema).min(1, "Add at least one transaction"),
 });
 
-export type BulkTransactionFormValues = z.infer<typeof bulkTransactionSchema>;
-export type TransactionRow = z.infer<typeof transactionRowSchema>;
+export type BulkTransactionFormValues = z.output<typeof bulkTransactionSchema>;
+export type TransactionRow = z.output<typeof transactionRowSchema>;
 
 export type TransactionCreateValues = {
   churchId: Id<"churches">;
