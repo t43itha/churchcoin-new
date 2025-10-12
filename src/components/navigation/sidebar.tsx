@@ -187,19 +187,6 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
         )}
 
         <div className="flex gap-2">
-          {permissions.canManageUsers ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 font-primary border-ledger text-grey-mid hover:text-ink"
-              asChild
-            >
-              <Link href="/settings" onClick={onNavigate} className="flex items-center justify-center gap-1">
-                <Settings className="h-3 w-3" />
-                Settings
-              </Link>
-            </Button>
-          ) : null}
           <Button
             variant="outline"
             size="sm"
@@ -207,6 +194,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
             className="flex-1 font-primary border-ledger text-grey-mid hover:text-ink"
           >
             <LogOut className="h-3 w-3" />
+            Sign Out
           </Button>
         </div>
       </div>
