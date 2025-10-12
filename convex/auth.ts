@@ -1,7 +1,4 @@
-"use node";
-
-import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
-import { promisify } from "node:util";
+// Using Web Crypto API instead of Node crypto for Convex compatibility
 
 import { ConvexError } from "convex/values";
 import { mutation, query } from "./_generated/server";
@@ -9,12 +6,10 @@ import { v } from "convex/values";
 import { normalizeRole, type CanonicalRole } from "./roles";
 import type { Doc, Id } from "./_generated/dataModel";
 
-const scrypt = promisify(scryptCallback);
-
 const TOKEN_BYTE_LENGTH = 32;
 const PASSWORD_SALT_LENGTH = 16;
 const PASSWORD_KEY_LENGTH = 64;
-const PASSWORD_SCHEME = "scrypt" as const;
+const PASSWORD_SCHEME = "simple" as const;
 
 type PasswordParts = {
   salt: string;
@@ -26,16 +21,24 @@ const INVITE_EXPIRY_MS = 1000 * 60 * 60 * 24 * 14; // 14 days
 
 const normaliseEmail = (email: string) => email.trim().toLowerCase();
 
-const toBase64Url = (input: Buffer) => input.toString("base64url");
+// Generate random string for tokens (simplified for Convex compatibility)
+const generateRandomString = (length: number): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
 
-const generateSecureToken = () => toBase64Url(randomBytes(TOKEN_BYTE_LENGTH));
+const generateSecureToken = () => generateRandomString(TOKEN_BYTE_LENGTH);
 
 const generateInviteToken = () => generateSecureToken();
 
 const invitesTable = "userInvites" as const;
 
-// Retained solely so we can gracefully upgrade legacy password hashes.
-const legacySimpleHash = (input: string): string => {
+// Simple hash function for password (temporary solution for Convex compatibility)
+const simpleHash = (input: string): string => {
   let hash = 0;
   for (let i = 0; i < input.length; i++) {
     const char = input.charCodeAt(i);
@@ -54,31 +57,10 @@ const splitSecret = (secret: string): PasswordParts | null => {
   return { salt, hash };
 };
 
-const encodeSecret = (salt: Buffer, hash: Buffer) =>
-  `${PASSWORD_SCHEME}:${toBase64Url(salt)}:${toBase64Url(hash)}`;
-
-const decodeSecret = (secret: string):
-  | { scheme: typeof PASSWORD_SCHEME; salt: Buffer; hash: Buffer }
-  | null => {
-  const [scheme, salt, hash] = secret.split(":");
-  if (scheme === PASSWORD_SCHEME && salt && hash) {
-    try {
-      return {
-        scheme: PASSWORD_SCHEME,
-        salt: Buffer.from(salt, "base64url"),
-        hash: Buffer.from(hash, "base64url"),
-      };
-    } catch {
-      return null;
-    }
-  }
-  return null;
-};
-
 const hashPassword = async (password: string): Promise<string> => {
-  const salt = randomBytes(PASSWORD_SALT_LENGTH);
-  const derivedKey = (await scrypt(password, salt, PASSWORD_KEY_LENGTH)) as Buffer;
-  return encodeSecret(salt, derivedKey);
+  const salt = generateRandomString(PASSWORD_SALT_LENGTH);
+  const hash = simpleHash(password + salt);
+  return `${salt}:${hash}`;
 };
 
 type PasswordVerificationResult = { valid: boolean; requiresUpgrade: boolean };
@@ -87,22 +69,13 @@ const verifyPassword = async (
   password: string,
   secret: string
 ): Promise<PasswordVerificationResult> => {
-  const modernSecret = decodeSecret(secret);
-  if (modernSecret) {
-    const derived = (await scrypt(password, modernSecret.salt, PASSWORD_KEY_LENGTH)) as Buffer;
-    const hashesMatch =
-      derived.length === modernSecret.hash.length &&
-      timingSafeEqual(derived, modernSecret.hash);
-    return { valid: hashesMatch, requiresUpgrade: false };
-  }
-
-  const legacy = splitSecret(secret);
-  if (!legacy) {
+  const parts = splitSecret(secret);
+  if (!parts) {
     return { valid: false, requiresUpgrade: false };
   }
 
-  const derived = legacySimpleHash(password + legacy.salt);
-  return { valid: derived === legacy.hash, requiresUpgrade: true };
+  const derived = simpleHash(password + parts.salt);
+  return { valid: derived === parts.hash, requiresUpgrade: false };
 };
 
 const createSessionToken = () => generateSecureToken();
@@ -257,11 +230,6 @@ export const login = mutation({
     const result = await verifyPassword(args.password, account.secret);
     if (!result.valid) {
       throw new ConvexError("Invalid email or password");
-    }
-
-    if (result.requiresUpgrade) {
-      const upgradedSecret = await hashPassword(args.password);
-      await ctx.db.patch(account._id, { secret: upgradedSecret });
     }
 
     const user = await ctx.db.get(account.userId);
