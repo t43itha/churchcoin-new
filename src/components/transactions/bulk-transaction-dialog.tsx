@@ -44,7 +44,13 @@ const transactionRowSchema = z.object({
   id: z.string(),
   collectionType: z.string().min(1, "Select collection type"),
   customDescription: z.string().optional(),
-  amount: z.coerce.number().positive("Amount must be greater than 0"),
+  amount: z.preprocess(
+    (val) => {
+      const num = Number(val);
+      return isNaN(num) ? 0 : num;
+    },
+    z.number().positive("Amount must be greater than 0")
+  ),
   method: z.enum(["cash", "card", "cheque", "online", "bank-transfer"]),
   fundId: z.string().min(1, "Select a fund"),
   categoryId: z.string().optional(),
