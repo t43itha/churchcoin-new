@@ -16,6 +16,10 @@ import {
   UserPlus,
 } from "lucide-react";
 import {
+  BulkTransactionDialog,
+  type TransactionCreateValues,
+} from "@/components/transactions/bulk-transaction-dialog";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -31,7 +35,7 @@ import {
 } from "@/components/dashboard/hero-metric-card";
 import { CollapsibleSection } from "@/components/dashboard/collapsible-section";
 import { PeriodSelector, type PeriodOption } from "@/components/dashboard/period-selector";
-import { api, type Id } from "@/lib/convexGenerated";
+import { api, type Id, type Doc } from "@/lib/convexGenerated";
 import {
   Bar,
   BarChart,
@@ -189,6 +193,7 @@ function quarterLabel(d: Date) {
 export default function DashboardPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodKey>("this-month");
   const [periodOffset] = useState(0);
+  const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
 
   const churches = useQuery(api.churches.listChurches, {});
   const churchId = churches?.[0]?._id;
@@ -206,6 +211,7 @@ export default function DashboardPage() {
     churchId ? { churchId } : "skip"
   );
   const generateInsights = useMutation(api.aiInsights.generateInsights);
+  const createTransaction = useMutation(api.transactions.createTransaction);
 
   const currentPeriod = useQuery(
     api.financialPeriods.getCurrentPeriod,
@@ -334,6 +340,12 @@ export default function DashboardPage() {
     income,
     comparisonReport?.income ?? 0
   );
+
+  const handleCreateTransactions = async (transactions: TransactionCreateValues[]) => {
+    for (const transaction of transactions) {
+      await createTransaction(transaction);
+    }
+  };
 
   const donorActivity = useMemo(() => {
     const transactions = incomeExpenseReport?.transactions ?? [];
@@ -867,11 +879,13 @@ export default function DashboardPage() {
                   Manage Funds
                 </Link>
               </Button>
-              <Button className="font-primary" asChild>
-                <Link href="/transactions">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Transaction
-                </Link>
+              <Button
+                className="font-primary"
+                onClick={() => setIsTransactionDialogOpen(true)}
+                disabled={!churchId}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Transaction
               </Button>
             </div>
           </div>
@@ -1201,6 +1215,19 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Transaction Dialog */}
+      {churchId && funds && categories && donors && (
+        <BulkTransactionDialog
+          open={isTransactionDialogOpen}
+          onOpenChange={setIsTransactionDialogOpen}
+          churchId={churchId}
+          funds={funds as Doc<"funds">[]}
+          categories={categories as Doc<"categories">[]}
+          donors={donors as Doc<"donors">[]}
+          onSubmit={handleCreateTransactions}
+        />
+      )}
     </div>
   );
 }

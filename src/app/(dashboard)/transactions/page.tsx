@@ -5,9 +5,9 @@ import { useConvex, useMutation, useQuery } from "convex/react";
 import { PlusCircle } from "lucide-react";
 
 import {
-  ManualTransactionDialog,
+  BulkTransactionDialog,
   type TransactionCreateValues,
-} from "@/components/transactions/manual-transaction-dialog";
+} from "@/components/transactions/bulk-transaction-dialog";
 import { EditTransactionDialog } from "@/components/transactions/edit-transaction-dialog";
 import {
   TransactionLedger,
@@ -597,7 +597,7 @@ export default function TransactionsPage() {
       {/* Dialogs */}
       {canRecordManualTransactions && churchId && funds && categories && donors && (
         <>
-          <ManualTransactionDialog
+          <BulkTransactionDialog
             open={isDialogOpen}
             onOpenChange={setIsDialogOpen}
             churchId={churchId}
