@@ -44,9 +44,7 @@ const transactionRowSchema = z.object({
   id: z.string(),
   collectionType: z.string().min(1, "Select collection type"),
   customDescription: z.string().optional(),
-  amount: z.union([z.string(), z.number()])
-    .transform((val) => typeof val === 'string' ? parseFloat(val) || 0 : val)
-    .pipe(z.number().positive("Amount must be greater than 0")),
+  amount: z.number().positive("Amount must be greater than 0"),
   method: z.enum(["cash", "card", "cheque", "online", "bank-transfer"]),
   fundId: z.string().min(1, "Select a fund"),
   categoryId: z.string().optional(),
@@ -70,8 +68,8 @@ const bulkTransactionSchema = z.object({
   rows: z.array(transactionRowSchema).min(1, "Add at least one transaction"),
 });
 
-export type BulkTransactionFormValues = z.output<typeof bulkTransactionSchema>;
-export type TransactionRow = z.output<typeof transactionRowSchema>;
+export type BulkTransactionFormValues = z.infer<typeof bulkTransactionSchema>;
+export type TransactionRow = z.infer<typeof transactionRowSchema>;
 
 export type TransactionCreateValues = {
   churchId: Id<"churches">;
@@ -400,7 +398,7 @@ export function BulkTransactionDialog({
                             type="number"
                             step="0.01"
                             min="0"
-                            {...register(`rows.${index}.amount`)}
+                            {...register(`rows.${index}.amount`, { valueAsNumber: true })}
                             className="h-8 w-24 text-xs"
                           />
                           {errors.rows?.[index]?.amount ? (
@@ -542,7 +540,7 @@ export function BulkTransactionDialog({
                         inputMode="decimal"
                         step="0.01"
                         min="0"
-                        {...register(`rows.${index}.amount`)}
+                        {...register(`rows.${index}.amount`, { valueAsNumber: true })}
                         className="h-11 text-base"
                       />
                       {errors.rows?.[index]?.amount ? (
