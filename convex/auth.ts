@@ -18,6 +18,7 @@ type PasswordParts = {
 
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 const INVITE_EXPIRY_MS = 1000 * 60 * 60 * 24 * 14; // 14 days
+const PASSWORD_RESET_EXPIRY_MS = 1000 * 60 * 60; // 1 hour
 
 const normaliseEmail = (email: string) => email.trim().toLowerCase();
 
@@ -247,6 +248,112 @@ export const login = mutation({
     });
 
     return { sessionToken, expires, user: { ...user, role: normalizeRole(user.role) } };
+  },
+});
+
+export const requestPasswordReset = mutation({
+  args: {
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const email = normaliseEmail(args.email);
+
+    if (!email) {
+      throw new ConvexError("Email is required");
+    }
+
+    const account = await ctx.db
+      .query("authAccounts")
+      .withIndex("by_provider_and_account_id", (q) =>
+        q.eq("provider", "credentials").eq("providerAccountId", email)
+      )
+      .first();
+
+    if (!account?.secret) {
+      // Return success even if the account does not exist to avoid leaking information
+      return { success: true };
+    }
+
+    const existingTokens = await ctx.db
+      .query("authVerificationTokens")
+      .withIndex("by_identifier", (q) => q.eq("identifier", email))
+      .collect();
+
+    await Promise.all(existingTokens.map((token) => ctx.db.delete(token._id)));
+
+    const token = generateSecureToken();
+    const expires = Date.now() + PASSWORD_RESET_EXPIRY_MS;
+
+    await ctx.db.insert("authVerificationTokens", {
+      identifier: email,
+      token,
+      expires,
+    });
+
+    return { success: true, token };
+  },
+});
+
+export const resetPassword = mutation({
+  args: {
+    token: v.string(),
+    password: v.string(),
+  },
+  handler: async (ctx, args) => {
+    if (!args.token) {
+      throw new ConvexError("A reset token is required");
+    }
+
+    if (!args.password) {
+      throw new ConvexError("A new password is required");
+    }
+
+    const resetRequest = await ctx.db
+      .query("authVerificationTokens")
+      .withIndex("by_token", (q) => q.eq("token", args.token))
+      .first();
+
+    if (!resetRequest) {
+      throw new ConvexError("Reset link is invalid or has already been used");
+    }
+
+    if (resetRequest.expires < Date.now()) {
+      await ctx.db.delete(resetRequest._id);
+      throw new ConvexError("Reset link has expired. Please request a new one.");
+    }
+
+    const email = resetRequest.identifier;
+
+    const account = await ctx.db
+      .query("authAccounts")
+      .withIndex("by_provider_and_account_id", (q) =>
+        q.eq("provider", "credentials").eq("providerAccountId", email)
+      )
+      .first();
+
+    if (!account) {
+      await ctx.db.delete(resetRequest._id);
+      throw new ConvexError("Account not found for this reset request");
+    }
+
+    const passwordHash = await hashPassword(args.password);
+    await ctx.db.patch(account._id, { secret: passwordHash });
+
+    const outstandingTokens = await ctx.db
+      .query("authVerificationTokens")
+      .withIndex("by_identifier", (q) => q.eq("identifier", email))
+      .collect();
+
+    await Promise.all(outstandingTokens.map((tokenDoc) => ctx.db.delete(tokenDoc._id)));
+
+    const activeSessions = await ctx.db
+      .query("authSessions")
+      .withIndex("by_user_id", (q) => q.eq("userId", account.userId))
+      .collect();
+
+    await Promise.all(activeSessions.map((session) => ctx.db.delete(session._id)));
+
+    return { success: true };
   },
 });
 
