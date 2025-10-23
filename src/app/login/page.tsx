@@ -89,6 +89,11 @@ function LoginPageContent() {
                 {error}
               </p>
             ) : null}
+            <p className="text-right text-sm text-grey-mid">
+              <Link className="text-ink underline" href="/reset-password">
+                Forgot your password?
+              </Link>
+            </p>
             <Button
               type="submit"
               disabled={submitting}
