@@ -6,27 +6,6 @@ import type { Id } from "./_generated/dataModel";
 
 type AnyCtx = MutationCtx | QueryCtx;
 
-const requireActiveSession = async (
-  ctx: AnyCtx,
-  sessionToken: string
-) => {
-  const session = await ctx.db
-    .query("authSessions")
-    .withIndex("by_session_token", (q) => q.eq("sessionToken", sessionToken))
-    .first();
-
-  if (!session || session.expires < Date.now()) {
-    throw new ConvexError("Unauthorised");
-  }
-
-  const user = await ctx.db.get(session.userId);
-  if (!user) {
-    throw new ConvexError("Unauthorised");
-  }
-
-  return { session, user };
-};
-
 const assertReceiptOwnership = async (
   ctx: AnyCtx,
   storageId: Id<"_storage">,
@@ -45,11 +24,11 @@ const assertReceiptOwnership = async (
 };
 
 export const generateReceiptUploadUrl = mutation({
-  args: { sessionToken: v.string(), churchId: v.id("churches") },
+  args: { userId: v.id("users"), churchId: v.id("churches") },
   handler: async (ctx, args) => {
-    const { user } = await requireActiveSession(ctx, args.sessionToken);
+    const user = await ctx.db.get(args.userId);
 
-    if (user.churchId !== args.churchId) {
+    if (!user || user.churchId !== args.churchId) {
       throw new ConvexError("Forbidden");
     }
 
@@ -59,14 +38,14 @@ export const generateReceiptUploadUrl = mutation({
 
 export const getReceiptUrl = query({
   args: {
-    sessionToken: v.string(),
+    userId: v.id("users"),
     churchId: v.id("churches"),
     storageId: v.id("_storage"),
   },
   handler: async (ctx, args) => {
-    const { user } = await requireActiveSession(ctx, args.sessionToken);
+    const user = await ctx.db.get(args.userId);
 
-    if (user.churchId !== args.churchId) {
+    if (!user || user.churchId !== args.churchId) {
       throw new ConvexError("Forbidden");
     }
 
@@ -78,14 +57,14 @@ export const getReceiptUrl = query({
 
 export const deleteReceipt = mutation({
   args: {
-    sessionToken: v.string(),
+    userId: v.id("users"),
     churchId: v.id("churches"),
     storageId: v.id("_storage"),
   },
   handler: async (ctx, args) => {
-    const { user } = await requireActiveSession(ctx, args.sessionToken);
+    const user = await ctx.db.get(args.userId);
 
-    if (user.churchId !== args.churchId) {
+    if (!user || user.churchId !== args.churchId) {
       throw new ConvexError("Forbidden");
     }
 
