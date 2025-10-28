@@ -62,7 +62,6 @@ export default function LoginPage() {
                 Need an account?{" "}
                 <SignUpButton
                   mode="modal"
-                  signInUrl="/login"
                   afterSignUpUrl={redirect || "/dashboard"}
                 >
                   <span className="cursor-pointer text-ink underline">
