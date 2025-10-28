@@ -13,9 +13,9 @@ import {
   Upload,
   FileText,
   Settings,
-  LogOut,
   Sparkles,
 } from "lucide-react";
+import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { getRoleDisplayName, getRolePermissions } from "@/lib/rbac";
 import { useSession } from "@/components/auth/session-provider";
@@ -77,7 +77,7 @@ interface SidebarProps {
 
 export function Sidebar({ className, onNavigate }: SidebarProps) {
   const pathname = usePathname();
-  const { user, signOut } = useSession();
+  const { user } = useSession();
   const [chatOpen, setChatOpen] = useState(false);
   const churches = useQuery(api.churches.listChurches, {});
   const churchId = churches?.[0]?._id;
@@ -96,11 +96,6 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
       ? [...baseNavigation, ...adminNavigation]
       : baseNavigation;
   }, [permissions.canManageUsers, permissions.restrictedToManualEntry]);
-
-  const handleSignOut = async () => {
-    await signOut();
-    window.location.href = "/";
-  };
 
   const currentPage = pathname.split("/")[1] || "dashboard";
 
@@ -168,35 +163,40 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
 
       {/* User Profile Section */}
       <div className="border-t border-ledger p-4">
-        {user && (
-          <div className="flex items-center gap-3 mb-3">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-ledger text-ink font-primary text-xs">
-                {user.name.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-ink font-primary truncate">
-                {user.name}
-              </p>
-              <p className="text-xs text-grey-mid font-primary">
-                {getRoleDisplayName(user.role)}
-              </p>
+        <SignedIn>
+          <div className="space-y-3">
+            {user ? (
+              <div className="flex items-center gap-3">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-ledger text-ink font-primary text-xs">
+                    {user.name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-ink font-primary truncate">
+                    {user.name}
+                  </p>
+                  <p className="text-xs text-grey-mid font-primary">
+                    {getRoleDisplayName(user.role)}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-grey-mid font-primary">
+                Manage your account
+              </span>
+              <UserButton afterSignOutUrl="/login" />
             </div>
           </div>
-        )}
-
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSignOut}
-            className="flex-1 font-primary border-ledger text-grey-mid hover:text-ink"
-          >
-            <LogOut className="h-3 w-3" />
-            Sign Out
-          </Button>
-        </div>
+        </SignedIn>
+        <SignedOut>
+          <SignInButton mode="modal" redirectUrl={pathname || "/dashboard"}>
+            <Button className="w-full bg-ink text-paper hover:bg-ink/90">
+              Sign in
+            </Button>
+          </SignInButton>
+        </SignedOut>
       </div>
     </div>
   );

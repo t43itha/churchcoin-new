@@ -2,6 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
+import { useClerk } from "@clerk/nextjs";
+
 import type { Doc } from "@/lib/convexGenerated";
 import { resolveUserRole } from "@/lib/rbac";
 
@@ -28,20 +30,14 @@ async function fetchSession() {
 
   return (await response.json()) as {
     user?: SessionUser;
-    session?: { expires: number } | null;
+    session?: { userId: string } | null;
   };
-}
-
-async function requestLogout() {
-  await fetch("/api/auth/logout", {
-    method: "POST",
-    credentials: "include",
-  });
 }
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SessionUser>(null);
   const [loading, setLoading] = useState(true);
+  const { signOut: clerkSignOut } = useClerk();
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -60,9 +56,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await requestLogout();
+    await clerkSignOut();
     setUser(null);
-  }, []);
+  }, [clerkSignOut]);
 
   useEffect(() => {
     refresh().catch((error) => {

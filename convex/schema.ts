@@ -301,9 +301,11 @@ export default defineSchema({
     isAnonymous: v.optional(v.boolean()),
     churchId: v.optional(v.id("churches")),
     role: userRoleValidator,
+    clerkUserId: v.optional(v.string()),
   })
     .index("by_email", ["email"])
-    .index("by_church", ["churchId"]),
+    .index("by_church", ["churchId"])
+    .index("by_clerk_user", ["clerkUserId"]),
 
   userInvites: defineTable({
     email: v.string(),
