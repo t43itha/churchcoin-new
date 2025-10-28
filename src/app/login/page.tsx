@@ -1,141 +1,92 @@
 "use client";
 
-import { FormEvent, Suspense, useEffect, useState } from "react";
-import Link from "next/link";
+import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { useSession } from "@/components/auth/session-provider";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import {
+  SignIn,
+  SignUpButton,
+  SignedIn,
+  SignedOut,
+  useAuth,
+} from "@clerk/nextjs";
 
-function LoginPageContent() {
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
+export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams?.get("redirect") ?? "/dashboard";
-  const { user, loading, refresh } = useSession();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const { isLoaded, isSignedIn } = useAuth();
 
   useEffect(() => {
-    if (!loading && user) {
+    if (isLoaded && isSignedIn) {
       router.replace(redirect || "/dashboard");
     }
-  }, [loading, user, redirect, router]);
-
-  if (!loading && user) {
-    return null;
-  }
-
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    setSubmitting(true);
-    setError(null);
-
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({ error: "" }));
-      setError(body.error || "Unable to sign in. Please check your details.");
-      setSubmitting(false);
-      return;
-    }
-
-    await refresh();
-    router.replace(redirect || "/dashboard");
-  };
+  }, [isLoaded, isSignedIn, redirect, router]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-12">
       <Card className="w-full max-w-md border-ledger bg-paper shadow-none">
         <CardHeader>
-          <CardTitle className="text-2xl font-semibold text-ink">Welcome back</CardTitle>
+          <CardTitle className="text-2xl font-semibold text-ink">
+            Welcome back
+          </CardTitle>
           <CardDescription className="text-grey-mid">
             Sign in to continue managing your church finances.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-grey-mid">Email</label>
-              <Input
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="font-primary"
+          <SignedOut>
+            <div className="space-y-6">
+              <SignIn
+                path="/login"
+                routing="path"
+                signUpUrl="/register"
+                afterSignInUrl={redirect || "/dashboard"}
+                appearance={{
+                  elements: {
+                    formButtonPrimary:
+                      "bg-ink text-paper hover:bg-ink/90 font-primary",
+                  },
+                }}
               />
-            </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-grey-mid">Password</label>
-              <Input
-                type="password"
-                required
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="font-primary"
-              />
-            </div>
-            {error ? (
-              <p className="rounded-md border border-error/40 bg-error/5 px-3 py-2 text-sm text-error">
-                {error}
+              <p className="text-center text-sm text-grey-mid">
+                Need an account?{" "}
+                <SignUpButton
+                  mode="modal"
+                  fallbackRedirectUrl={redirect || "/dashboard"}
+                >
+                  <span className="cursor-pointer text-ink underline">
+                    Create one now
+                  </span>
+                </SignUpButton>
+                .
               </p>
-            ) : null}
-            <Button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-ink text-paper hover:bg-ink/90"
-            >
-              {submitting ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
-          <p className="mt-6 text-center text-sm text-grey-mid">
-            Need an account? {" "}
-            <Link className="text-ink underline" href="/register">
-              Create one now
-            </Link>
-            .
-          </p>
+            </div>
+          </SignedOut>
+          <SignedIn>
+            <div className="flex flex-col items-center gap-4">
+              <p className="text-sm text-grey-mid">
+                Redirecting to your dashboard…
+              </p>
+              <Button
+                onClick={() => router.replace(redirect || "/dashboard")}
+                className="bg-ink text-paper hover:bg-ink/90"
+              >
+                Continue
+              </Button>
+            </div>
+          </SignedIn>
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function LoginSuspenseFallback() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-12">
-      <Card className="w-full max-w-md border-ledger bg-paper shadow-none">
-        <CardHeader>
-          <CardTitle className="text-2xl font-semibold text-ink">Loading</CardTitle>
-          <CardDescription className="text-grey-mid">
-            Preparing your sign in experience...
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="h-10 rounded-md bg-grey-light" />
-            <div className="h-10 rounded-md bg-grey-light" />
-            <div className="h-12 rounded-md bg-grey-light" />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={<LoginSuspenseFallback />}>
-      <LoginPageContent />
-    </Suspense>
   );
 }

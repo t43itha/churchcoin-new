@@ -1,13 +1,8 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import type { Id } from "@/lib/convexGenerated";
 import { api, convexServerClient } from "@/lib/convexServerClient";
-import {
-  SESSION_COOKIE_NAME,
-  assertUserInChurch,
-  requireSessionUser,
-} from "@/lib/server-auth";
+import { assertUserInChurch, requireSessionUser } from "@/lib/server-auth";
 
 export async function POST(request: Request) {
   try {
@@ -37,17 +32,10 @@ export async function POST(request: Request) {
       assertUserInChurch(user, resolvedChurchId);
     }
 
-    const store = await cookies();
-    const sessionToken = store.get(SESSION_COOKIE_NAME)?.value;
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
-    }
-
     const uploadUrl = await convexServerClient.mutation(
       api.files.generateReceiptUploadUrl,
       {
-        sessionToken,
+        userId: user._id,
         churchId: resolvedChurchId,
       }
     );

@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import type { Id } from "@/convex/_generated/dataModel";
@@ -6,34 +5,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { api, convexServerClient } from "@/lib/convexServerClient";
 import { ALL_ROLES, getRolePermissions, resolveUserRole } from "@/lib/rbac";
 import type { UserRole } from "@/lib/rbac";
-
-const SESSION_COOKIE = "churchcoin-session";
-
-type SessionUser = {
-  _id: Id<"users">;
-  name: string;
-  role: UserRole;
-  churchId?: Id<"churches"> | null;
-};
-
-async function requireSession(): Promise<SessionUser | null> {
-  const store = await cookies();
-  const token = store.get(SESSION_COOKIE)?.value;
-
-  if (!token) {
-    return null;
-  }
-
-  const session = await convexServerClient.query(api.auth.getSession, {
-    sessionToken: token,
-  });
-
-  if (!session) {
-    return null;
-  }
-
-  return session.user as SessionUser;
-}
+import { requireSessionUser } from "@/lib/server-auth";
 
 function normalizeError(error: unknown, fallback: string) {
   let status = 500;
@@ -71,54 +43,79 @@ function normalizeError(error: unknown, fallback: string) {
 }
 
 export async function GET() {
-  const user = await requireSession();
+  try {
+    const user = await requireSessionUser();
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
-  }
+    const permissions = getRolePermissions(user.role);
 
-  const permissions = getRolePermissions(user.role);
+    if (!permissions.canManageUsers) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
-  if (!permissions.canManageUsers) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+    if (!user.churchId) {
+      return NextResponse.json(
+        { error: "Unable to determine church context for this user" },
+        { status: 400 }
+      );
+    }
 
-  if (!user.churchId) {
+    const invites = await convexServerClient.query(api.auth.listInvitations, {
+      churchId: user.churchId,
+    });
+
+    const formatted = invites.map((invite) => ({
+      id: invite._id,
+      email: invite.email,
+      role: resolveUserRole(invite.role),
+      token: invite.token,
+      createdAt: invite.createdAt,
+      expiresAt: invite.expiresAt,
+      acceptedAt: invite.acceptedAt ?? null,
+      revokedAt: invite.revokedAt ?? null,
+      invitedBy: invite.invitedByUser
+        ? {
+            id: invite.invitedByUser._id,
+            name: invite.invitedByUser.name,
+          }
+        : null,
+    }));
+
+    return NextResponse.json({ invites: formatted });
+  } catch (error) {
+    const status = (error as { status?: number }).status;
+    if (status === 401) {
+      return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+    }
+
+    console.error("Failed to list invitations", error);
     return NextResponse.json(
-      { error: "Unable to determine church context for this user" },
-      { status: 400 }
+      { error: "Unable to load invitations" },
+      { status: 500 }
     );
   }
-
-  const invites = await convexServerClient.query(api.auth.listInvitations, {
-    churchId: user.churchId,
-  });
-
-  const formatted = invites.map((invite) => ({
-    id: invite._id,
-    email: invite.email,
-    role: resolveUserRole(invite.role),
-    token: invite.token,
-    createdAt: invite.createdAt,
-    expiresAt: invite.expiresAt,
-    acceptedAt: invite.acceptedAt ?? null,
-    revokedAt: invite.revokedAt ?? null,
-    invitedBy: invite.invitedByUser
-      ? {
-          id: invite.invitedByUser._id,
-          name: invite.invitedByUser.name,
-        }
-      : null,
-  }));
-
-  return NextResponse.json({ invites: formatted });
 }
 
 export async function POST(request: Request) {
-  const user = await requireSession();
+  let user: {
+    _id: Id<"users">;
+    name: string;
+    role: UserRole;
+    churchId?: Id<"churches"> | null;
+  };
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  try {
+    user = await requireSessionUser();
+  } catch (error) {
+    const status = (error as { status?: number }).status;
+    if (status === 401) {
+      return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+    }
+
+    console.error("Failed to authenticate for invite creation", error);
+    return NextResponse.json(
+      { error: "Unable to verify your permissions" },
+      { status: 500 }
+    );
   }
 
   const permissions = getRolePermissions(user.role);

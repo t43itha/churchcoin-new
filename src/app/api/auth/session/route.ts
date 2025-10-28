@@ -1,59 +1,21 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { api, convexServerClient } from "@/lib/convexServerClient";
-import { resolveUserRole } from "@/lib/rbac";
-
-const SESSION_COOKIE = "churchcoin-session";
-const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
-const REFRESH_THRESHOLD = 60 * 60 * 24 * 7; // 7 days
+import { getSessionUser } from "@/lib/server-auth";
 
 export async function GET() {
-  const store = await cookies();
-  const token = store.get(SESSION_COOKIE)?.value;
+  try {
+    const user = await getSessionUser();
 
-  if (!token) {
-    return NextResponse.json({ session: null });
-  }
-
-  const session = await convexServerClient.query(api.auth.getSession, {
-    sessionToken: token,
-  });
-
-  if (!session) {
-    store.delete(SESSION_COOKIE);
-    return NextResponse.json({ session: null });
-  }
-
-  const normalizedUser = session.user
-    ? { ...session.user, role: resolveUserRole(session.user.role) }
-    : null;
-
-  const expiresInSeconds = Math.floor((session.session.expires - Date.now()) / 1000);
-  if (expiresInSeconds < REFRESH_THRESHOLD) {
-    try {
-      const extended = await convexServerClient.mutation(api.auth.extendSession, {
-        sessionToken: token,
-      });
-
-      store.set({
-        name: SESSION_COOKIE,
-        value: token,
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: SESSION_MAX_AGE,
-      });
-
-      return NextResponse.json({
-        session: { ...session.session, expires: extended.expires },
-        user: normalizedUser,
-      });
-    } catch (error) {
-      console.error("Failed to extend session", error);
+    if (!user) {
+      return NextResponse.json({ session: null, user: null });
     }
-  }
 
-  return NextResponse.json({ session: session.session, user: normalizedUser });
+    return NextResponse.json({
+      session: { userId: user._id },
+      user,
+    });
+  } catch (error) {
+    console.error("Failed to load session", error);
+    return NextResponse.json({ session: null, user: null }, { status: 500 });
+  }
 }

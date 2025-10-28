@@ -1,10 +1,8 @@
-import { cookies } from "next/headers";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 
 import type { Id } from "@/lib/convexGenerated";
 import { api, convexServerClient } from "@/lib/convexServerClient";
 import { resolveUserRole, type UserRole } from "@/lib/rbac";
-
-export const SESSION_COOKIE_NAME = "churchcoin-session";
 
 export type SessionUser = {
   _id: Id<"users">;
@@ -13,25 +11,50 @@ export type SessionUser = {
   churchId?: Id<"churches"> | null;
 };
 
-export async function getSessionUser(): Promise<SessionUser | null> {
-  const store = await cookies();
-  const token = store.get(SESSION_COOKIE_NAME)?.value;
+function deriveDisplayName(options: {
+  fullName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  email: string;
+}) {
+  const { fullName, firstName, lastName, email } = options;
+  const composite = [firstName, lastName].filter(Boolean).join(" ");
 
-  if (!token) {
+  return (fullName?.trim() || composite || email).trim();
+}
+
+export async function getSessionUser(): Promise<SessionUser | null> {
+  const authState = await auth();
+
+  if (!authState.userId) {
     return null;
   }
 
-  const session = await convexServerClient.query(api.auth.getSession, {
-    sessionToken: token,
+  const clerkUser = await clerkClient.users.getUser(authState.userId);
+  const email = clerkUser.primaryEmailAddress?.emailAddress?.toLowerCase();
+
+  if (!email) {
+    return null;
+  }
+
+  const name = deriveDisplayName({
+    fullName: clerkUser.fullName,
+    firstName: clerkUser.firstName,
+    lastName: clerkUser.lastName,
+    email,
   });
 
-  if (!session?.user) {
-    return null;
-  }
+  const profile = await convexServerClient.mutation(api.auth.ensureUserProfile, {
+    clerkUserId: authState.userId,
+    email,
+    name,
+  });
 
   return {
-    ...session.user,
-    role: resolveUserRole(session.user.role),
+    _id: profile._id,
+    name: profile.name,
+    role: resolveUserRole(profile.role),
+    churchId: profile.churchId ?? null,
   } as SessionUser;
 }
 
