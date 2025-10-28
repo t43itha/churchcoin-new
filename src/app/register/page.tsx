@@ -190,7 +190,6 @@ export default function RegisterPage() {
                 Already have an account?{" "}
                 <SignInButton
                   mode="modal"
-                  signUpUrl="/register"
                   afterSignInUrl={redirect || "/dashboard"}
                 >
                   <span className="cursor-pointer text-ink underline">
