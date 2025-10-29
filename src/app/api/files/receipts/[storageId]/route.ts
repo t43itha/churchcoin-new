@@ -1,13 +1,8 @@
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 import type { Id } from "@/lib/convexGenerated";
-import { api, convexServerClient } from "@/lib/convexServerClient";
-import {
-  SESSION_COOKIE_NAME,
-  assertUserInChurch,
-  requireSessionUser,
-} from "@/lib/server-auth";
+import { api } from "@/lib/convexServerClient";
+import { assertUserInChurch, requireSessionContext } from "@/lib/server-auth";
 
 export async function GET(
   request: NextRequest,
@@ -15,12 +10,12 @@ export async function GET(
 ) {
   try {
     const { storageId } = await context.params;
-    const sessionResult = await requireSessionUser().catch((error: Error) => error);
+    const sessionResult = await requireSessionContext().catch((error: Error) => error);
     if (sessionResult instanceof Error) {
       const status = (sessionResult as { status?: number }).status ?? 500;
       return NextResponse.json({ error: sessionResult.message }, { status });
     }
-    const user = sessionResult;
+    const { user, client } = sessionResult;
 
     const churchIdParam = request.nextUrl.searchParams.get("churchId");
     const resolvedChurchId = (churchIdParam ?? user.churchId ?? null) as
@@ -35,15 +30,7 @@ export async function GET(
       assertUserInChurch(user, resolvedChurchId);
     }
 
-    const store = await cookies();
-    const sessionToken = store.get(SESSION_COOKIE_NAME)?.value;
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
-    }
-
-    const url = await convexServerClient.query(api.files.getReceiptUrl, {
-      sessionToken,
+    const url = await client.query(api.files.getReceiptUrl, {
       churchId: resolvedChurchId,
       storageId: storageId as Id<"_storage">,
     });

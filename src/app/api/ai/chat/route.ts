@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import type { ConvexHttpClient } from "convex/browser";
 
 import type { Id } from "@/lib/convexGenerated";
 import { api } from "@/lib/convexGenerated";
-import { convexServerClient } from "@/lib/convexServerClient";
-import { assertUserInChurch, requireSessionUser } from "@/lib/server-auth";
+import { assertUserInChurch, requireSessionContext } from "@/lib/server-auth";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -153,7 +153,8 @@ const tools: OpenAI.Chat.ChatCompletionTool[] = [
 async function executeFunctionCall(
   functionName: string,
   args: Record<string, unknown>,
-  churchId: Id<"churches">
+  churchId: Id<"churches">,
+  client: ConvexHttpClient
 ) {
   // Currency formatter is defined in formatResponse function
 
@@ -161,7 +162,7 @@ async function executeFunctionCall(
     switch (functionName) {
       case "get_fund_balance": {
         if (typeof args.fundId === "string" && args.fundId) {
-          const fund = await convexServerClient.query(api.funds.getFund, {
+          const fund = await client.query(api.funds.getFund, {
             fundId: args.fundId as Id<"funds">,
           });
 
@@ -174,13 +175,10 @@ async function executeFunctionCall(
             type: fund?.type,
           };
         } else {
-          const funds = await convexServerClient.query(api.funds.list, {
+          const funds = await client.query(api.funds.list, {
             churchId,
           });
-          const total = await convexServerClient.query(
-            api.funds.getTotalBalance,
-            { churchId }
-          );
+          const total = await client.query(api.funds.getTotalBalance, { churchId });
           return {
             totalBalance: total,
             funds: funds?.map((f) => ({
@@ -195,13 +193,10 @@ async function executeFunctionCall(
 
       case "get_recent_transactions": {
         const limit = (args.limit as number) || 10;
-        const transactions = await convexServerClient.query(
-          api.transactions.getRecent,
-          {
-            churchId,
-            limit,
-          }
-        );
+        const transactions = await client.query(api.transactions.getRecent, {
+          churchId,
+          limit,
+        });
 
         let filtered = transactions || [];
         if (args.type) {
@@ -220,7 +215,7 @@ async function executeFunctionCall(
       }
 
       case "search_donors": {
-        const donors = await convexServerClient.query(api.donors.getDonors, {
+        const donors = await client.query(api.donors.getDonors, {
           churchId,
         });
 
@@ -236,7 +231,7 @@ async function executeFunctionCall(
         if (args.sortByAmount) {
           const donorsWithGiving = await Promise.all(
             filtered.map(async (donor) => {
-              const history = await convexServerClient.query(
+              const history = await client.query(
                 api.donors.getDonorGivingHistory,
                 { donorId: donor._id }
               );
@@ -266,7 +261,7 @@ async function executeFunctionCall(
         const { startDate, endDate, reportType } = args;
 
         if (reportType === "gift-aid") {
-          const report = await convexServerClient.query(
+          const report = await client.query(
             api.reports.getGiftAidClaimReport,
             {
               churchId,
@@ -281,7 +276,7 @@ async function executeFunctionCall(
             transactionCount: report?.transactionCount,
           };
         } else if (reportType === "monthly") {
-          const report = await convexServerClient.query(
+          const report = await client.query(
             api.reports.getMonthlyIncomeExpenseReport,
             {
               churchId,
@@ -296,7 +291,7 @@ async function executeFunctionCall(
             monthlyBreakdown: report?.monthlyBreakdown,
           };
         } else {
-          const report = await convexServerClient.query(
+          const report = await client.query(
             api.reports.getIncomeExpenseReport,
             {
               churchId,
@@ -462,7 +457,10 @@ function formatResponse(content: string, functionResults?: Record<string, unknow
   return `${content}\n\n${supplements.join("\n\n")}`;
 }
 
-async function buildFinancialSnapshot(churchId: Id<"churches">) {
+async function buildFinancialSnapshot(
+  churchId: Id<"churches">,
+  client: ConvexHttpClient
+) {
   try {
     const endDate = new Date();
     const end = endDate.toISOString().slice(0, 10);
@@ -471,10 +469,10 @@ async function buildFinancialSnapshot(churchId: Id<"churches">) {
     const start = startDate.toISOString().slice(0, 10);
 
     const [fundSummary, monthlyReport] = await Promise.all([
-      convexServerClient.query(api.reports.getFundBalanceSummary, {
+      client.query(api.reports.getFundBalanceSummary, {
         churchId,
       }),
-      convexServerClient.query(api.reports.getMonthlyIncomeExpenseReport, {
+      client.query(api.reports.getMonthlyIncomeExpenseReport, {
         churchId,
         startDate: start,
         endDate: end,
@@ -531,7 +529,13 @@ async function buildFinancialSnapshot(churchId: Id<"churches">) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireSessionUser();
+    const session = await requireSessionContext().catch((error: Error) => error);
+    if (session instanceof Error) {
+      const status = (session as { status?: number }).status ?? 500;
+      return NextResponse.json({ error: session.message }, { status });
+    }
+
+    const { user, client } = session;
     const body: ChatRequest = await request.json();
     const { message, context, history } = body;
 
@@ -567,7 +571,7 @@ export async function POST(request: NextRequest) {
       { role: "system", content: systemPrompt },
     ];
 
-    const snapshot = await buildFinancialSnapshot(effectiveChurchId);
+    const snapshot = await buildFinancialSnapshot(effectiveChurchId, client);
     if (snapshot) {
       messages.push({ role: "system", content: snapshot });
     }
@@ -615,7 +619,8 @@ export async function POST(request: NextRequest) {
       const functionResult = await executeFunctionCall(
         functionName,
         functionArgs,
-        effectiveChurchId
+        effectiveChurchId,
+        client
       );
 
       const secondMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [

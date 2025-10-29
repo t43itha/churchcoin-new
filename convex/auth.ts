@@ -2,6 +2,7 @@
 
 import { ConvexError } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { normalizeRole, type CanonicalRole } from "./roles";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -36,6 +37,58 @@ const generateSecureToken = () => generateRandomString(TOKEN_BYTE_LENGTH);
 const generateInviteToken = () => generateSecureToken();
 
 const invitesTable = "userInvites" as const;
+
+type AnyCtx = MutationCtx | QueryCtx;
+
+const isActiveInviteForEmail = (invitation: Doc<"userInvites">, email: string) => {
+  if (!invitation) {
+    return false;
+  }
+
+  if (invitation.revokedAt || invitation.acceptedAt) {
+    return false;
+  }
+
+  if (invitation.expiresAt <= Date.now()) {
+    return false;
+  }
+
+  return normaliseEmail(invitation.email) === email;
+};
+
+const findInvitationForEmail = async (
+  ctx: AnyCtx,
+  email: string,
+  token?: string | null
+) => {
+  const normalizedEmail = normaliseEmail(email);
+
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  if (token) {
+    const inviteByToken = await ctx.db
+      .query(invitesTable)
+      .withIndex("by_token", (q) => q.eq("token", token))
+      .first();
+
+    if (inviteByToken && isActiveInviteForEmail(inviteByToken, normalizedEmail)) {
+      return inviteByToken;
+    }
+  }
+
+  const invitations = await ctx.db
+    .query(invitesTable)
+    .withIndex("by_email", (q) => q.eq("email", normalizedEmail))
+    .collect();
+
+  return (
+    invitations
+      .filter((invite) => isActiveInviteForEmail(invite, normalizedEmail))
+      .sort((a, b) => b.createdAt - a.createdAt)[0] ?? null
+  );
+};
 
 // Simple hash function for password (temporary solution for Convex compatibility)
 const simpleHash = (input: string): string => {
@@ -316,6 +369,174 @@ export const listSessions = query({
       .query("authSessions")
       .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
       .collect();
+  },
+});
+
+export const ensureUser = mutation({
+  args: {
+    clerkUserId: v.string(),
+    email: v.optional(v.string()),
+    name: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    inviteToken: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity || identity.subject !== args.clerkUserId) {
+      throw new ConvexError("Unauthorised");
+    }
+
+    const email = normaliseEmail(
+      args.email ?? identity.email ?? ""
+    );
+
+    if (!email) {
+      throw new ConvexError("An email address is required to establish a user session");
+    }
+
+    const displayName = (args.name ?? identity.name ?? email).trim();
+    const imageUrl = args.imageUrl ?? identity.pictureUrl ?? undefined;
+
+    let user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", args.clerkUserId))
+      .first();
+
+    const now = Date.now();
+    let invitation: Doc<"userInvites"> | null = null;
+
+    if (!user) {
+      user = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", email))
+        .first();
+    }
+
+    if (!user) {
+      invitation = await findInvitationForEmail(ctx, email, args.inviteToken ?? null);
+
+      let churchId = invitation?.churchId ?? null;
+      let role: CanonicalRole = invitation ? normalizeRole(invitation.role) : "administrator";
+
+      if (!churchId) {
+        const existingChurch = await ctx.db.query("churches").first();
+        if (existingChurch) {
+          churchId = existingChurch._id;
+        }
+      }
+
+      if (!churchId) {
+        const fallbackName = displayName.split(" ")[0] || "New";
+        churchId = await ctx.db.insert("churches", {
+          name: `${fallbackName}'s Church`,
+          charityNumber: undefined,
+          address: undefined,
+          settings: {
+            fiscalYearEnd: "03-31",
+            giftAidEnabled: false,
+            defaultCurrency: "GBP",
+          },
+        });
+      }
+
+      const userId = await ctx.db.insert("users", {
+        name: displayName,
+        email,
+        role,
+        churchId,
+        clerkUserId: args.clerkUserId,
+        image: imageUrl,
+      });
+
+      user = await ctx.db.get(userId);
+
+      if (invitation) {
+        await ctx.db.patch(invitation._id, {
+          acceptedAt: now,
+          acceptedBy: userId,
+        });
+      }
+    } else {
+      const updates: Partial<Doc<"users">> = {};
+
+      if (!user.clerkUserId) {
+        updates.clerkUserId = args.clerkUserId;
+      }
+
+      if (displayName && displayName !== user.name) {
+        updates.name = displayName;
+      }
+
+      if (email && email !== normaliseEmail(user.email)) {
+        updates.email = email;
+      }
+
+      if (imageUrl && imageUrl !== user.image) {
+        updates.image = imageUrl;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await ctx.db.patch(user._id, updates);
+        user = await ctx.db.get(user._id);
+      }
+
+      invitation = await findInvitationForEmail(ctx, email, args.inviteToken ?? null);
+
+      if (invitation && user) {
+        const normalizedRole = normalizeRole(invitation.role);
+        const requiresUpdate =
+          user.churchId !== invitation.churchId || user.role !== normalizedRole;
+
+        if (requiresUpdate) {
+          await ctx.db.patch(user._id, {
+            churchId: invitation.churchId,
+            role: normalizedRole,
+          });
+          user = await ctx.db.get(user._id);
+        }
+
+        if (!invitation.acceptedAt || invitation.acceptedBy !== user._id) {
+          await ctx.db.patch(invitation._id, {
+            acceptedAt: now,
+            acceptedBy: user._id,
+          });
+        }
+      }
+    }
+
+    if (!user) {
+      throw new ConvexError("Unable to resolve user identity");
+    }
+
+    return {
+      ...user,
+      role: normalizeRole(user.role),
+    };
+  },
+});
+
+export const getCurrentUser = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.subject) {
+      return null;
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", identity.subject))
+      .first();
+
+    if (!user) {
+      return null;
+    }
+
+    return {
+      ...user,
+      role: normalizeRole(user.role),
+    };
   },
 });
 

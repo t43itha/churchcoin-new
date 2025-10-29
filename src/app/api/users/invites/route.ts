@@ -1,39 +1,9 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-import type { Id } from "@/convex/_generated/dataModel";
-
-import { api, convexServerClient } from "@/lib/convexServerClient";
+import { api } from "@/lib/convexServerClient";
+import { requireSessionContext } from "@/lib/server-auth";
 import { ALL_ROLES, getRolePermissions, resolveUserRole } from "@/lib/rbac";
 import type { UserRole } from "@/lib/rbac";
-
-const SESSION_COOKIE = "churchcoin-session";
-
-type SessionUser = {
-  _id: Id<"users">;
-  name: string;
-  role: UserRole;
-  churchId?: Id<"churches"> | null;
-};
-
-async function requireSession(): Promise<SessionUser | null> {
-  const store = await cookies();
-  const token = store.get(SESSION_COOKIE)?.value;
-
-  if (!token) {
-    return null;
-  }
-
-  const session = await convexServerClient.query(api.auth.getSession, {
-    sessionToken: token,
-  });
-
-  if (!session) {
-    return null;
-  }
-
-  return session.user as SessionUser;
-}
 
 function normalizeError(error: unknown, fallback: string) {
   let status = 500;
@@ -71,11 +41,14 @@ function normalizeError(error: unknown, fallback: string) {
 }
 
 export async function GET() {
-  const user = await requireSession();
+  const session = await requireSessionContext().catch((error: Error) => error);
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  if (session instanceof Error) {
+    const status = (session as { status?: number }).status ?? 401;
+    return NextResponse.json({ error: session.message || "Unauthorised" }, { status });
   }
+
+  const { user, client } = session;
 
   const permissions = getRolePermissions(user.role);
 
@@ -90,7 +63,7 @@ export async function GET() {
     );
   }
 
-  const invites = await convexServerClient.query(api.auth.listInvitations, {
+  const invites = await client.query(api.auth.listInvitations, {
     churchId: user.churchId,
   });
 
@@ -115,11 +88,14 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const user = await requireSession();
+  const session = await requireSessionContext().catch((error: Error) => error);
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  if (session instanceof Error) {
+    const status = (session as { status?: number }).status ?? 401;
+    return NextResponse.json({ error: session.message || "Unauthorised" }, { status });
   }
+
+  const { user, client } = session;
 
   const permissions = getRolePermissions(user.role);
 
@@ -153,15 +129,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const created = await convexServerClient.mutation(
-      api.auth.createInvitation,
-      {
-        email,
-        role: role as UserRole,
-        churchId: user.churchId,
-        invitedBy: user._id,
-      }
-    );
+    const created = await client.mutation(api.auth.createInvitation, {
+      email,
+      role: role as UserRole,
+      churchId: user.churchId,
+      invitedBy: user._id,
+    });
 
     return NextResponse.json({
       invite: {

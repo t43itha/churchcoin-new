@@ -2,7 +2,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import { NextResponse } from "next/server";
 
 import type { Doc, Id } from "@/lib/convexGenerated";
-import { api, convexServerClient } from "@/lib/convexServerClient";
+import { api, createConvexServerClient } from "@/lib/convexServerClient";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -64,10 +64,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
   }
 
-  const report = await convexServerClient.query(
-    api.reconciliation.getReconciliationReport,
-    { sessionId: sessionId as Id<"reconciliationSessions"> }
-  );
+  const client = createConvexServerClient();
+  const report = await client.query(api.reconciliation.getReconciliationReport, {
+    sessionId: sessionId as Id<"reconciliationSessions">,
+  });
 
   if (!report) {
     return NextResponse.json({ error: "Report not found" }, { status: 404 });
