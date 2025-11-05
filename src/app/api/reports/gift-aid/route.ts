@@ -3,18 +3,17 @@ import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 import type { Id } from "@/lib/convexGenerated";
 import { api } from "@/lib/convexGenerated";
-import { convexServerClient } from "@/lib/convexServerClient";
-import { assertUserInChurch, requireSessionUser } from "@/lib/server-auth";
+import { assertUserInChurch, requireSessionContext } from "@/lib/server-auth";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const sessionResult = await requireSessionUser().catch((error: Error) => error);
+    const sessionResult = await requireSessionContext().catch((error: Error) => error);
     if (sessionResult instanceof Error) {
       const status = (sessionResult as { status?: number }).status ?? 500;
       return NextResponse.json({ error: sessionResult.message }, { status });
     }
-    const user = sessionResult;
+    const { user, client } = sessionResult;
 
     const { churchId, startDate, endDate } = body as {
       churchId?: string;
@@ -37,14 +36,11 @@ export async function POST(request: NextRequest) {
       assertUserInChurch(user, resolvedChurchId);
     }
 
-    const report = await convexServerClient.query(
-      api.reports.getGiftAidClaimReport,
-      {
-        churchId: resolvedChurchId,
-        startDate,
-        endDate,
-      }
-    );
+    const report = await client.query(api.reports.getGiftAidClaimReport, {
+      churchId: resolvedChurchId,
+      startDate,
+      endDate,
+    });
 
     const pdfDoc = await PDFDocument.create();
     const timesRomanFont = await pdfDoc.embedFont(StandardFonts.TimesRoman);

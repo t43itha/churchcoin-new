@@ -2,29 +2,28 @@ import { ConvexError, v } from "convex/values";
 
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 
 type AnyCtx = MutationCtx | QueryCtx;
 
 const requireActiveSession = async (
   ctx: AnyCtx,
-  sessionToken: string
 ) => {
-  const session = await ctx.db
-    .query("authSessions")
-    .withIndex("by_session_token", (q) => q.eq("sessionToken", sessionToken))
-    .first();
-
-  if (!session || session.expires < Date.now()) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity?.subject) {
     throw new ConvexError("Unauthorised");
   }
 
-  const user = await ctx.db.get(session.userId);
+  const user = await ctx.db
+    .query("users")
+    .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", identity.subject))
+    .first();
+
   if (!user) {
     throw new ConvexError("Unauthorised");
   }
 
-  return { session, user };
+  return { user: user as Doc<"users"> };
 };
 
 const assertReceiptOwnership = async (
@@ -45,9 +44,9 @@ const assertReceiptOwnership = async (
 };
 
 export const generateReceiptUploadUrl = mutation({
-  args: { sessionToken: v.string(), churchId: v.id("churches") },
+  args: { churchId: v.id("churches") },
   handler: async (ctx, args) => {
-    const { user } = await requireActiveSession(ctx, args.sessionToken);
+    const { user } = await requireActiveSession(ctx);
 
     if (user.churchId !== args.churchId) {
       throw new ConvexError("Forbidden");
@@ -59,12 +58,11 @@ export const generateReceiptUploadUrl = mutation({
 
 export const getReceiptUrl = query({
   args: {
-    sessionToken: v.string(),
     churchId: v.id("churches"),
     storageId: v.id("_storage"),
   },
   handler: async (ctx, args) => {
-    const { user } = await requireActiveSession(ctx, args.sessionToken);
+    const { user } = await requireActiveSession(ctx);
 
     if (user.churchId !== args.churchId) {
       throw new ConvexError("Forbidden");
@@ -78,12 +76,11 @@ export const getReceiptUrl = query({
 
 export const deleteReceipt = mutation({
   args: {
-    sessionToken: v.string(),
     churchId: v.id("churches"),
     storageId: v.id("_storage"),
   },
   handler: async (ctx, args) => {
-    const { user } = await requireActiveSession(ctx, args.sessionToken);
+    const { user } = await requireActiveSession(ctx);
 
     if (user.churchId !== args.churchId) {
       throw new ConvexError("Forbidden");

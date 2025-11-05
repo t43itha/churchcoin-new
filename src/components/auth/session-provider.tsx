@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useAuth, useClerk } from "@clerk/nextjs";
 
 import type { Doc } from "@/lib/convexGenerated";
 import { resolveUserRole } from "@/lib/rbac";
@@ -16,8 +17,12 @@ type SessionState = {
 
 const SessionContext = createContext<SessionState | undefined>(undefined);
 
-async function fetchSession() {
-  const response = await fetch("/api/auth/session", {
+async function fetchSession(inviteToken?: string | null) {
+  const url = new URL("/api/auth/session", window.location.origin);
+  if (inviteToken) {
+    url.searchParams.set("invite", inviteToken);
+  }
+  const response = await fetch(url.toString(), {
     method: "GET",
     credentials: "include",
   });
@@ -28,25 +33,33 @@ async function fetchSession() {
 
   return (await response.json()) as {
     user?: SessionUser;
-    session?: { expires: number } | null;
   };
 }
 
-async function requestLogout() {
-  await fetch("/api/auth/logout", {
-    method: "POST",
-    credentials: "include",
-  });
-}
-
 export function SessionProvider({ children }: { children: React.ReactNode }) {
+  const { isLoaded, isSignedIn } = useAuth();
+  const { signOut: clerkSignOut } = useClerk();
   const [user, setUser] = useState<SessionUser>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
+    if (!isLoaded) {
+      return;
+    }
+
+    if (!isSignedIn) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
-      const data = await fetchSession();
+      const inviteFromUrl =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("invite")
+          : null;
+      const data = await fetchSession(inviteFromUrl);
       const normalizedUser = data.user
         ? ({ ...data.user, role: resolveUserRole(data.user.role) } as SessionUser)
         : null;
@@ -57,27 +70,37 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
   const signOut = useCallback(async () => {
-    await requestLogout();
+    await clerkSignOut();
     setUser(null);
-  }, []);
+  }, [clerkSignOut]);
 
   useEffect(() => {
+    if (!isLoaded) {
+      return;
+    }
+
+    if (!isSignedIn) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     refresh().catch((error) => {
       console.error("Initial session load failed", error);
     });
-  }, [refresh]);
+  }, [isLoaded, isSignedIn, refresh]);
 
   const value = useMemo<SessionState>(
     () => ({
       user,
-      loading,
+      loading: loading || !isLoaded,
       refresh,
       signOut,
     }),
-    [user, loading, refresh, signOut]
+    [user, loading, isLoaded, refresh, signOut]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

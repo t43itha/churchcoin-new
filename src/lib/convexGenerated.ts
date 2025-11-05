@@ -30,8 +30,29 @@ type BaseAuthModule = BaseApi["auth"];
 
 type AugmentedAuthModule = Omit<
   BaseAuthModule,
-  "createInvitation" | "listInvitations" | "getInvitationByToken" | "revokeInvitation"
+  | "createInvitation"
+  | "listInvitations"
+  | "getInvitationByToken"
+  | "revokeInvitation"
 > & {
+  ensureUser: FunctionReference<
+    "mutation",
+    "public",
+    {
+      clerkUserId: string;
+      email?: string;
+      name?: string;
+      imageUrl?: string;
+      inviteToken?: string;
+    },
+    Doc<"users">
+  >;
+  getCurrentUser: FunctionReference<
+    "query",
+    "public",
+    {},
+    Doc<"users"> | null
+  >;
   createInvitation: FunctionReference<
     "mutation",
     "public",

@@ -301,9 +301,11 @@ export default defineSchema({
     isAnonymous: v.optional(v.boolean()),
     churchId: v.optional(v.id("churches")),
     role: userRoleValidator,
+    clerkUserId: v.optional(v.string()),
   })
     .index("by_email", ["email"])
-    .index("by_church", ["churchId"]),
+    .index("by_church", ["churchId"])
+    .index("by_clerk_user", ["clerkUserId"]),
 
   userInvites: defineTable({
     email: v.string(),
@@ -318,51 +320,12 @@ export default defineSchema({
     revokedAt: v.optional(v.number()),
   })
     .index("by_token", ["token"])
+    .index("by_email", ["email"])
     .index("by_email_church", ["email", "churchId"])
     .index("by_church", ["churchId"]),
 
-  // Auth sessions and accounts (for Convex Auth)
-  authSessions: defineTable({
-    userId: v.id("users"),
-    sessionToken: v.string(),
-    expires: v.number(),
-  })
-    .index("by_session_token", ["sessionToken"])
-    .index("by_user_id", ["userId"]),
-
-  authAccounts: defineTable({
-    userId: v.id("users"),
-    type: v.union(
-      v.literal("email"),
-      v.literal("phone"),
-      v.literal("oauth"),
-      v.literal("oidc"),
-      v.literal("webauthn")
-    ),
-    provider: v.string(),
-    providerAccountId: v.string(),
-    refresh_token: v.optional(v.string()),
-    access_token: v.optional(v.string()),
-    expires_at: v.optional(v.number()),
-    token_type: v.optional(v.string()),
-    scope: v.optional(v.string()),
-    id_token: v.optional(v.string()),
-    session_state: v.optional(v.string()),
-    secret: v.optional(v.string()),
-  })
-    .index("by_provider_and_account_id", [
-      "provider",
-      "providerAccountId",
-    ])
-    .index("by_user_id", ["userId"]),
-
-  authVerificationTokens: defineTable({
-    identifier: v.string(),
-    token: v.string(),
-    expires: v.number(),
-  })
-    .index("by_identifier", ["identifier"])
-    .index("by_token", ["token"]),
+  // Note: Authentication is now handled by Clerk
+  // Previous authSessions, authAccounts, and authVerificationTokens tables removed
 
   // AI Cache
   aiCache: defineTable({

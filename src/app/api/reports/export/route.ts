@@ -2,8 +2,8 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { NextResponse } from "next/server";
 
 import type { Id } from "@/lib/convexGenerated";
-import { api, convexServerClient } from "@/lib/convexServerClient";
-import { assertUserInChurch, requireSessionUser } from "@/lib/server-auth";
+import { api } from "@/lib/convexServerClient";
+import { assertUserInChurch, requireSessionContext } from "@/lib/server-auth";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -18,12 +18,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const sessionResult = await requireSessionUser().catch((error: Error) => error);
+  const sessionResult = await requireSessionContext().catch((error: Error) => error);
   if (sessionResult instanceof Error) {
     const status = (sessionResult as { status?: number }).status ?? 500;
     return NextResponse.json({ error: sessionResult.message }, { status });
   }
-  const user = sessionResult;
+  const { user, client } = sessionResult;
 
   const { type, churchId: rawChurchId, startDate, endDate } = body as {
     type: "fund-balance" | "income-expense";
@@ -52,10 +52,9 @@ export async function POST(request: Request) {
 
   if (type === "fund-balance") {
     reportTitle = "Fund balance summary";
-    const summary = await convexServerClient.query(
-      api.reports.getFundBalanceSummary,
-      { churchId: resolvedChurchId }
-    );
+    const summary = await client.query(api.reports.getFundBalanceSummary, {
+      churchId: resolvedChurchId,
+    });
 
     buildSections = async () => {
       const sections: string[] = [];
@@ -76,10 +75,11 @@ export async function POST(request: Request) {
     reportTitle = "Income & expenditure";
     const from = startDate ?? new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10);
     const to = endDate ?? new Date().toISOString().slice(0, 10);
-    const report = await convexServerClient.query(
-      api.reports.getIncomeExpenseReport,
-      { churchId: resolvedChurchId, startDate: from, endDate: to }
-    );
+    const report = await client.query(api.reports.getIncomeExpenseReport, {
+      churchId: resolvedChurchId,
+      startDate: from,
+      endDate: to,
+    });
 
     buildSections = async () => {
       const sections: string[] = [];

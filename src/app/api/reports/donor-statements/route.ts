@@ -12,8 +12,8 @@ import {
 } from "pdf-lib";
 
 import type { Id } from "@/lib/convexGenerated";
-import { api, convexServerClient } from "@/lib/convexServerClient";
-import { assertUserInChurch, requireSessionUser } from "@/lib/server-auth";
+import { api } from "@/lib/convexServerClient";
+import { assertUserInChurch, requireSessionContext } from "@/lib/server-auth";
 
 const currency = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -697,12 +697,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
-    const sessionResult = await requireSessionUser().catch((error: Error) => error);
+    const sessionResult = await requireSessionContext().catch((error: Error) => error);
     if (sessionResult instanceof Error) {
       const status = (sessionResult as { status?: number }).status ?? 500;
       return NextResponse.json({ error: sessionResult.message }, { status });
     }
-    const user = sessionResult;
+    const { user, client } = sessionResult;
 
     const { churchId, fromDate, toDate, fundType, donorIds } = body as {
       churchId?: string;
@@ -755,10 +755,7 @@ export async function POST(request: Request) {
       queryArgs.donorIds = donorIdList;
     }
 
-    const statements = await convexServerClient.query(
-      api.reports.getDonorStatementBatch,
-      queryArgs
-    );
+    const statements = await client.query(api.reports.getDonorStatementBatch, queryArgs);
 
     if (!statements || statements.length === 0) {
       return NextResponse.json(
