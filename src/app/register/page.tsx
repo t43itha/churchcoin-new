@@ -1,10 +1,10 @@
 "use client";
 
 import { SignUp } from "@clerk/nextjs";
-import { useMemo } from "react";
+import { useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function RegisterPage() {
+function RegisterContent() {
   const searchParams = useSearchParams();
   const redirect = searchParams?.get("redirect") ?? "/dashboard";
   const inviteToken = searchParams?.get("invite") ?? undefined;
@@ -26,12 +26,20 @@ export default function RegisterPage() {
   }, [redirect, inviteToken]);
 
   return (
+    <SignUp
+      routing="hash"
+      fallbackRedirectUrl={afterSignUpUrl}
+      signInUrl={signInUrl}
+    />
+  );
+}
+
+export default function RegisterPage() {
+  return (
     <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-12">
-      <SignUp
-        routing="hash"
-        fallbackRedirectUrl={afterSignUpUrl}
-        signInUrl={signInUrl}
-      />
+      <Suspense fallback={<div>Loading...</div>}>
+        <RegisterContent />
+      </Suspense>
     </div>
   );
 }
