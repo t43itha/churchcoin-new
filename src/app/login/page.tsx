@@ -9,7 +9,11 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-12">
-      <SignIn routing="path" path="/login" afterSignInUrl={redirect} />
+      <SignIn
+        routing="hash"
+        fallbackRedirectUrl={redirect}
+        signUpUrl="/register"
+      />
     </div>
   );
 }

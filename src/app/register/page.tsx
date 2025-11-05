@@ -27,7 +27,11 @@ export default function RegisterPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-12">
-      <SignUp routing="path" path="/register" afterSignUpUrl={afterSignUpUrl} signInUrl={signInUrl} />
+      <SignUp
+        routing="hash"
+        fallbackRedirectUrl={afterSignUpUrl}
+        signInUrl={signInUrl}
+      />
     </div>
   );
 }

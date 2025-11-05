@@ -1,13 +1,6 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono } from "next/font/google";
-import {
-  ClerkProvider,
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  SignUpButton,
-  UserButton,
-} from "@clerk/nextjs";
+import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { ConvexClientProvider } from "./providers/convex-provider";
 import { SessionProvider } from "@/components/auth/session-provider";
@@ -35,15 +28,6 @@ export default function RootLayout({
         <body className={`${jetbrainsMono.variable} font-primary antialiased`}>
           <ConvexClientProvider>
             <SessionProvider>
-              <div className="sr-only">
-                <SignedOut>
-                  <SignInButton />
-                  <SignUpButton />
-                </SignedOut>
-                <SignedIn>
-                  <UserButton />
-                </SignedIn>
-              </div>
               {children}
             </SessionProvider>
           </ConvexClientProvider>

@@ -373,8 +373,8 @@ export default function Home() {
                     <span className="font-primary text-grey-mid">Email support</span>
                   </li>
                 </ul>
-                <Button className="w-full font-primary" variant="outline">
-                  Start Free Trial
+                <Button className="w-full font-primary" variant="outline" asChild>
+                  <Link href="/register">Start Free Trial</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -420,8 +420,8 @@ export default function Home() {
                     <span className="font-primary text-grey-mid">Data export</span>
                   </li>
                 </ul>
-                <Button className="w-full bg-ink text-paper hover:bg-grey-dark font-primary">
-                  Start Free Trial
+                <Button className="w-full bg-ink text-paper hover:bg-grey-dark font-primary" asChild>
+                  <Link href="/register">Start Free Trial</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -462,8 +462,8 @@ export default function Home() {
                     <span className="font-primary text-grey-mid">Phone support</span>
                   </li>
                 </ul>
-                <Button className="w-full font-primary" variant="outline">
-                  Start Free Trial
+                <Button className="w-full font-primary" variant="outline" asChild>
+                  <Link href="/register">Start Free Trial</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -492,12 +492,16 @@ export default function Home() {
             Join 500+ UK churches saving 15 hours monthly while maximizing every pound for ministry.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="w-full sm:w-auto bg-paper text-ink hover:bg-paper/90 px-6 sm:px-8 py-5 text-base sm:text-lg font-semibold font-primary">
-              Start Free Trial
-              <ArrowRight className="ml-2 h-5 w-5" />
+            <Button size="lg" className="w-full sm:w-auto bg-paper text-ink hover:bg-paper/90 px-6 sm:px-8 py-5 text-base sm:text-lg font-semibold font-primary" asChild>
+              <Link href="/register">
+                Start Free Trial
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
             </Button>
-            <Button size="lg" variant="outline" className="w-full sm:w-auto border-paper text-paper hover:bg-paper/10 px-6 sm:px-8 py-5 text-base sm:text-lg font-semibold font-primary">
-              Book a Demo
+            <Button size="lg" variant="outline" className="w-full sm:w-auto border-paper text-paper hover:bg-paper/10 px-6 sm:px-8 py-5 text-base sm:text-lg font-semibold font-primary" asChild>
+              <Link href="/login">
+                Book a Demo
+              </Link>
             </Button>
           </div>
           <div className="mt-8 text-paper/70 space-y-1 font-primary">
