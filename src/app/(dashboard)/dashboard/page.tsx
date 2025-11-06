@@ -26,7 +26,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InsightsWidget } from "@/components/ai/insights-widget";
 import {
@@ -834,10 +833,7 @@ export default function DashboardPage() {
       <div className="flex-1 space-y-8 p-6 pb-32">
         <header className="space-y-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="space-y-2">
-              <Badge variant="outline" className="font-primary text-xs uppercase tracking-[0.2em]">
-                Finance &amp; Donor Health Dashboard
-              </Badge>
+            <div className="mt-2 space-y-2">
               <h1 className="text-3xl font-semibold text-ink">
                 Finance &amp; Donor Health Dashboard
               </h1>
