@@ -22,6 +22,18 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const disableClerk = process.env.NEXT_PUBLIC_CLERK_DISABLE === "1";
+
+  if (disableClerk) {
+    return (
+      <html lang="en">
+        <body className={`${jetbrainsMono.variable} font-primary antialiased`}>
+          {children}
+        </body>
+      </html>
+    );
+  }
+
   return (
     <ClerkProvider>
       <html lang="en">
