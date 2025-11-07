@@ -48,6 +48,7 @@ const transactionRowSchema = z.object({
   method: z.enum(["cash", "card", "cheque", "online", "bank-transfer"]),
   fundId: z.string().min(1, "Select a fund"),
   categoryId: z.string().optional(),
+  donorId: z.string().optional(),
   notes: z.string().optional(),
 }).refine(
   (row) => {
@@ -113,6 +114,7 @@ export function BulkTransactionDialog({
   churchId,
   funds,
   categories,
+  donors,
   onSubmit,
 }: BulkTransactionDialogProps) {
   const [submitting, setSubmitting] = useState(false);
@@ -136,6 +138,7 @@ export function BulkTransactionDialog({
           method: "cash",
           fundId: funds[0]?._id ?? "",
           categoryId: "",
+          donorId: "",
           notes: "",
         },
       ],
@@ -165,6 +168,7 @@ export function BulkTransactionDialog({
             method: "cash",
             fundId: funds[0]?._id ?? "",
             categoryId: "",
+            donorId: "",
             notes: "",
           },
         ],
@@ -241,6 +245,7 @@ export function BulkTransactionDialog({
       method: lastRow?.method ?? "cash",
       fundId: lastRow?.fundId ?? (funds[0]?._id ?? ""),
       categoryId: lastRow?.categoryId ?? "",
+      donorId: lastRow?.donorId ?? "",
       notes: "",
     });
   };
@@ -270,7 +275,7 @@ export function BulkTransactionDialog({
           type: "income",
           fundId: row.fundId as Id<"funds">,
           categoryId: row.categoryId ? (row.categoryId as Id<"categories">) : undefined,
-          donorId: undefined,
+          donorId: row.donorId ? (row.donorId as Id<"donors">) : undefined,
           method: row.method,
           giftAid: false,
           notes: row.notes?.trim() || undefined,
@@ -351,6 +356,9 @@ export function BulkTransactionDialog({
                       </th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-grey-dark">
                         Fund
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-grey-dark">
+                        Donor
                       </th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-grey-dark">
                         Category
@@ -436,6 +444,19 @@ export function BulkTransactionDialog({
                               {errors.rows[index]?.fundId?.message}
                             </p>
                           ) : null}
+                        </td>
+                        <td className="px-3 py-2">
+                          <select
+                            {...register(`rows.${index}.donorId`)}
+                            className="h-8 w-full min-w-[140px] rounded-md border border-ledger bg-paper px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-grey-mid"
+                          >
+                            <option value="">Anonymous</option>
+                            {donors.map((donor) => (
+                              <option key={donor._id} value={donor._id}>
+                                {donor.name}
+                              </option>
+                            ))}
+                          </select>
                         </td>
                         <td className="px-3 py-2">
                           <select
@@ -590,6 +611,25 @@ export function BulkTransactionDialog({
                         {errors.rows[index]?.fundId?.message}
                       </p>
                     ) : null}
+                  </div>
+
+                  {/* Donor */}
+                  <div className="space-y-2">
+                    <Label htmlFor={`mobile-donorId-${index}`} className="text-sm font-medium">
+                      Donor (Optional)
+                    </Label>
+                    <select
+                      id={`mobile-donorId-${index}`}
+                      {...register(`rows.${index}.donorId`)}
+                      className="h-11 w-full rounded-md border border-ledger bg-paper px-3 text-base text-ink focus:outline-none focus:ring-2 focus:ring-grey-mid"
+                    >
+                      <option value="">Anonymous</option>
+                      {donors.map((donor) => (
+                        <option key={donor._id} value={donor._id}>
+                          {donor.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Category */}
