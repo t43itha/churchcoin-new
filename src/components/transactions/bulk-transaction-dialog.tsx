@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useFieldArray } from "react-hook-form";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import { Plus, X } from "lucide-react";
 
@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { DonorSelect } from "@/components/transactions/donor-select";
 import type { Doc, Id } from "@/lib/convexGenerated";
 
 // Collection type options
@@ -48,6 +49,7 @@ const transactionRowSchema = z.object({
   method: z.enum(["cash", "card", "cheque", "online", "bank-transfer"]),
   fundId: z.string().min(1, "Select a fund"),
   categoryId: z.string().optional(),
+  donorId: z.string().optional(),
   notes: z.string().optional(),
 }).refine(
   (row) => {
@@ -113,6 +115,7 @@ export function BulkTransactionDialog({
   churchId,
   funds,
   categories,
+  donors,
   onSubmit,
 }: BulkTransactionDialogProps) {
   const [submitting, setSubmitting] = useState(false);
@@ -136,6 +139,7 @@ export function BulkTransactionDialog({
           method: "cash",
           fundId: funds[0]?._id ?? "",
           categoryId: "",
+          donorId: "",
           notes: "",
         },
       ],
@@ -165,6 +169,7 @@ export function BulkTransactionDialog({
             method: "cash",
             fundId: funds[0]?._id ?? "",
             categoryId: "",
+            donorId: "",
             notes: "",
           },
         ],
@@ -241,6 +246,7 @@ export function BulkTransactionDialog({
       method: lastRow?.method ?? "cash",
       fundId: lastRow?.fundId ?? (funds[0]?._id ?? ""),
       categoryId: lastRow?.categoryId ?? "",
+      donorId: lastRow?.donorId ?? "",
       notes: "",
     });
   };
@@ -270,7 +276,7 @@ export function BulkTransactionDialog({
           type: "income",
           fundId: row.fundId as Id<"funds">,
           categoryId: row.categoryId ? (row.categoryId as Id<"categories">) : undefined,
-          donorId: undefined,
+          donorId: row.donorId ? (row.donorId as Id<"donors">) : undefined,
           method: row.method,
           giftAid: false,
           notes: row.notes?.trim() || undefined,
@@ -351,6 +357,9 @@ export function BulkTransactionDialog({
                       </th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-grey-dark">
                         Fund
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-grey-dark">
+                        Donor
                       </th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-grey-dark">
                         Category
@@ -438,6 +447,25 @@ export function BulkTransactionDialog({
                           ) : null}
                         </td>
                         <td className="px-3 py-2">
+                          <Controller
+                            control={control}
+                            name={`rows.${index}.donorId`}
+                            render={({ field }) => (
+                              <DonorSelect
+                                donors={donors}
+                                value={field.value ?? ""}
+                                onChange={(next) => field.onChange(next)}
+                                onBlur={field.onBlur}
+                                placeholder="Anonymous"
+                                emptyLabel="Anonymous donor"
+                                variant="compact"
+                                className="w-full min-w-[160px]"
+                                id={`desktop-donor-${index}`}
+                              />
+                            )}
+                          />
+                        </td>
+                        <td className="px-3 py-2">
                           <select
                             {...register(`rows.${index}.categoryId`)}
                             className="h-8 w-full min-w-[120px] rounded-md border border-ledger bg-paper px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-grey-mid"
@@ -472,13 +500,31 @@ export function BulkTransactionDialog({
 
             {/* Mobile Card View (visible only on mobile) */}
             <div className="md:hidden space-y-6">
-              {fields.map((field, index) => (
-                <div key={field.id} className="rounded-lg border-2 border-ledger bg-paper p-5 space-y-4 shadow-sm">
-                  {/* Card Header with Row Number and Delete */}
-                  <div className="flex items-center justify-between pb-2 border-b border-ledger">
-                    <span className="text-sm font-semibold text-ink">
-                      Transaction {index + 1}
-                    </span>
+              {fields.map((field, index) => {
+                const cardRow = rows[index];
+                const donorName = cardRow?.donorId
+                  ? donors.find((donor) => donor._id === cardRow.donorId)?.name
+                  : null;
+                const fundName = cardRow?.fundId
+                  ? funds.find((fund) => fund._id === cardRow.fundId)?.name
+                  : null;
+                const methodLabel = METHOD_OPTIONS.find((option) => option.value === cardRow?.method)?.label;
+                const collectionLabel = cardRow?.collectionType
+                  ? (
+                      cardRow.collectionType === "other"
+                        ? cardRow.customDescription || "Other donation"
+                        : COLLECTION_TYPES.find((option) => option.value === cardRow.collectionType)?.label ||
+                          cardRow.collectionType
+                    )
+                  : "Collection type";
+
+                return (
+                  <div key={field.id} className="rounded-lg border-2 border-ledger bg-paper p-5 space-y-4 shadow-sm">
+                    {/* Card Header with Row Number and Delete */}
+                    <div className="flex items-center justify-between pb-2 border-b border-ledger">
+                      <span className="text-sm font-semibold text-ink">
+                        Transaction {index + 1}
+                      </span>
                     <Button
                       type="button"
                       variant="ghost"
@@ -490,6 +536,24 @@ export function BulkTransactionDialog({
                       <X className="h-4 w-4 mr-1" />
                       Remove
                     </Button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-grey-mid">
+                    <Badge variant="outline" className="border-ledger text-ink">
+                      {collectionLabel}
+                    </Badge>
+                    <Badge variant="outline" className="border-ledger bg-highlight/40 text-ink">
+                      {currency.format(Number(cardRow?.amount || 0))}
+                    </Badge>
+                    <Badge variant="outline" className="border-ledger text-ink">
+                      {methodLabel ?? "Select method"}
+                    </Badge>
+                    <Badge variant="outline" className="border-ledger text-ink">
+                      {fundName ?? "No fund"}
+                    </Badge>
+                    <Badge variant="outline" className="border-ledger text-ink">
+                      {donorName ?? "Anonymous"}
+                    </Badge>
                   </div>
 
                   {/* Collection Type */}
@@ -526,6 +590,30 @@ export function BulkTransactionDialog({
                         {errors.rows[index]?.customDescription?.message}
                       </p>
                     ) : null}
+                  </div>
+
+                  {/* Donor */}
+                  <div className="space-y-2">
+                    <Label htmlFor={`mobile-donorId-${index}`} className="text-sm font-medium">
+                      Donor (optional)
+                    </Label>
+                    <Controller
+                      control={control}
+                      name={`rows.${index}.donorId`}
+                      render={({ field }) => (
+                        <DonorSelect
+                          donors={donors}
+                          value={field.value ?? ""}
+                          onChange={(next) => field.onChange(next)}
+                          onBlur={field.onBlur}
+                          placeholder="Anonymous donor"
+                          emptyLabel="Anonymous donor"
+                          className="w-full"
+                          id={`mobile-donorId-${index}`}
+                        />
+                      )}
+                    />
+                    <p className="text-xs text-grey-mid">Leave as anonymous if no donor is linked.</p>
                   </div>
 
                   {/* Amount and Method in a grid */}
@@ -611,7 +699,8 @@ export function BulkTransactionDialog({
                     </select>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             <Button
