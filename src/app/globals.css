@@ -9,7 +9,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
-  /* ChurchCoin Ledger Colors */
+  /* ChurchCoin Ledger Colors - Sleek Edition */
   --color-ink: var(--ink);
   --color-paper: var(--paper);
   --color-ledger: var(--ledger);
@@ -19,11 +19,12 @@
   --color-success: var(--success);
   --color-error: var(--error);
   --color-highlight: var(--highlight);
+  --color-gold: var(--gold);
 
   /* Fonts */
-  --font-primary: 'JetBrains Mono', monospace;
-  --font-sans: 'JetBrains Mono', monospace;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-primary: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 
   /* Component mappings */
   --color-sidebar-ring: var(--sidebar-ring);
@@ -62,85 +63,87 @@
 }
 
 :root {
-  --radius: 0.375rem;
+  --radius: 0.5rem; /* Slightly more rounded for modern feel */
 
-  /* ChurchCoin Ledger Color Palette */
-  --ink: #000000;          /* Primary text */
-  --paper: #FAFAF8;        /* Background */
-  --ledger: #E8E8E6;       /* Ledger lines */
-  --grey-dark: #4A4A4A;    /* Headers and secondary text */
-  --grey-mid: #6B6B6B;     /* Muted text */
-  --grey-light: #F5F5F5;   /* Light backgrounds */
-  --success: #0A5F38;      /* Positive amounts */
-  --error: #8B0000;        /* Negative amounts */
-  --highlight: #F0F0EE;    /* Subtle selection */
+  /* ChurchCoin Sleek Ledger Palette */
+  --ink: #1A1A1A;          /* Softer Black */
+  --paper: #FAFAF9;        /* Stone-50ish, Warm Paper */
+  --ledger: #E7E5E4;       /* Stone-200, Warm Divider */
+  --grey-dark: #44403C;    /* Stone-700 */
+  --grey-mid: #78716C;     /* Stone-500 */
+  --grey-light: #F5F5F4;   /* Stone-100 */
+  --success: #15803D;      /* Green-700 */
+  --error: #B91C1C;        /* Red-700 */
+  --highlight: #F0FDFA;    /* Teal-50, subtle cool highlight */
+  --gold: #D97706;         /* Amber-600, Coin Gold */
 
   /* Core theme variables mapped to ChurchCoin palette */
   --background: var(--paper);
   --foreground: var(--ink);
-  --card: var(--paper);
+  --card: #FFFFFF;         /* Cards are pure white for lift */
   --card-foreground: var(--ink);
-  --popover: var(--paper);
+  --popover: #FFFFFF;
   --popover-foreground: var(--ink);
-  --primary: var(--grey-dark);
-  --primary-foreground: var(--paper);
-  --secondary: var(--ledger);
-  --secondary-foreground: var(--grey-dark);
-  --muted: var(--ledger);
+  --primary: var(--ink);
+  --primary-foreground: #FFFFFF;
+  --secondary: var(--grey-light);
+  --secondary-foreground: var(--ink);
+  --muted: var(--grey-light);
   --muted-foreground: var(--grey-mid);
   --accent: var(--highlight);
-  --accent-foreground: var(--grey-dark);
+  --accent-foreground: var(--ink);
   --destructive: var(--error);
-  --destructive-foreground: var(--paper);
+  --destructive-foreground: #FFFFFF;
   --border: var(--ledger);
-  --input: var(--paper);
+  --input: #FFFFFF;
   --ring: var(--grey-mid);
 
-  /* Chart colors using ChurchCoin palette */
+  /* Chart colors */
   --chart-1: var(--success);
-  --chart-2: var(--grey-mid);
+  --chart-2: var(--gold);
   --chart-3: var(--grey-dark);
   --chart-4: var(--highlight);
   --chart-5: var(--error);
 
-  /* Sidebar using ChurchCoin palette */
+  /* Sidebar */
   --sidebar: var(--paper);
   --sidebar-foreground: var(--ink);
-  --sidebar-primary: var(--grey-dark);
-  --sidebar-primary-foreground: var(--paper);
+  --sidebar-primary: var(--ink);
+  --sidebar-primary-foreground: #FFFFFF;
   --sidebar-accent: var(--ledger);
-  --sidebar-accent-foreground: var(--grey-dark);
+  --sidebar-accent-foreground: var(--ink);
   --sidebar-border: var(--ledger);
   --sidebar-ring: var(--grey-mid);
 }
 
 .dark {
-  /* Dark mode ChurchCoin palette (inverted ledger) */
-  --ink: #FAFAF8;          /* Light text on dark */
-  --paper: #1A1A1A;        /* Dark background */
-  --ledger: #333333;       /* Dark ledger lines */
-  --grey-dark: #E8E8E6;    /* Light headers */
-  --grey-mid: #999999;     /* Mid grey (unchanged) */
-  --grey-light: #666666;   /* Darker disabled */
-  --success: #4CAF50;      /* Brighter green for dark mode */
-  --error: #F44336;        /* Brighter red for dark mode */
-  --highlight: #2A2A2A;    /* Subtle dark highlight */
+  /* Dark Sleek Ledger */
+  --ink: #FAFAF9;          /* Warm White */
+  --paper: #0C0A09;        /* Stone-950, Deep Warm Black */
+  --ledger: #292524;       /* Stone-800 */
+  --grey-dark: #A8A29E;    /* Stone-400 */
+  --grey-mid: #78716C;     /* Stone-500 */
+  --grey-light: #1C1917;   /* Stone-900 */
+  --success: #4ADE80;      /* Green-400 */
+  --error: #F87171;        /* Red-400 */
+  --highlight: #134E4A;    /* Teal-900 */
+  --gold: #F59E0B;         /* Amber-500 */
 
   /* Update mappings for dark mode */
   --background: var(--paper);
   --foreground: var(--ink);
-  --card: var(--paper);
+  --card: #1C1917;         /* Stone-900 for cards */
   --card-foreground: var(--ink);
-  --popover: var(--paper);
+  --popover: #1C1917;
   --popover-foreground: var(--ink);
-  --primary: var(--grey-dark);
+  --primary: var(--ink);
   --primary-foreground: var(--paper);
   --secondary: var(--ledger);
-  --secondary-foreground: var(--grey-dark);
+  --secondary-foreground: var(--ink);
   --muted: var(--ledger);
   --muted-foreground: var(--grey-mid);
-  --accent: var(--highlight);
-  --accent-foreground: var(--grey-dark);
+  --accent: var(--ledger);
+  --accent-foreground: var(--ink);
   --destructive: var(--error);
   --destructive-foreground: var(--paper);
   --border: var(--ledger);
@@ -149,7 +152,7 @@
 
   /* Charts for dark mode */
   --chart-1: var(--success);
-  --chart-2: var(--grey-mid);
+  --chart-2: var(--gold);
   --chart-3: var(--grey-dark);
   --chart-4: var(--highlight);
   --chart-5: var(--error);
@@ -157,10 +160,10 @@
   /* Sidebar for dark mode */
   --sidebar: var(--paper);
   --sidebar-foreground: var(--ink);
-  --sidebar-primary: var(--grey-dark);
+  --sidebar-primary: var(--ink);
   --sidebar-primary-foreground: var(--paper);
   --sidebar-accent: var(--ledger);
-  --sidebar-accent-foreground: var(--grey-dark);
+  --sidebar-accent-foreground: var(--ink);
   --sidebar-border: var(--ledger);
   --sidebar-ring: var(--grey-mid);
 }

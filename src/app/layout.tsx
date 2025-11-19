@@ -1,14 +1,20 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono } from "next/font/google";
+import { JetBrains_Mono, Inter } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { ConvexClientProvider } from "./providers/convex-provider";
 import { SessionProvider } from "@/components/auth/session-provider";
 
 const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
+  variable: "--font-mono",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+});
+
+const inter = Inter({
+  variable: "--font-sans",
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -25,7 +31,7 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
-        <body className={`${jetbrainsMono.variable} font-primary antialiased`}>
+        <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
           <ConvexClientProvider>
             <SessionProvider>
               {children}

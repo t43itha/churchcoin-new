@@ -18,7 +18,12 @@
       "Bash(git push:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(npx npm list:*)",
+      "Bash(npm info:*)",
+      "WebSearch",
+      "WebFetch(domain:labs.convex.dev)",
+      "WebFetch(domain:docs.convex.dev)"
     ],
     "deny": [],
     "ask": []
