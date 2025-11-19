@@ -47,7 +47,7 @@ const navigationLinks = [
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-paper font-primary selection:bg-ink selection:text-paper">
+    <div className="min-h-screen bg-paper font-sans selection:bg-ink selection:text-paper">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-paper/80 backdrop-blur-md border-b border-ledger/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -202,19 +202,19 @@ export default function Home() {
                   </p>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-highlight p-4 rounded-xl">
-                      <p className="text-3xl font-bold text-ink mb-1">10m</p>
+                      <p className="text-3xl font-bold font-mono text-ink mb-1">10m</p>
                       <p className="text-sm text-grey-mid">Setup time</p>
                     </div>
                     <div className="bg-highlight p-4 rounded-xl">
-                      <p className="text-3xl font-bold text-ink mb-1">25%</p>
+                      <p className="text-3xl font-bold font-mono text-ink mb-1">25%</p>
                       <p className="text-sm text-grey-mid">More Gift Aid</p>
                     </div>
                     <div className="bg-highlight p-4 rounded-xl">
-                      <p className="text-3xl font-bold text-ink mb-1">100%</p>
+                      <p className="text-3xl font-bold font-mono text-ink mb-1">100%</p>
                       <p className="text-sm text-grey-mid">Compliant</p>
                     </div>
                     <div className="bg-highlight p-4 rounded-xl">
-                      <p className="text-3xl font-bold text-ink mb-1">0</p>
+                      <p className="text-3xl font-bold font-mono text-ink mb-1">0</p>
                       <p className="text-sm text-grey-mid">Spreadsheets</p>
                     </div>
                   </div>
@@ -383,19 +383,19 @@ export default function Home() {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center border-t border-ledger pt-12">
               <div>
-                <p className="text-4xl font-bold text-ink mb-1">500+</p>
+                <p className="text-4xl font-bold font-mono text-ink mb-1">500+</p>
                 <p className="text-grey-mid">Churches Onboarded</p>
               </div>
               <div>
-                <p className="text-4xl font-bold text-ink mb-1">£2.3M</p>
+                <p className="text-4xl font-bold font-mono text-ink mb-1">£2.3M</p>
                 <p className="text-grey-mid">Gift Aid Recovered</p>
               </div>
               <div>
-                <p className="text-4xl font-bold text-ink mb-1">7,500</p>
+                <p className="text-4xl font-bold font-mono text-ink mb-1">7,500</p>
                 <p className="text-grey-mid">Hours Saved Monthly</p>
               </div>
               <div>
-                <p className="text-4xl font-bold text-ink mb-1">99.9%</p>
+                <p className="text-4xl font-bold font-mono text-ink mb-1">99.9%</p>
                 <p className="text-grey-mid">Uptime Guaranteed</p>
               </div>
             </div>
@@ -418,7 +418,7 @@ export default function Home() {
               <div className="border border-ledger rounded-2xl p-8 hover:shadow-lg transition-shadow">
                 <h3 className="text-xl font-bold text-ink mb-2">Starter</h3>
                 <div className="mb-6">
-                  <span className="text-4xl font-bold text-ink">£29</span>
+                  <span className="text-4xl font-bold font-mono text-ink">£29</span>
                   <span className="text-grey-mid">/month</span>
                 </div>
                 <p className="text-grey-mid mb-6 text-sm">Perfect for small churches and plants</p>
@@ -447,7 +447,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-bold text-ink mb-2">Growing</h3>
                 <div className="mb-6">
-                  <span className="text-4xl font-bold text-ink">£59</span>
+                  <span className="text-4xl font-bold font-mono text-ink">£59</span>
                   <span className="text-grey-mid">/month</span>
                 </div>
                 <p className="text-grey-mid mb-6 text-sm">Perfect for established churches</p>
@@ -476,7 +476,7 @@ export default function Home() {
               <div className="border border-ledger rounded-2xl p-8 hover:shadow-lg transition-shadow">
                 <h3 className="text-xl font-bold text-ink mb-2">Thriving</h3>
                 <div className="mb-6">
-                  <span className="text-4xl font-bold text-ink">£99</span>
+                  <span className="text-4xl font-bold font-mono text-ink">£99</span>
                   <span className="text-grey-mid">/month</span>
                 </div>
                 <p className="text-grey-mid mb-6 text-sm">Perfect for large churches</p>
