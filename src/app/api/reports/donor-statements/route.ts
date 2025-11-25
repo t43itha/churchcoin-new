@@ -215,7 +215,6 @@ function drawBuildingHeader(
     x: titleX,
     y: height - margin + 12,
     size: 24,
-    size: 24,
     font: fonts.bold,
     color: palette.secondary,
   });
