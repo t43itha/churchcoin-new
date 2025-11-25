@@ -25,6 +25,7 @@ import type * as financialPeriods from "../financialPeriods.js";
 import type * as fundraising from "../fundraising.js";
 import type * as funds from "../funds.js";
 import type * as imports from "../imports.js";
+import type * as lib_errors from "../lib/errors.js";
 import type * as migrations_backfill_funds from "../migrations/backfill_funds.js";
 import type * as migrations_normalize_user_roles from "../migrations/normalize_user_roles.js";
 import type * as migrations from "../migrations.js";
@@ -33,6 +34,7 @@ import type * as reports from "../reports.js";
 import type * as roles from "../roles.js";
 import type * as seedCategories from "../seedCategories.js";
 import type * as transactions from "../transactions.js";
+import type * as validators from "../validators.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -55,6 +57,7 @@ declare const fullApi: ApiFromModules<{
   fundraising: typeof fundraising;
   funds: typeof funds;
   imports: typeof imports;
+  "lib/errors": typeof lib_errors;
   "migrations/backfill_funds": typeof migrations_backfill_funds;
   "migrations/normalize_user_roles": typeof migrations_normalize_user_roles;
   migrations: typeof migrations;
@@ -63,6 +66,7 @@ declare const fullApi: ApiFromModules<{
   roles: typeof roles;
   seedCategories: typeof seedCategories;
   transactions: typeof transactions;
+  validators: typeof validators;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,

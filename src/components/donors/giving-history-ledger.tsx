@@ -1,33 +1,17 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import type { Id } from "@/lib/convexGenerated";
+import { formatCurrency } from "@/lib/formats";
+import { formatUkDateWithMonth } from "@/lib/dates";
 import { cn } from "@/lib/utils";
-
-const currency = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "GBP",
-});
-
-const dateFormatter = new Intl.DateTimeFormat("en-GB", {
-  year: "numeric",
-  month: "short",
-  day: "2-digit",
-});
 
 /**
  * Safely format a date string, returning a fallback if invalid
  */
 function formatDateSafe(dateString: string): string {
-  if (!dateString || dateString.trim() === "") {
-    return "—";
-  }
-
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) {
-    return "—";
-  }
-
-  return dateFormatter.format(date);
+  const formatted = formatUkDateWithMonth(dateString);
+  return formatted || "—";
 }
 
 type HistoryEntry = {
@@ -43,7 +27,25 @@ type GivingHistoryLedgerProps = {
   className?: string;
 };
 
-export function GivingHistoryLedger({ history, className }: GivingHistoryLedgerProps) {
+/**
+ * Giving history ledger component - memoized for performance.
+ * Displays a table of donor giving history with totals.
+ */
+export const GivingHistoryLedger = memo(function GivingHistoryLedger({ history, className }: GivingHistoryLedgerProps) {
+  // Memoize totals calculation to avoid recalculating on every render
+  const totals = useMemo(() => {
+    return history.reduce(
+      (acc, entry) => {
+        acc.amount += entry.amount;
+        if (entry.giftAidEligible) {
+          acc.giftAid += entry.amount;
+        }
+        return acc;
+      },
+      { amount: 0, giftAid: 0 }
+    );
+  }, [history]);
+
   if (!history.length) {
     return (
       <div className={cn("rounded-lg border border-ledger bg-paper px-4 py-6 text-sm text-grey-mid", className)}>
@@ -51,17 +53,6 @@ export function GivingHistoryLedger({ history, className }: GivingHistoryLedgerP
       </div>
     );
   }
-
-  const totals = history.reduce(
-    (acc, entry) => {
-      acc.amount += entry.amount;
-      if (entry.giftAidEligible) {
-        acc.giftAid += entry.amount;
-      }
-      return acc;
-    },
-    { amount: 0, giftAid: 0 },
-  );
 
   return (
     <div className={cn("overflow-hidden rounded-lg border border-ledger bg-paper", className)}>
@@ -82,7 +73,7 @@ export function GivingHistoryLedger({ history, className }: GivingHistoryLedgerP
               </td>
               <td className="px-4 py-3 text-sm">{entry.fundName ?? "—"}</td>
               <td className="px-4 py-3 text-right font-medium text-success">
-                {currency.format(entry.amount)}
+                {formatCurrency(entry.amount)}
               </td>
               <td className="px-4 py-3 text-center text-sm">
                 {entry.giftAidEligible ? "✓" : "—"}
@@ -95,11 +86,11 @@ export function GivingHistoryLedger({ history, className }: GivingHistoryLedgerP
             <td className="px-4 py-3" colSpan={2}>
               Totals
             </td>
-            <td className="px-4 py-3 text-right">{currency.format(totals.amount)}</td>
-            <td className="px-4 py-3 text-center">{currency.format(totals.giftAid)}</td>
+            <td className="px-4 py-3 text-right">{formatCurrency(totals.amount)}</td>
+            <td className="px-4 py-3 text-center">{formatCurrency(totals.giftAid)}</td>
           </tr>
         </tfoot>
       </table>
     </div>
   );
-}
+});

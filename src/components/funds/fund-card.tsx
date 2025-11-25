@@ -1,9 +1,11 @@
 "use client";
 
+import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatUkDateNumeric } from "@/lib/dates";
+import { formatCurrency } from "@/lib/formats";
 import { cn } from "@/lib/utils";
 
 const typeLabels: Record<string, { label: string; description: string; tone: string }> = {
@@ -23,12 +25,6 @@ const typeLabels: Record<string, { label: string; description: string; tone: str
     tone: "bg-paper border border-ledger text-grey-dark",
   },
 };
-
-const currency = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "GBP",
-  minimumFractionDigits: 2,
-});
 
 export type FundCardSummary = {
   id: string;
@@ -54,7 +50,11 @@ type FundCardProps = {
   onEdit?: () => void;
 };
 
-export function FundCard({ fund, onSelect, onEdit }: FundCardProps) {
+/**
+ * Fund card component - memoized to prevent unnecessary re-renders.
+ * Only re-renders when fund data or callback references change.
+ */
+export const FundCard = memo(function FundCard({ fund, onSelect, onEdit }: FundCardProps) {
   const type = typeLabels[fund.type];
   const hasFundraising = fund.isFundraising;
   const target = fund.fundraisingTarget;
@@ -100,22 +100,22 @@ export function FundCard({ fund, onSelect, onEdit }: FundCardProps) {
           <div>
             <p className="text-sm text-grey-mid">Current Balance</p>
             <p className="text-2xl font-semibold text-ink">
-              {currency.format(fund.balance)}
+              {formatCurrency(fund.balance)}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-success">+{currency.format(fund.incomeTotal)}</p>
-            <p className="text-sm text-error">-{currency.format(fund.expenseTotal)}</p>
+            <p className="text-sm text-success">+{formatCurrency(fund.incomeTotal)}</p>
+            <p className="text-sm text-error">-{formatCurrency(fund.expenseTotal)}</p>
           </div>
         </div>
         {hasFundraising ? (
           <div className="space-y-2 rounded-md border border-ledger bg-paper px-3 py-3">
             <div className="flex items-center justify-between text-xs text-grey-mid">
-              <span>Target {target ? currency.format(target) : "Not set"}</span>
+              <span>Target {target ? formatCurrency(target) : "Not set"}</span>
               <span>
                 {progress !== null
                   ? `${Math.round(progress * 100)}% raised`
-                  : `${currency.format(raised)} raised`}
+                  : `${formatCurrency(raised)} raised`}
               </span>
             </div>
             <div className="h-2 w-full rounded-full bg-ledger">
@@ -125,15 +125,15 @@ export function FundCard({ fund, onSelect, onEdit }: FundCardProps) {
               />
             </div>
             <div className="flex items-center justify-between text-xs text-grey-mid">
-              <span>{currency.format(raised)} raised</span>
+              <span>{formatCurrency(raised)} raised</span>
               <span>
                 {fund.supporterCount} supporter{fund.supporterCount === 1 ? "" : "s"}
               </span>
             </div>
             <div className="text-xs text-grey-mid">
-              {pledged > raised ? `${currency.format(pledged)} pledged` : null}
+              {pledged > raised ? `${formatCurrency(pledged)} pledged` : null}
               {outstanding !== null ? (
-                <span className="ml-2">{currency.format(outstanding)} to target</span>
+                <span className="ml-2">{formatCurrency(outstanding)} to target</span>
               ) : null}
             </div>
           </div>
@@ -171,4 +171,4 @@ export function FundCard({ fund, onSelect, onEdit }: FundCardProps) {
       ) : null}
     </Card>
   );
-}
+});
