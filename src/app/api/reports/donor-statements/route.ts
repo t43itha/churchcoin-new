@@ -32,6 +32,17 @@ const buildingPalette = {
   muted: rgb(0.45, 0.45, 0.45),
 };
 
+const tithePalette = {
+  background: rgb(1, 1, 1),
+  primary: rgb(0.2, 0.3, 0.5), // Slate Blue
+  secondary: rgb(0.1, 0.15, 0.25), // Darker Slate
+  accent: rgb(0.96, 0.97, 0.99), // Very light blue/gray
+  text: rgb(0.15, 0.15, 0.18),
+  muted: rgb(0.5, 0.5, 0.55),
+};
+
+type Palette = typeof buildingPalette;
+
 type DonorStatement = {
   donor: {
     name: string;
@@ -70,6 +81,9 @@ type BuildingRenderContext = {
   fromDate: string;
   toDate: string;
   pdfDoc: PDFDocument;
+  title: string;
+  footerText: string;
+  palette: Palette;
 };
 
 type BuildingTableContext = BuildingRenderContext & { page: PDFPage };
@@ -151,6 +165,9 @@ function drawBuildingHeader(
   toDate: string,
   logo: PDFImage | undefined,
   pageNumber: number,
+  title: string,
+  footerText: string,
+  palette: Palette,
   options: BuildingPageOptions
 ) {
   const { continued } = options;
@@ -163,7 +180,7 @@ function drawBuildingHeader(
     y: 0,
     width,
     height,
-    color: buildingPalette.background,
+    color: palette.background,
   });
 
   page.drawRectangle({
@@ -179,7 +196,7 @@ function drawBuildingHeader(
     y: height - 14,
     width,
     height: 14,
-    color: buildingPalette.primary,
+    color: palette.primary,
   });
 
   let titleX = margin;
@@ -194,12 +211,13 @@ function drawBuildingHeader(
     titleX += scaled.width + 20;
   }
 
-  page.drawText("Building Fund Statement", {
+  page.drawText(title, {
     x: titleX,
     y: height - margin + 12,
     size: 24,
+    size: 24,
     font: fonts.bold,
-    color: buildingPalette.secondary,
+    color: palette.secondary,
   });
 
   page.drawText(statement.donor.name, {
@@ -207,7 +225,7 @@ function drawBuildingHeader(
     y: height - margin - 14,
     size: 12,
     font: fonts.regular,
-    color: buildingPalette.secondary,
+    color: palette.secondary,
   });
 
   const formattedFrom = formatDateForPdf(fromDate);
@@ -218,7 +236,7 @@ function drawBuildingHeader(
     y: height - margin - 32,
     size: 11,
     font: fonts.regular,
-    color: buildingPalette.muted,
+    color: palette.muted,
   });
 
   page.drawText(`Page ${pageNumber}`, {
@@ -229,7 +247,7 @@ function drawBuildingHeader(
     y: height - margin - 32,
     size: 10,
     font: fonts.regular,
-    color: buildingPalette.muted,
+    color: palette.muted,
   });
 
   if (continued) {
@@ -238,7 +256,7 @@ function drawBuildingHeader(
       y: height - margin - 48,
       size: 11,
       font: fonts.regular,
-      color: buildingPalette.secondary,
+      color: palette.secondary,
     });
   }
 
@@ -246,15 +264,15 @@ function drawBuildingHeader(
     start: { x: margin, y: margin + 24 },
     end: { x: width - margin, y: margin + 24 },
     thickness: 1,
-    color: buildingPalette.primary,
+    color: palette.primary,
   });
 
-  page.drawText("Thank you for investing in the Legacy Building Project vision.", {
+  page.drawText(footerText, {
     x: margin,
     y: margin + 10,
     size: 10,
     font: fonts.regular,
-    color: buildingPalette.muted,
+    color: palette.muted,
   });
 }
 
@@ -264,6 +282,7 @@ function drawSummarySection(
   statement: DonorStatement,
   fromDate: string,
   toDate: string,
+  palette: Palette,
   startY: number
 ) {
   const { width } = page.getSize();
@@ -281,8 +300,8 @@ function drawSummarySection(
     y: cardY,
     width: width - margin * 2,
     height: cardHeight,
-    color: buildingPalette.accent,
-    borderColor: buildingPalette.primary,
+    color: palette.accent,
+    borderColor: palette.primary,
     borderWidth: 1.2,
   });
 
@@ -291,7 +310,7 @@ function drawSummarySection(
     y: cardY + cardHeight - 26,
     size: 13,
     font: fonts.bold,
-    color: buildingPalette.secondary,
+    color: palette.secondary,
   });
 
   const baseY = cardY + cardHeight - 60;
@@ -344,7 +363,7 @@ function drawSummarySection(
         y: rowY + 14,
         size: 10,
         font: fonts.regular,
-        color: buildingPalette.muted,
+        color: palette.muted,
       });
 
       page.drawText(item.value, {
@@ -352,7 +371,7 @@ function drawSummarySection(
         y: rowY,
         size: 14,
         font: fonts.bold,
-        color: buildingPalette.secondary,
+        color: palette.secondary,
       });
     });
   });
@@ -364,6 +383,7 @@ function drawSectionHeading(
   page: PDFPage,
   fonts: { regular: PDFFont; bold: PDFFont },
   title: string,
+  palette: Palette,
   y: number
 ) {
   const { width } = page.getSize();
@@ -375,14 +395,14 @@ function drawSectionHeading(
     y: headingY,
     size: 12,
     font: fonts.bold,
-    color: buildingPalette.secondary,
+    color: palette.secondary,
   });
 
   page.drawLine({
     start: { x: margin, y: headingY - 6 },
     end: { x: width - margin, y: headingY - 6 },
     thickness: 1,
-    color: buildingPalette.primary,
+    color: palette.primary,
   });
 
   return headingY - 20;
@@ -392,9 +412,10 @@ function drawDonorDetails(
   page: PDFPage,
   fonts: { regular: PDFFont; bold: PDFFont },
   statement: DonorStatement,
+  palette: Palette,
   startY: number
 ) {
-  let y = drawSectionHeading(page, fonts, "Donor Details", startY);
+  let y = drawSectionHeading(page, fonts, "Donor Details", palette, startY);
   const { width } = page.getSize();
   const margin = 56;
   const contentWidth = width - margin * 2;
@@ -405,7 +426,7 @@ function drawDonorDetails(
     y,
     size: fontSize,
     font: fonts.bold,
-    color: buildingPalette.text,
+    color: palette.text,
   });
 
   y -= 14;
@@ -424,7 +445,7 @@ function drawDonorDetails(
         y,
         size: fontSize,
         font: fonts.regular,
-        color: buildingPalette.text,
+        color: palette.text,
       });
       y -= 12;
     }
@@ -436,7 +457,7 @@ function drawDonorDetails(
       y,
       size: fontSize,
       font: fonts.regular,
-      color: buildingPalette.text,
+      color: palette.text,
     });
     y -= 14;
   }
@@ -450,7 +471,7 @@ function drawDonorDetails(
     y,
     size: fontSize,
     font: fonts.regular,
-    color: buildingPalette.muted,
+    color: palette.muted,
   });
 
   return y - 24;
@@ -460,7 +481,7 @@ function drawTransactionsTable(
   context: BuildingTableContext,
   startY: number
 ) {
-  const { pdfDoc, fonts, statement } = context;
+  const { pdfDoc, fonts, statement, palette } = context;
   let { page } = context;
   let y = startY;
   let pageNumber = 1;
@@ -499,6 +520,9 @@ function drawTransactionsTable(
         context.toDate,
         context.logo,
         pageNumber,
+        context.title,
+        context.footerText,
+        context.palette,
         { continued: true }
       );
       y = page.getSize().height - 136 - 40;
@@ -517,7 +541,7 @@ function drawTransactionsTable(
       y: y - headerHeight,
       width: tableWidth,
       height: headerHeight,
-      color: buildingPalette.secondary,
+      color: palette.secondary,
     });
 
     const headerY = y - 20;
@@ -573,7 +597,7 @@ function drawTransactionsTable(
       y,
       size: 11,
       font: fonts.regular,
-      color: buildingPalette.muted,
+      color: palette.muted,
     });
     return;
   }
@@ -605,7 +629,7 @@ function drawTransactionsTable(
       y: rowY + rowHeight - 16,
       size: 10,
       font: fonts.regular,
-      color: buildingPalette.text,
+      color: palette.text,
     });
 
     let textY = rowY + rowHeight - 16;
@@ -615,7 +639,7 @@ function drawTransactionsTable(
         y: textY,
         size: 10,
         font: fonts.regular,
-        color: buildingPalette.text,
+        color: palette.text,
       });
       textY -= 12;
     }
@@ -634,7 +658,7 @@ function drawTransactionsTable(
       y: rowY + rowHeight - 16,
       size: 10,
       font: fonts.bold,
-      color: buildingPalette.secondary,
+      color: palette.secondary,
     });
 
     const giftAidText = txn.giftAid ? "Yes" : "No";
@@ -651,7 +675,7 @@ function drawTransactionsTable(
       y: rowY + rowHeight - 16,
       size: 10,
       font: fonts.regular,
-      color: buildingPalette.text,
+      color: palette.text,
     });
 
     y = rowY - 8;
@@ -661,7 +685,7 @@ function drawTransactionsTable(
 function renderBuildingFundStatement(
   context: BuildingRenderContext
 ) {
-  const { pdfDoc, fonts, statement, fromDate, toDate, logo } = context;
+  const { pdfDoc, fonts, statement, fromDate, toDate, logo, title, footerText, palette } = context;
   const pageNumber = 1;
   const page = pdfDoc.addPage(pageSize);
 
@@ -673,13 +697,16 @@ function renderBuildingFundStatement(
     toDate,
     logo,
     pageNumber,
+    title,
+    footerText,
+    palette,
     { continued: false }
   );
 
   let y = page.getSize().height - 136 - 40;
-  y = drawSummarySection(page, fonts, statement, fromDate, toDate, y);
+  y = drawSummarySection(page, fonts, statement, fromDate, toDate, palette, y);
 
-  y = drawDonorDetails(page, fonts, statement, y);
+  y = drawDonorDetails(page, fonts, statement, palette, y);
 
   const tableContext: BuildingTableContext = {
     ...context,
@@ -768,16 +795,17 @@ export async function POST(request: Request) {
     const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    const fundTypeLabel = fundType === "general" ? "Tithes" 
-      : fundType === "restricted" ? "Building Fund" 
-      : fundType === "designated" ? "Designated Funds"
-      : "All Donations";
+    const fundTypeLabel = fundType === "general" ? "Tithes"
+      : fundType === "restricted" ? "Building Fund"
+        : fundType === "designated" ? "Designated Funds"
+          : "All Donations";
 
     let logoImage: PDFImage | undefined;
+    const publicDir = process.env.VERCEL
+      ? join(process.cwd(), "public")
+      : join(process.cwd(), "public");
+
     if (fundTypeLabel === "Building Fund") {
-      const publicDir = process.env.VERCEL
-        ? join(process.cwd(), "public")
-        : join(process.cwd(), "public");
       const logoFiles = [
         "legacy logo.jpg",
         "legacy-logo.jpg",
@@ -805,151 +833,46 @@ export async function POST(request: Request) {
           // try next file name
         }
       }
-      if (!logoImage) {
-        console.warn("Building fund logo could not be embedded from known filenames");
+    } else {
+      // Try loading the tithe logo for other statement types
+      try {
+        const logoPath = join(publicDir, "tithe_logo.png");
+        const logoBytes = await readFile(logoPath);
+        try {
+          logoImage = await pdfDoc.embedPng(logoBytes);
+        } catch {
+          try {
+            logoImage = await pdfDoc.embedJpg(logoBytes);
+          } catch {
+            // ignore
+          }
+        }
+      } catch {
+        // ignore
       }
     }
 
     for (const statement of statements) {
       const statementPayload = statement as DonorStatement;
 
-      if (fundTypeLabel === "Building Fund") {
-        renderBuildingFundStatement({
-          pdfDoc,
-          fonts: { regular: helvetica, bold: helveticaBold },
-          statement: statementPayload,
-          fromDate,
-          toDate,
-          logo: logoImage,
-        });
-        continue;
-      }
+      const title = fundTypeLabel === "Building Fund" ? "Building Fund Statement" : `${fundTypeLabel} Statement`;
+      const footerText = fundTypeLabel === "Building Fund"
+        ? "Thank you for investing in the Legacy Building Project vision."
+        : "Thank you for your faithful giving.";
 
-      const page = pdfDoc.addPage(pageSize);
-      const { width, height } = page.getSize();
-      const margin = 50;
-      let yPosition = height - margin;
+      const palette = fundTypeLabel === "Building Fund" ? buildingPalette : tithePalette;
 
-      const donor = statementPayload.donor;
-
-      page.drawText(`${fundTypeLabel} Statement`, {
-        x: width / 2 - 100,
-        y: yPosition,
-        size: 20,
-        font: helveticaBold,
-        color: rgb(0, 0, 0),
+      renderBuildingFundStatement({
+        pdfDoc,
+        fonts: { regular: helvetica, bold: helveticaBold },
+        statement: statementPayload,
+        fromDate,
+        toDate,
+        logo: logoImage,
+        title,
+        footerText,
+        palette
       });
-
-      yPosition -= 30;
-      page.drawText(donor.name, {
-        x: width / 2 - 80,
-        y: yPosition,
-        size: 16,
-        font: helvetica,
-        color: rgb(0, 0, 0),
-      });
-
-      yPosition -= 40;
-      const formattedFromDate = formatDateForPdf(fromDate);
-      const formattedToDate = formatDateForPdf(toDate);
-
-      page.drawText(`Period: ${formattedFromDate} to ${formattedToDate}`, {
-        x: margin,
-        y: yPosition,
-        size: 12,
-        font: helvetica,
-        color: rgb(0.3, 0.3, 0.3),
-      });
-
-      if (donor.address) {
-        yPosition -= 20;
-        page.drawText(donor.address.substring(0, 80), {
-          x: margin,
-          y: yPosition,
-          size: 10,
-          font: helvetica,
-          color: rgb(0.3, 0.3, 0.3),
-        });
-      }
-
-      yPosition -= 40;
-      page.drawText(`Total ${fundTypeLabel}: ${currency.format(statementPayload.total)}`, {
-        x: margin,
-        y: yPosition,
-        size: 14,
-        font: helveticaBold,
-        color: rgb(0, 0, 0),
-      });
-
-      yPosition -= 30;
-      page.drawText("Transactions", {
-        x: margin,
-        y: yPosition,
-        size: 14,
-        font: helveticaBold,
-        color: rgb(0, 0, 0),
-      });
-
-      yPosition -= 5;
-      page.drawLine({
-        start: { x: margin, y: yPosition },
-        end: { x: width - margin, y: yPosition },
-        thickness: 1,
-        color: rgb(0.8, 0.8, 0.8),
-      });
-
-      yPosition -= 25;
-
-      if (statementPayload.transactions.length === 0) {
-        page.drawText("No transactions recorded in this period.", {
-          x: margin,
-          y: yPosition,
-          size: 11,
-          font: helvetica,
-          color: rgb(0.5, 0.5, 0.5),
-        });
-      } else {
-        for (const txn of statementPayload.transactions) {
-          if (yPosition < margin + 80) {
-            break;
-          }
-
-          page.drawText(`${formatDateForPdf(txn.date)} - ${txn.description.substring(0, 50)}`, {
-            x: margin,
-            y: yPosition,
-            size: 11,
-            font: helvetica,
-            color: rgb(0, 0, 0),
-          });
-
-          yPosition -= 15;
-          const details = `${txn.fundName ?? "Unknown"} · ${currency.format(txn.amount)} · Gift Aid: ${
-            txn.giftAid ? "Yes" : "No"
-          }`;
-          page.drawText(details, {
-            x: margin + 10,
-            y: yPosition,
-            size: 9,
-            font: helvetica,
-            color: rgb(0.4, 0.4, 0.4),
-          });
-
-          yPosition -= 20;
-        }
-      }
-
-      if (donor.giftAidDeclaration?.signed) {
-        yPosition -= 30;
-        if (yPosition > margin + 40) {
-          page.drawText("Gift Aid Declaration: Valid", {
-            x: margin,
-            y: margin + 20,
-            size: 9,
-            font: helvetica,
-            color: rgb(0, 0.5, 0),
-          });
-        }
-      }
     }
 
     const pdfBytes = await pdfDoc.save();
