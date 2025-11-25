@@ -23,7 +23,8 @@
       "Bash(npm info:*)",
       "WebSearch",
       "WebFetch(domain:labs.convex.dev)",
-      "WebFetch(domain:docs.convex.dev)"
+      "WebFetch(domain:docs.convex.dev)",
+      "mcp__filesystem__directory_tree"
     ],
     "deny": [],
     "ask": []

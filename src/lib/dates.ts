@@ -108,3 +108,102 @@ export const formatUkDateTime = (
 
   return new Intl.DateTimeFormat("en-GB", options).format(date);
 };
+
+/**
+ * Format date in long UK format: "25 November 2025"
+ */
+export const formatUkDateLong = (value: DateInput): string => {
+  const date = parseDateInput(value);
+  if (!date) {
+    return "";
+  }
+
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+};
+
+/**
+ * Format relative time: "2 hours ago", "Yesterday", etc.
+ */
+export const formatRelativeTime = (value: DateInput): string => {
+  const date = parseDateInput(value);
+  if (!date) {
+    return "";
+  }
+
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSeconds = Math.floor(diffMs / 1000);
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffSeconds < 60) {
+    return "Just now";
+  }
+
+  if (diffMinutes < 60) {
+    return diffMinutes === 1 ? "1 minute ago" : `${diffMinutes} minutes ago`;
+  }
+
+  if (diffHours < 24) {
+    return diffHours === 1 ? "1 hour ago" : `${diffHours} hours ago`;
+  }
+
+  if (diffDays === 1) {
+    return "Yesterday";
+  }
+
+  if (diffDays < 7) {
+    return `${diffDays} days ago`;
+  }
+
+  if (diffDays < 30) {
+    const weeks = Math.floor(diffDays / 7);
+    return weeks === 1 ? "1 week ago" : `${weeks} weeks ago`;
+  }
+
+  return formatUkDate(date);
+};
+
+/**
+ * Format date as ISO date string (YYYY-MM-DD)
+ */
+export const formatIsoDate = (value: DateInput): string => {
+  const date = parseDateInput(value);
+  if (!date) {
+    return "";
+  }
+
+  const year = date.getUTCFullYear();
+  const month = pad(date.getUTCMonth() + 1);
+  const day = pad(date.getUTCDate());
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Get the start of a given day (midnight)
+ */
+export const startOfDay = (value: DateInput): Date | null => {
+  const date = parseDateInput(value);
+  if (!date) {
+    return null;
+  }
+
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+};
+
+/**
+ * Get the end of a given day (23:59:59.999)
+ */
+export const endOfDay = (value: DateInput): Date | null => {
+  const date = parseDateInput(value);
+  if (!date) {
+    return null;
+  }
+
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+};

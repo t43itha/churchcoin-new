@@ -1,18 +1,43 @@
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
+import { fundTypeValidator } from "./validators";
+import { assertExists } from "./lib/errors";
 
-// Get all funds for a church
+// Get all funds for a church (with optional limit for performance)
 export const getFunds = query({
-  args: { churchId: v.id("churches") },
+  args: {
+    churchId: v.id("churches"),
+    limit: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
+    const limit = args.limit ?? 100; // Sensible default
     const funds = await ctx.db
       .query("funds")
       .withIndex("by_church", (q) => q.eq("churchId", args.churchId))
       .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+      .take(limit);
 
     return funds;
+  },
+});
+
+/**
+ * Get funds with pagination support for large datasets.
+ * Returns paginated results with continuation cursor.
+ */
+export const getFundsPaginated = query({
+  args: {
+    churchId: v.id("churches"),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("funds")
+      .withIndex("by_church", (q) => q.eq("churchId", args.churchId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .paginate(args.paginationOpts);
   },
 });
 
@@ -64,9 +89,7 @@ export const updateFund = mutation({
   args: {
     fundId: v.id("funds"),
     name: v.optional(v.string()),
-    type: v.optional(
-      v.union(v.literal("general"), v.literal("restricted"), v.literal("designated"))
-    ),
+    type: v.optional(fundTypeValidator),
     description: v.optional(v.union(v.string(), v.null())),
     restrictions: v.optional(v.union(v.string(), v.null())),
     isFundraising: v.optional(v.boolean()),
@@ -75,9 +98,7 @@ export const updateFund = mutation({
   handler: async (ctx, args) => {
     const { fundId, ...updates } = args;
     const fund = await ctx.db.get(fundId);
-    if (!fund) {
-      throw new Error("Fund not found");
-    }
+    assertExists(fund, "Fund");
 
     const patch: Partial<Doc<"funds">> = {};
 
@@ -126,9 +147,7 @@ export const updateFundBalance = mutation({
   },
   handler: async (ctx, args) => {
     const fund = await ctx.db.get(args.fundId);
-    if (!fund) {
-      throw new Error("Fund not found");
-    }
+    assertExists(fund, "Fund");
 
     const newBalance = fund.balance + args.amount;
 
