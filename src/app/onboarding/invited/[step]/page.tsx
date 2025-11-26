@@ -62,7 +62,8 @@ function InvitedStepContent({ stepNumber }: { stepNumber: number }) {
     }
   }, [inviteValidation, router]);
 
-  if (isLoading || inviteValidation === undefined) {
+  // Wait for context to load, and for invite validation only if we have a token
+  if (isLoading || (inviteToken && inviteValidation === undefined)) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-ledger border-t-ink" />
