@@ -29,6 +29,7 @@ import type * as lib_errors from "../lib/errors.js";
 import type * as migrations_backfill_funds from "../migrations/backfill_funds.js";
 import type * as migrations_normalize_user_roles from "../migrations/normalize_user_roles.js";
 import type * as migrations from "../migrations.js";
+import type * as onboarding from "../onboarding.js";
 import type * as reconciliation from "../reconciliation.js";
 import type * as reports from "../reports.js";
 import type * as roles from "../roles.js";
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/backfill_funds": typeof migrations_backfill_funds;
   "migrations/normalize_user_roles": typeof migrations_normalize_user_roles;
   migrations: typeof migrations;
+  onboarding: typeof onboarding;
   reconciliation: typeof reconciliation;
   reports: typeof reports;
   roles: typeof roles;

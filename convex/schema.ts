@@ -302,6 +302,15 @@ export default defineSchema({
     churchId: v.optional(v.id("churches")),
     role: userRoleValidator,
     clerkUserId: v.optional(v.string()),
+    // Onboarding tracking
+    onboardingStatus: v.optional(
+      v.union(
+        v.literal("pending"), // Not started
+        v.literal("in_progress"), // Started but not complete
+        v.literal("completed") // Finished onboarding
+      )
+    ),
+    onboardingCompletedAt: v.optional(v.number()),
   })
     .index("by_email", ["email"])
     .index("by_church", ["churchId"])
