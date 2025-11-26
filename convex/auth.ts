@@ -125,29 +125,15 @@ export const ensureUser = mutation({
     if (!user) {
       invitation = await findInvitationForEmail(ctx, email, args.inviteToken ?? null);
 
-      let churchId = invitation?.churchId ?? null;
+      // For invited users: use the church from invitation
+      // For new users without invitation: churchId is undefined, they'll go through onboarding
+      const churchId = invitation?.churchId ?? undefined;
       const role: CanonicalRole = invitation ? normalizeRole(invitation.role) : "administrator";
 
-      if (!churchId) {
-        const existingChurch = await ctx.db.query("churches").first();
-        if (existingChurch) {
-          churchId = existingChurch._id;
-        }
-      }
-
-      if (!churchId) {
-        const fallbackName = displayName.split(" ")[0] || "New";
-        churchId = await ctx.db.insert("churches", {
-          name: `${fallbackName}'s Church`,
-          charityNumber: undefined,
-          address: undefined,
-          settings: {
-            fiscalYearEnd: "03-31",
-            giftAidEnabled: false,
-            defaultCurrency: "GBP",
-          },
-        });
-      }
+      // Determine onboarding status:
+      // - With invitation: "pending" (will see welcome wizard)
+      // - Without invitation: "pending" (will create new church via wizard)
+      const onboardingStatus = "pending" as const;
 
       const userId = await ctx.db.insert("users", {
         name: displayName,
@@ -156,6 +142,7 @@ export const ensureUser = mutation({
         churchId,
         clerkUserId: args.clerkUserId,
         image: imageUrl,
+        onboardingStatus,
       });
 
       user = await ctx.db.get(userId);
