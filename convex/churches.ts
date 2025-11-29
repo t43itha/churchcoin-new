@@ -273,6 +273,29 @@ export const updateAiApiKey = mutation({
   },
 });
 
+// Set default fund for Plaid bank imports
+export const setPlaidDefaultFund = mutation({
+  args: {
+    churchId: v.id("churches"),
+    fundId: v.id("funds"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const church = await ctx.db.get(args.churchId);
+    if (!church) {
+      throw new Error("Church not found");
+    }
+
+    await ctx.db.patch(args.churchId, {
+      settings: {
+        ...(church.settings ?? {}),
+        plaidDefaultFundId: args.fundId,
+      },
+    });
+    return null;
+  },
+});
+
 // Get default fund (or first general fund as fallback)
 export const getDefaultFund = query({
   args: { churchId: v.id("churches") },

@@ -18,6 +18,8 @@ export default defineSchema({
       enableAiCategorization: v.optional(v.boolean()), // default true
       importsAllowAi: v.optional(v.boolean()),
       aiApiKey: v.optional(v.string()),
+      // Plaid integration settings
+      plaidDefaultFundId: v.optional(v.id("funds")), // Where to put Plaid transactions
     }),
   }),
 
@@ -105,9 +107,16 @@ export default defineSchema({
     source: v.union(
       v.literal("manual"),
       v.literal("csv"),
-      v.literal("api")
+      v.literal("api"),
+      v.literal("plaid")
     ),
     csvBatch: v.optional(v.string()), // For tracking imports
+    // Plaid-specific fields
+    plaidTransactionId: v.optional(v.string()), // Plaid's transaction_id for dedup
+    plaidItemId: v.optional(v.id("plaidItems")), // Link to source bank account
+    plaidAccountId: v.optional(v.string()), // Which account in the item
+    plaidPending: v.optional(v.boolean()), // If transaction is pending in Plaid
+    plaidMerchantName: v.optional(v.string()), // Merchant name from Plaid
     receiptStorageId: v.optional(v.id("_storage")),
     receiptFilename: v.optional(v.string()),
     pendingStatus: v.optional(
@@ -133,7 +142,9 @@ export default defineSchema({
     .index("by_reconciled", ["churchId", "reconciled"])
     .index("by_period", ["churchId", "periodYear", "periodMonth"])
     .index("by_review_status", ["churchId", "needsReview"])
-    .index("by_receipt_storage_id", ["receiptStorageId"]),
+    .index("by_receipt_storage_id", ["receiptStorageId"])
+    .index("by_plaid_transaction", ["plaidTransactionId"])
+    .index("by_plaid_item", ["plaidItemId", "date"]),
 
   // CSV Imports
   csvImports: defineTable({
@@ -447,5 +458,70 @@ export default defineSchema({
   })
     .index("by_church_unread", ["churchId", "isRead", "createdAt"])
     .index("by_church_active", ["churchId", "isDismissed", "createdAt"]),
+
+  // Plaid Bank Account Connections
+  plaidItems: defineTable({
+    churchId: v.id("churches"),
+    itemId: v.string(), // Plaid item_id
+    accessToken: v.string(), // Plaid access_token (stored securely, never sent to client)
+    institutionId: v.string(), // Plaid institution_id
+    institutionName: v.string(), // e.g., "Barclays", "HSBC"
+
+    // Account details (from Plaid accounts API)
+    accounts: v.array(
+      v.object({
+        accountId: v.string(), // Plaid account_id
+        name: v.string(), // "Main Checking"
+        officialName: v.optional(v.string()), // "Barclays Current Account"
+        type: v.string(), // "depository", "credit", etc.
+        subtype: v.string(), // "checking", "savings", etc.
+        mask: v.optional(v.string()), // Last 4 digits "1234"
+        balances: v.object({
+          current: v.optional(v.number()),
+          available: v.optional(v.number()),
+          limit: v.optional(v.number()),
+        }),
+      })
+    ),
+
+    // Sync state
+    status: v.union(
+      v.literal("active"),
+      v.literal("error"),
+      v.literal("login_required"),
+      v.literal("disconnected")
+    ),
+    syncCursor: v.optional(v.string()), // Plaid transactions/sync cursor for incremental sync
+    lastSyncedAt: v.optional(v.number()),
+    lastSuccessfulSyncAt: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
+
+    // Audit
+    linkedBy: v.id("users"),
+    linkedAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_church", ["churchId"])
+    .index("by_item_id", ["itemId"])
+    .index("by_status", ["churchId", "status"]),
+
+  // Plaid Sync History Logs
+  plaidSyncLogs: defineTable({
+    churchId: v.id("churches"),
+    plaidItemId: v.id("plaidItems"),
+    syncedAt: v.number(),
+    status: v.union(
+      v.literal("success"),
+      v.literal("partial"),
+      v.literal("failed")
+    ),
+    transactionsAdded: v.number(),
+    transactionsModified: v.number(),
+    transactionsRemoved: v.number(),
+    errorMessage: v.optional(v.string()),
+    syncDurationMs: v.number(),
+  })
+    .index("by_church", ["churchId", "syncedAt"])
+    .index("by_item", ["plaidItemId", "syncedAt"]),
 });
 
