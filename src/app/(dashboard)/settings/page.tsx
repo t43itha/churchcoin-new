@@ -16,9 +16,10 @@ import {
 import { api, type Id } from "@/lib/convexGenerated";
 
 import { SettingsAutomationTab } from "./_components/automation-tab";
+import { SettingsBankAccountsTab } from "./_components/bank-accounts-tab";
 import { SettingsTeamTab } from "./_components/team-tab";
 
-type TabValue = "team" | "automation";
+type TabValue = "team" | "automation" | "bank-accounts";
 
 const TAB_ITEMS: Array<{ value: TabValue; label: string; description: string }> = [
   {
@@ -31,6 +32,11 @@ const TAB_ITEMS: Array<{ value: TabValue; label: string; description: string }> 
     label: "Automation",
     description: "Configure import defaults, AI categorisation, and category seeding.",
   },
+  {
+    value: "bank-accounts",
+    label: "Bank Accounts",
+    description: "Connect and manage bank accounts for automatic transaction imports.",
+  },
 ];
 
 export default function SettingsPage() {
@@ -38,7 +44,10 @@ export default function SettingsPage() {
   const router = useRouter();
 
   const tabParam = (searchParams.get("tab") as TabValue | null) ?? null;
-  const activeTab: TabValue = tabParam === "automation" ? "automation" : "team";
+  const activeTab: TabValue =
+    tabParam === "automation" ? "automation" :
+    tabParam === "bank-accounts" ? "bank-accounts" :
+    "team";
 
   const churchParam = searchParams.get("church");
   const churches = useQuery(api.churches.listChurches, {});
@@ -164,6 +173,12 @@ export default function SettingsPage() {
           {activeTab === "automation" && (
             <TabsContent value="automation">
               <SettingsAutomationTab churchId={churchId} />
+            </TabsContent>
+          )}
+
+          {activeTab === "bank-accounts" && (
+            <TabsContent value="bank-accounts">
+              <SettingsBankAccountsTab churchId={churchId} />
             </TabsContent>
           )}
         </Tabs>

@@ -30,6 +30,8 @@ import type * as migrations_backfill_funds from "../migrations/backfill_funds.js
 import type * as migrations_normalize_user_roles from "../migrations/normalize_user_roles.js";
 import type * as migrations from "../migrations.js";
 import type * as onboarding from "../onboarding.js";
+import type * as plaid from "../plaid.js";
+import type * as plaidInternal from "../plaidInternal.js";
 import type * as reconciliation from "../reconciliation.js";
 import type * as reports from "../reports.js";
 import type * as roles from "../roles.js";
@@ -63,6 +65,8 @@ declare const fullApi: ApiFromModules<{
   "migrations/normalize_user_roles": typeof migrations_normalize_user_roles;
   migrations: typeof migrations;
   onboarding: typeof onboarding;
+  plaid: typeof plaid;
+  plaidInternal: typeof plaidInternal;
   reconciliation: typeof reconciliation;
   reports: typeof reports;
   roles: typeof roles;
