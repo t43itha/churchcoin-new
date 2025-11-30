@@ -314,34 +314,59 @@ export const syncTransactions = action({
     }
 
     try {
-      // Build request for Plaid transactions/sync endpoint
-      const requestBody: Record<string, unknown> = {
-        access_token: itemData.accessToken,
-      };
+      // Accumulate totals across all pages
+      let totalAdded = 0;
+      let totalModified = 0;
+      let totalRemoved = 0;
 
-      if (itemData.syncCursor) {
-        requestBody.cursor = itemData.syncCursor;
+      // Start with existing cursor or undefined for initial sync
+      let cursor: string | undefined = itemData.syncCursor;
+      let hasMore = true;
+
+      // Loop through all pages until has_more is false
+      while (hasMore) {
+        const requestBody: Record<string, unknown> = {
+          access_token: itemData.accessToken,
+        };
+
+        if (cursor) {
+          requestBody.cursor = cursor;
+        }
+
+        const syncResponse: PlaidSyncResponse = await plaidRequest<PlaidSyncResponse>(
+          "/transactions/sync",
+          requestBody
+        );
+
+        // Process this page of transactions via internal mutation
+        // Processing per-page avoids hitting mutation size limits on large syncs
+        const pageResult: SyncResult = await ctx.runMutation(
+          internal.plaidInternal.processPlaidTransactions,
+          {
+            plaidItemId: args.plaidItemId,
+            userId: args.userId,
+            added: syncResponse.added,
+            modified: syncResponse.modified,
+            removed: syncResponse.removed,
+            nextCursor: syncResponse.next_cursor,
+          }
+        );
+
+        // Accumulate results
+        totalAdded += pageResult.added;
+        totalModified += pageResult.modified;
+        totalRemoved += pageResult.removed;
+
+        // Update loop control variables
+        cursor = syncResponse.next_cursor;
+        hasMore = syncResponse.has_more;
       }
 
-      const syncResponse: PlaidSyncResponse = await plaidRequest<PlaidSyncResponse>(
-        "/transactions/sync",
-        requestBody
-      );
-
-      // Process transactions via internal mutation
-      const result: SyncResult = await ctx.runMutation(
-        internal.plaidInternal.processPlaidTransactions,
-        {
-          plaidItemId: args.plaidItemId,
-          userId: args.userId,
-          added: syncResponse.added,
-          modified: syncResponse.modified,
-          removed: syncResponse.removed,
-          nextCursor: syncResponse.next_cursor,
-        }
-      );
-
-      return result;
+      return {
+        added: totalAdded,
+        modified: totalModified,
+        removed: totalRemoved,
+      };
     } catch (error) {
       // Update item status to error via internal mutation
       const errorMessage =
