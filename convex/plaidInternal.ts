@@ -358,12 +358,39 @@ export const processPlaidTransactions = internalMutation({
         .first();
 
       if (existingTx) {
+        // Calculate new amount and type from Plaid data
+        const newAmount = Math.abs(plaidTx.amount);
+        const newType: "income" | "expense" = plaidTx.amount < 0 ? "income" : "expense";
+        const newPeriodFields = calculatePeriodFields(plaidTx.date);
+
+        // Calculate balance adjustment: reverse old impact, apply new impact
+        const oldBalanceImpact = existingTx.type === "income" ? existingTx.amount : -existingTx.amount;
+        const newBalanceImpact = newType === "income" ? newAmount : -newAmount;
+        const balanceDelta = newBalanceImpact - oldBalanceImpact;
+
+        // Update the transaction with all changed fields
         await ctx.db.patch(existingTx._id, {
           description: plaidTx.merchant_name || plaidTx.name || existingTx.description,
+          amount: newAmount,
+          type: newType,
+          date: plaidTx.date,
+          periodMonth: newPeriodFields.periodMonth,
+          periodYear: newPeriodFields.periodYear,
+          weekEnding: newPeriodFields.weekEnding,
           reconciled: !plaidTx.pending,
           plaidPending: plaidTx.pending,
           plaidMerchantName: plaidTx.merchant_name,
         });
+
+        // Adjust fund balance if amount or type changed
+        if (balanceDelta !== 0) {
+          const txFund = await ctx.db.get(existingTx.fundId);
+          if (txFund) {
+            await ctx.db.patch(existingTx.fundId, {
+              balance: txFund.balance + balanceDelta,
+            });
+          }
+        }
 
         modifiedCount++;
       }
