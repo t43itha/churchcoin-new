@@ -1,6 +1,14 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
+// Import auth utilities
+import {
+  requireWritePermission,
+  requireAdminPermission,
+  verifyCategoryOwnership,
+  verifyCategoryKeywordOwnership,
+} from "./lib/auth";
+
 export const getCategories = query({
   args: {
     churchId: v.id("churches"),
@@ -79,16 +87,21 @@ export const getSubcategoriesWithParents = query({
   },
 });
 
+// Create a new main category (secured)
 export const createMainCategory = mutation({
   args: {
-    churchId: v.id("churches"),
+    // churchId kept for backward compatibility but verified against auth
+    churchId: v.optional(v.id("churches")),
     name: v.string(),
     type: v.union(v.literal("income"), v.literal("expense")),
   },
   returns: v.id("categories"),
   handler: async (ctx, args) => {
+    // Authenticate and authorize
+    const church = await requireWritePermission(ctx);
+
     return await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: args.name,
       type: args.type,
       parentId: undefined,
@@ -98,23 +111,28 @@ export const createMainCategory = mutation({
   },
 });
 
+// Create a new subcategory (secured)
 export const createSubcategory = mutation({
   args: {
-    churchId: v.id("churches"),
+    // churchId kept for backward compatibility but verified against auth
+    churchId: v.optional(v.id("churches")),
     name: v.string(),
     type: v.union(v.literal("income"), v.literal("expense")),
     parentId: v.id("categories"),
   },
   returns: v.id("categories"),
   handler: async (ctx, args) => {
-    // Verify parent exists and is a main category
-    const parent = await ctx.db.get(args.parentId);
-    if (!parent || parent.isSubcategory) {
+    // Authenticate and authorize
+    const church = await requireWritePermission(ctx);
+
+    // Verify parent exists, belongs to church, and is a main category
+    const parent = await verifyCategoryOwnership(ctx, args.parentId);
+    if (parent.isSubcategory) {
       throw new Error("Parent must be a main category");
     }
 
     return await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: args.name,
       type: args.type,
       parentId: args.parentId,
@@ -124,17 +142,22 @@ export const createSubcategory = mutation({
   },
 });
 
+// Add a keyword to a subcategory (secured)
 export const addKeywordToSubcategory = mutation({
   args: {
-    churchId: v.id("churches"),
+    // churchId kept for backward compatibility but verified against auth
+    churchId: v.optional(v.id("churches")),
     categoryId: v.id("categories"),
     keyword: v.string(),
   },
   returns: v.id("categoryKeywords"),
   handler: async (ctx, args) => {
-    // Verify category exists and is a subcategory
-    const category = await ctx.db.get(args.categoryId);
-    if (!category || !category.isSubcategory) {
+    // Authenticate and authorize
+    const church = await requireWritePermission(ctx);
+
+    // Verify category exists, belongs to church, and is a subcategory
+    const category = await verifyCategoryOwnership(ctx, args.categoryId);
+    if (!category.isSubcategory) {
       throw new Error("Keywords can only be added to subcategories");
     }
 
@@ -142,7 +165,7 @@ export const addKeywordToSubcategory = mutation({
     const existing = await ctx.db
       .query("categoryKeywords")
       .withIndex("by_keyword", (q) =>
-        q.eq("churchId", args.churchId).eq("keyword", args.keyword.toLowerCase().trim())
+        q.eq("churchId", church.churchId).eq("keyword", args.keyword.toLowerCase().trim())
       )
       .filter((q) => q.eq(q.field("categoryId"), args.categoryId))
       .first();
@@ -152,7 +175,7 @@ export const addKeywordToSubcategory = mutation({
     }
 
     return await ctx.db.insert("categoryKeywords", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       categoryId: args.categoryId,
       keyword: args.keyword.toLowerCase().trim(),
       isActive: true,
@@ -161,12 +184,19 @@ export const addKeywordToSubcategory = mutation({
   },
 });
 
+// Remove a keyword from a subcategory (secured)
 export const removeKeywordFromSubcategory = mutation({
   args: {
     keywordId: v.id("categoryKeywords"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Authenticate and authorize
+    await requireWritePermission(ctx);
+
+    // Verify keyword belongs to user's church
+    await verifyCategoryKeywordOwnership(ctx, args.keywordId);
+
     await ctx.db.delete(args.keywordId);
     return null;
   },
@@ -222,6 +252,7 @@ export const getCategoryKeywords = query({
   },
 });
 
+// Update a category (secured)
 export const updateCategory = mutation({
   args: {
     categoryId: v.id("categories"),
@@ -229,6 +260,12 @@ export const updateCategory = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Authenticate and authorize
+    await requireWritePermission(ctx);
+
+    // Verify category belongs to user's church
+    await verifyCategoryOwnership(ctx, args.categoryId);
+
     await ctx.db.patch(args.categoryId, {
       name: args.name,
     });
@@ -236,16 +273,18 @@ export const updateCategory = mutation({
   },
 });
 
+// Delete a category (secured - requires admin permission)
 export const deleteCategory = mutation({
   args: {
     categoryId: v.id("categories"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const category = await ctx.db.get(args.categoryId);
-    if (!category) {
-      throw new Error("Category not found");
-    }
+    // Authenticate and authorize (admin required for delete)
+    await requireAdminPermission(ctx);
+
+    // Verify category belongs to user's church
+    const category = await verifyCategoryOwnership(ctx, args.categoryId);
 
     // Check if category is in use by transactions
     const transactionsCount = await ctx.db
@@ -298,16 +337,21 @@ export const deleteCategory = mutation({
   },
 });
 
+// Seed default categories for a church (secured - requires admin permission)
 export const seedCategories = mutation({
   args: {
-    churchId: v.id("churches"),
+    // churchId kept for backward compatibility but verified against auth
+    churchId: v.optional(v.id("churches")),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Authenticate and authorize (admin required for seeding)
+    const church = await requireAdminPermission(ctx);
+
     // Check if categories already exist for this church
     const existingCategories = await ctx.db
       .query("categories")
-      .withIndex("by_church", (q) => q.eq("churchId", args.churchId))
+      .withIndex("by_church", (q) => q.eq("churchId", church.churchId))
       .collect();
 
     if (existingCategories.length > 0) {
@@ -317,7 +361,7 @@ export const seedCategories = mutation({
 
     // Create Income main categories
     const donationsId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Donations",
       type: "income",
       parentId: undefined,
@@ -326,7 +370,7 @@ export const seedCategories = mutation({
     });
 
     const charitableActivitiesId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Charitable Activities",
       type: "income",
       parentId: undefined,
@@ -335,7 +379,7 @@ export const seedCategories = mutation({
     });
 
     const otherIncomeMainId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Separate Material Item of Income",
       type: "income",
       parentId: undefined,
@@ -345,7 +389,7 @@ export const seedCategories = mutation({
 
     // Create Income subcategories
     const offeringsId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Offerings",
       type: "income",
       parentId: donationsId,
@@ -354,7 +398,7 @@ export const seedCategories = mutation({
     });
 
     const tithesId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Tithes & First Fruits",
       type: "income",
       parentId: donationsId,
@@ -363,7 +407,7 @@ export const seedCategories = mutation({
     });
 
     const thanksgivingId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Thanksgiving",
       type: "income",
       parentId: donationsId,
@@ -372,7 +416,7 @@ export const seedCategories = mutation({
     });
 
     const programsId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Programs",
       type: "income",
       parentId: donationsId,
@@ -381,7 +425,7 @@ export const seedCategories = mutation({
     });
 
     const genderMinistriesId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Gender Ministries (RLM, MEN, WMG ETC)",
       type: "income",
       parentId: charitableActivitiesId,
@@ -390,7 +434,7 @@ export const seedCategories = mutation({
     });
 
     const otherIncomeId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Other Income",
       type: "income",
       parentId: otherIncomeMainId,
@@ -400,7 +444,7 @@ export const seedCategories = mutation({
 
     // Create Expense main categories
     const majorProgramId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Major Program",
       type: "expense",
       parentId: undefined,
@@ -409,7 +453,7 @@ export const seedCategories = mutation({
     });
 
     const ministryCostId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Ministry Cost",
       type: "expense",
       parentId: undefined,
@@ -418,7 +462,7 @@ export const seedCategories = mutation({
     });
 
     const staffCostId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Staff Cost",
       type: "expense",
       parentId: undefined,
@@ -427,7 +471,7 @@ export const seedCategories = mutation({
     });
 
     const volunteerCostId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Volunteer Cost",
       type: "expense",
       parentId: undefined,
@@ -436,7 +480,7 @@ export const seedCategories = mutation({
     });
 
     const premisesCostId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Premises Cost",
       type: "expense",
       parentId: undefined,
@@ -445,7 +489,7 @@ export const seedCategories = mutation({
     });
 
     const missionCostId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Mission Cost",
       type: "expense",
       parentId: undefined,
@@ -454,7 +498,7 @@ export const seedCategories = mutation({
     });
 
     const governanceId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Governance",
       type: "expense",
       parentId: undefined,
@@ -463,7 +507,7 @@ export const seedCategories = mutation({
     });
 
     const adminCostId = await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Admin Cost",
       type: "expense",
       parentId: undefined,
@@ -475,7 +519,7 @@ export const seedCategories = mutation({
 
     // Major Program subcategories
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "MP Honorarium",
       type: "expense",
       parentId: majorProgramId,
@@ -484,7 +528,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "MP Hotels Accommodation",
       type: "expense",
       parentId: majorProgramId,
@@ -493,7 +537,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "MP Food and Refreshments",
       type: "expense",
       parentId: majorProgramId,
@@ -502,7 +546,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "MP Expense",
       type: "expense",
       parentId: majorProgramId,
@@ -512,7 +556,7 @@ export const seedCategories = mutation({
 
     // Ministry Cost subcategories
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Church Provisions & Materials",
       type: "expense",
       parentId: ministryCostId,
@@ -521,7 +565,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Travel & Transport Cost",
       type: "expense",
       parentId: ministryCostId,
@@ -530,7 +574,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Vehicle Maintenance, Insurance & Other Cost",
       type: "expense",
       parentId: ministryCostId,
@@ -539,7 +583,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Equipment Purchase & Maintenance",
       type: "expense",
       parentId: ministryCostId,
@@ -548,7 +592,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Church Refreshment",
       type: "expense",
       parentId: ministryCostId,
@@ -557,7 +601,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Media & Publicity",
       type: "expense",
       parentId: ministryCostId,
@@ -566,7 +610,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Gender Ministry Activities Cost",
       type: "expense",
       parentId: ministryCostId,
@@ -575,7 +619,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Other Ministry Costs",
       type: "expense",
       parentId: ministryCostId,
@@ -585,7 +629,7 @@ export const seedCategories = mutation({
 
     // Staff Cost subcategories
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Gross Salary",
       type: "expense",
       parentId: staffCostId,
@@ -595,7 +639,7 @@ export const seedCategories = mutation({
 
     // Volunteer Cost subcategories
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Allowances",
       type: "expense",
       parentId: volunteerCostId,
@@ -604,7 +648,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Honorarium",
       type: "expense",
       parentId: volunteerCostId,
@@ -614,7 +658,7 @@ export const seedCategories = mutation({
 
     // Premises Cost subcategories
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Rent-Premises",
       type: "expense",
       parentId: premisesCostId,
@@ -623,7 +667,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Rent-Manse",
       type: "expense",
       parentId: premisesCostId,
@@ -632,7 +676,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Rent Non Contract & Adhoc",
       type: "expense",
       parentId: premisesCostId,
@@ -642,7 +686,7 @@ export const seedCategories = mutation({
 
     // Mission Cost subcategories
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Missions -Tithe",
       type: "expense",
       parentId: missionCostId,
@@ -651,7 +695,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Missions - Other Missions Cost",
       type: "expense",
       parentId: missionCostId,
@@ -660,7 +704,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Missions - Overseas Travel",
       type: "expense",
       parentId: missionCostId,
@@ -669,7 +713,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Mission Support - Donation and Gifts",
       type: "expense",
       parentId: missionCostId,
@@ -679,7 +723,7 @@ export const seedCategories = mutation({
 
     // Governance subcategories
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Training",
       type: "expense",
       parentId: governanceId,
@@ -688,7 +732,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Fees & License",
       type: "expense",
       parentId: governanceId,
@@ -698,7 +742,7 @@ export const seedCategories = mutation({
 
     // Admin Cost subcategories
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "IT costs",
       type: "expense",
       parentId: adminCostId,
@@ -707,7 +751,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Telephones & Internet",
       type: "expense",
       parentId: adminCostId,
@@ -716,7 +760,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Stationery & Printing",
       type: "expense",
       parentId: adminCostId,
@@ -725,7 +769,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categories", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: "Bank Charges",
       type: "expense",
       parentId: adminCostId,
@@ -735,7 +779,7 @@ export const seedCategories = mutation({
 
     // Add keywords for automatic categorization
     await ctx.db.insert("categoryKeywords", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       categoryId: tithesId,
       keyword: "tithe",
       isActive: true,
@@ -743,7 +787,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categoryKeywords", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       categoryId: tithesId,
       keyword: "tithing",
       isActive: true,
@@ -751,7 +795,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categoryKeywords", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       categoryId: tithesId,
       keyword: "thithe",
       isActive: true,
@@ -759,7 +803,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categoryKeywords", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       categoryId: thanksgivingId,
       keyword: "thanks",
       isActive: true,
@@ -767,7 +811,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categoryKeywords", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       categoryId: thanksgivingId,
       keyword: "thanksgiving",
       isActive: true,
@@ -775,7 +819,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categoryKeywords", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       categoryId: thanksgivingId,
       keyword: "thx",
       isActive: true,
@@ -783,7 +827,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categoryKeywords", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       categoryId: offeringsId,
       keyword: "pledge",
       isActive: true,
@@ -791,7 +835,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categoryKeywords", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       categoryId: offeringsId,
       keyword: "offering",
       isActive: true,
@@ -799,7 +843,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categoryKeywords", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       categoryId: offeringsId,
       keyword: "seed",
       isActive: true,
@@ -807,7 +851,7 @@ export const seedCategories = mutation({
     });
 
     await ctx.db.insert("categoryKeywords", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       categoryId: offeringsId,
       keyword: "sacrifice",
       isActive: true,

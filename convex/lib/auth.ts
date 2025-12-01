@@ -289,6 +289,20 @@ export async function verifyCategoryOwnership(
 }
 
 /**
+ * Verify a category keyword belongs to the user's church
+ *
+ * @throws NotFoundError if keyword doesn't exist
+ * @throws AuthorizationError if keyword doesn't belong to user's church
+ */
+export async function verifyCategoryKeywordOwnership(
+  ctx: AuthContext,
+  keywordId: Id<"categoryKeywords">
+): Promise<Doc<"categoryKeywords">> {
+  const keyword = await ctx.db.get(keywordId);
+  return verifyChurchOwnership(ctx, keyword, "Category Keyword");
+}
+
+/**
  * Verify a Plaid item belongs to the user's church
  *
  * @throws NotFoundError if Plaid item doesn't exist
