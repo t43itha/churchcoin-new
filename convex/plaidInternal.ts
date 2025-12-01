@@ -3,36 +3,43 @@ import { ConvexError, v } from "convex/values";
 import { api } from "./_generated/api";
 import { normalizeRole } from "./roles";
 
-// Helper functions for period calculation
-function parseDateToUTC(dateString: string): Date {
-  if (dateString.includes("/")) {
-    const [day, month, year] = dateString.split("/").map(Number);
-    return new Date(Date.UTC(year, month - 1, day));
-  }
-  return new Date(dateString);
-}
+// Import shared utilities
+import { calculatePeriodFields } from "./lib/periods";
+import { requirePermission, verifyPlaidItemOwnership } from "./lib/auth";
 
-function calculatePeriodFields(dateString: string): {
-  periodMonth: number;
-  periodYear: number;
-  weekEnding: string;
-} {
-  const date = parseDateToUTC(dateString);
-  const month = date.getUTCMonth() + 1;
-  const year = date.getUTCFullYear();
+// ============================================================================
+// PUBLIC QUERIES (secured with auth middleware)
+// ============================================================================
 
-  const dayOfWeek = date.getUTCDay();
-  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-  const sunday = new Date(date);
-  sunday.setUTCDate(date.getUTCDate() + daysUntilSunday);
+/**
+ * Get authenticated user context for Plaid operations.
+ * This query uses our auth middleware to securely get the user/church IDs
+ * instead of accepting them from the client.
+ */
+export const getPlaidAuthContext = query({
+  args: {},
+  handler: async (ctx) => {
+    try {
+      // Require MANAGE_BANK_CONNECTIONS permission
+      const churchContext = await requirePermission(ctx, "MANAGE_BANK_CONNECTIONS");
 
-  const day = String(sunday.getUTCDate()).padStart(2, "0");
-  const sundayMonth = String(sunday.getUTCMonth() + 1).padStart(2, "0");
-  const sundayYear = sunday.getUTCFullYear();
-  const weekEnding = `${day}/${sundayMonth}/${sundayYear}`;
-
-  return { periodMonth: month, periodYear: year, weekEnding };
-}
+      return {
+        valid: true,
+        userId: churchContext.userId,
+        churchId: churchContext.churchId,
+        churchName: churchContext.church.name,
+      };
+    } catch (error) {
+      return {
+        valid: false,
+        error: error instanceof Error ? error.message : "Authentication failed",
+        userId: null,
+        churchId: null,
+        churchName: null,
+      };
+    }
+  },
+});
 
 // ============================================================================
 // INTERNAL QUERIES

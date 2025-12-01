@@ -3,6 +3,13 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 
+// Import auth utilities
+import {
+  requireWritePermission,
+  requireAdminPermission,
+  verifyDonorOwnership,
+} from "./lib/auth";
+
 // Get all donors for a church
 export const getDonors = query({
   args: { churchId: v.id("churches") },
@@ -49,10 +56,11 @@ export const searchDonors = query({
   },
 });
 
-// Create a new donor
+// Create a new donor (secured)
 export const createDonor = mutation({
   args: {
-    churchId: v.id("churches"),
+    // churchId kept for backward compatibility but verified against auth
+    churchId: v.optional(v.id("churches")),
     name: v.string(),
     email: v.optional(v.string()),
     phone: v.optional(v.string()),
@@ -66,14 +74,20 @@ export const createDonor = mutation({
     })),
   },
   handler: async (ctx, args) => {
+    // Authenticate and authorize
+    const church = await requireWritePermission(ctx);
+
+    const { churchId: _unused, ...donorData } = args;
+
     return await ctx.db.insert("donors", {
-      ...args,
+      ...donorData,
+      churchId: church.churchId,
       isActive: true,
     });
   },
 });
 
-// Update donor information
+// Update donor information (secured)
 export const updateDonor = mutation({
   args: {
     donorId: v.id("donors"),
@@ -90,26 +104,47 @@ export const updateDonor = mutation({
     })),
   },
   handler: async (ctx, args) => {
+    // Authenticate and authorize
+    await requireWritePermission(ctx);
+
     const { donorId, ...updates } = args;
+
+    // Verify donor belongs to user's church
+    await verifyDonorOwnership(ctx, donorId);
+
     await ctx.db.patch(donorId, updates);
   },
 });
 
-// Archive donor (soft delete)
+// Archive donor (secured - requires admin permission)
 export const archiveDonor = mutation({
   args: { donorId: v.id("donors") },
   handler: async (ctx, args) => {
+    // Authenticate and authorize (admin required for archive)
+    await requireAdminPermission(ctx);
+
+    // Verify donor belongs to user's church
+    await verifyDonorOwnership(ctx, args.donorId);
+
     await ctx.db.patch(args.donorId, {
       isActive: false,
     });
   },
 });
 
+// Create anonymous donor (secured)
 export const createAnonymousDonor = mutation({
-  args: { churchId: v.id("churches"), label: v.optional(v.string()) },
+  args: {
+    // churchId kept for backward compatibility
+    churchId: v.optional(v.id("churches")),
+    label: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
+    // Authenticate and authorize
+    const church = await requireWritePermission(ctx);
+
     return await ctx.db.insert("donors", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: args.label ?? "Anonymous donor",
       isActive: true,
       notes: "System-generated anonymous donor",

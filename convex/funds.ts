@@ -5,6 +5,14 @@ import { v } from "convex/values";
 import { fundTypeValidator } from "./validators";
 import { assertExists } from "./lib/errors";
 
+// Import auth utilities
+import {
+  requireWritePermission,
+  requireAdminPermission,
+  getChurchContext,
+  verifyFundOwnership,
+} from "./lib/auth";
+
 // Get all funds for a church (with optional limit for performance)
 export const getFunds = query({
   args: {
@@ -50,10 +58,11 @@ export const getFund = query({
   },
 });
 
-// Create a new fund
+// Create a new fund (secured)
 export const createFund = mutation({
   args: {
-    churchId: v.id("churches"),
+    // churchId kept for backward compatibility but verified against auth
+    churchId: v.optional(v.id("churches")),
     name: v.string(),
     type: v.union(
       v.literal("general"),
@@ -66,8 +75,11 @@ export const createFund = mutation({
     fundraisingTarget: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Authenticate and authorize
+    const church = await requireWritePermission(ctx);
+
     const fundId = await ctx.db.insert("funds", {
-      churchId: args.churchId,
+      churchId: church.churchId,
       name: args.name,
       type: args.type,
       balance: 0,
@@ -85,6 +97,7 @@ export const createFund = mutation({
   },
 });
 
+// Update a fund (secured)
 export const updateFund = mutation({
   args: {
     fundId: v.id("funds"),
@@ -96,9 +109,13 @@ export const updateFund = mutation({
     fundraisingTarget: v.optional(v.union(v.number(), v.null())),
   },
   handler: async (ctx, args) => {
+    // Authenticate and authorize
+    await requireWritePermission(ctx);
+
     const { fundId, ...updates } = args;
-    const fund = await ctx.db.get(fundId);
-    assertExists(fund, "Fund");
+
+    // Verify fund belongs to user's church
+    const fund = await verifyFundOwnership(ctx, fundId);
 
     const patch: Partial<Doc<"funds">> = {};
 
@@ -139,15 +156,18 @@ export const updateFund = mutation({
   },
 });
 
-// Update fund balance
+// Update fund balance (secured)
 export const updateFundBalance = mutation({
   args: {
     fundId: v.id("funds"),
     amount: v.number(),
   },
   handler: async (ctx, args) => {
-    const fund = await ctx.db.get(args.fundId);
-    assertExists(fund, "Fund");
+    // Authenticate and authorize
+    await requireWritePermission(ctx);
+
+    // Verify fund belongs to user's church
+    const fund = await verifyFundOwnership(ctx, args.fundId);
 
     const newBalance = fund.balance + args.amount;
 
@@ -159,10 +179,16 @@ export const updateFundBalance = mutation({
   },
 });
 
-// Archive fund (soft delete)
+// Archive fund (secured - requires admin permission)
 export const archiveFund = mutation({
   args: { fundId: v.id("funds") },
   handler: async (ctx, args) => {
+    // Authenticate and authorize (admin required for archive/delete)
+    await requireAdminPermission(ctx);
+
+    // Verify fund belongs to user's church
+    await verifyFundOwnership(ctx, args.fundId);
+
     await ctx.db.patch(args.fundId, {
       isActive: false,
     });

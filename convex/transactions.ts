@@ -4,6 +4,17 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 
+// Import shared utilities
+import {
+  requireWritePermission,
+  requireAdminPermission,
+  getChurchContext,
+  verifyTransactionOwnership,
+  verifyFundOwnership,
+} from "./lib/auth";
+import { calculatePeriodFields as calculatePeriodFieldsLib } from "./lib/periods";
+import { getOrCreatePlaceholderUser } from "./lib/users";
+
 export type CreateTransactionInput = {
   churchId: Id<"churches">;
   date: string;
@@ -35,43 +46,8 @@ type DuplicateSearchArgs = {
   reference?: string;
 };
 
-// Helper functions for period calculation
-function parseDateToUTC(dateString: string): Date {
-  // Parse DD/MM/YYYY or ISO format to UTC date
-  if (dateString.includes('/')) {
-    const [day, month, year] = dateString.split('/').map(Number);
-    return new Date(Date.UTC(year, month - 1, day));
-  }
-  return new Date(dateString);
-}
-
-function calculatePeriodFields(dateString: string): {
-  periodMonth: number;
-  periodYear: number;
-  weekEnding: string;
-} {
-  const date = parseDateToUTC(dateString);
-  const month = date.getUTCMonth() + 1; // 1-12
-  const year = date.getUTCFullYear();
-
-  // Calculate week ending (Sunday)
-  const dayOfWeek = date.getUTCDay(); // 0 = Sunday, 6 = Saturday
-  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-  const sunday = new Date(date);
-  sunday.setUTCDate(date.getUTCDate() + daysUntilSunday);
-
-  // Format as DD/MM/YYYY
-  const day = String(sunday.getUTCDate()).padStart(2, '0');
-  const sundayMonth = String(sunday.getUTCMonth() + 1).padStart(2, '0');
-  const sundayYear = sunday.getUTCFullYear();
-  const weekEnding = `${day}/${sundayMonth}/${sundayYear}`;
-
-  return {
-    periodMonth: month,
-    periodYear: year,
-    weekEnding,
-  };
-}
+// Use shared period calculation from lib
+const calculatePeriodFields = calculatePeriodFieldsLib;
 
 const toDuplicateMatches = async (
   ctx: QueryCtx | MutationCtx,
@@ -263,10 +239,11 @@ export const getTransaction = query({
   },
 });
 
-// Create a new transaction
+// Create a new transaction (secured)
 export const createTransaction = mutation({
   args: {
-    churchId: v.id("churches"),
+    // Note: churchId is kept for backward compatibility but will be verified against auth
+    churchId: v.optional(v.id("churches")),
     date: v.string(),
     description: v.string(),
     amount: v.number(),
@@ -293,11 +270,22 @@ export const createTransaction = mutation({
     expectedClearDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return insertTransaction(ctx, args);
+    // Authenticate and authorize
+    const church = await requireWritePermission(ctx);
+
+    // Verify fund belongs to user's church
+    await verifyFundOwnership(ctx, args.fundId);
+
+    // Use authenticated church context
+    return insertTransaction(ctx, {
+      ...args,
+      churchId: church.churchId,
+      createdBy: args.createdBy ?? church.userId,
+    });
   },
 });
 
-// Update a transaction
+// Update a transaction (secured)
 export const updateTransaction = mutation({
   args: {
     transactionId: v.id("transactions"),
@@ -323,41 +311,21 @@ export const updateTransaction = mutation({
     expectedClearDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Authenticate and authorize
+    const church = await requireWritePermission(ctx);
+
     const { transactionId, updatedBy, ...updates } = args;
 
-    const transaction = await ctx.db.get(transactionId);
-    if (!transaction) {
-      throw new Error("Transaction not found");
+    // Verify transaction belongs to user's church
+    const transaction = await verifyTransactionOwnership(ctx, transactionId);
+
+    // If changing fund, verify new fund belongs to church
+    if (updates.fundId) {
+      await verifyFundOwnership(ctx, updates.fundId);
     }
 
-    let userId = updatedBy;
-    if (!userId) {
-      const existingChurchUser = await ctx.db
-        .query("users")
-        .withIndex("by_church", (q) => q.eq("churchId", transaction.churchId))
-        .first();
-
-      if (existingChurchUser) {
-        userId = existingChurchUser._id;
-      } else {
-        const placeholderEmail = `manual+${transaction.churchId}@churchcoin.local`;
-        const placeholderUser = await ctx.db
-          .query("users")
-          .withIndex("by_email", (q) => q.eq("email", placeholderEmail))
-          .first();
-
-        if (placeholderUser) {
-          userId = placeholderUser._id;
-        } else {
-          userId = await ctx.db.insert("users", {
-            name: transaction.enteredByName ?? "Manual Entry",
-            email: placeholderEmail,
-            role: "secured_guest",
-            churchId: transaction.churchId,
-          } satisfies Omit<Doc<"users">, "_id" | "_creationTime">);
-        }
-      }
-    }
+    // Use authenticated user ID
+    const userId = updatedBy ?? church.userId;
 
     const { removeReceipt, ...rawUpdates } = updates as typeof updates & {
       removeReceipt?: boolean;
@@ -496,45 +464,21 @@ export const updateTransaction = mutation({
   },
 });
 
+// Delete a transaction (secured - requires write permission)
 export const deleteTransaction = mutation({
   args: {
     transactionId: v.id("transactions"),
     deletedBy: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const transaction = await ctx.db.get(args.transactionId);
-    if (!transaction) {
-      throw new Error("Transaction not found");
-    }
+    // Authenticate and authorize (write permission for delete)
+    const church = await requireWritePermission(ctx);
 
-    let userId = args.deletedBy;
-    if (!userId) {
-      const existingChurchUser = await ctx.db
-        .query("users")
-        .withIndex("by_church", (q) => q.eq("churchId", transaction.churchId))
-        .first();
+    // Verify transaction belongs to user's church
+    const transaction = await verifyTransactionOwnership(ctx, args.transactionId);
 
-      if (existingChurchUser) {
-        userId = existingChurchUser._id;
-      } else {
-        const placeholderEmail = `manual+${transaction.churchId}@churchcoin.local`;
-        const placeholderUser = await ctx.db
-          .query("users")
-          .withIndex("by_email", (q) => q.eq("email", placeholderEmail))
-          .first();
-
-        if (placeholderUser) {
-          userId = placeholderUser._id;
-        } else {
-          userId = await ctx.db.insert("users", {
-            name: transaction.enteredByName ?? "Manual Entry",
-            email: placeholderEmail,
-            role: "secured_guest",
-            churchId: transaction.churchId,
-          } satisfies Omit<Doc<"users">, "_id" | "_creationTime">);
-        }
-      }
-    }
+    // Use authenticated user ID
+    const userId = args.deletedBy ?? church.userId;
 
     // Reverse fund balance impact
     const balanceChange = transaction.type === "income" ? -transaction.amount : transaction.amount;
@@ -575,9 +519,11 @@ export const findPotentialDuplicates = query({
   },
 });
 
+// Record an expense (secured - convenience wrapper)
 export const recordExpense = mutation({
   args: {
-    churchId: v.id("churches"),
+    // churchId kept for backward compatibility but verified against auth
+    churchId: v.optional(v.id("churches")),
     date: v.string(),
     description: v.string(),
     amount: v.number(),
@@ -592,13 +538,21 @@ export const recordExpense = mutation({
     receiptFilename: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Authenticate and authorize
+    const church = await requireWritePermission(ctx);
+
+    // Verify fund belongs to user's church
+    await verifyFundOwnership(ctx, args.fundId);
+
     return await insertTransaction(ctx, {
       ...args,
+      churchId: church.churchId,
       amount: Math.abs(args.amount),
       type: "expense",
       donorId: undefined,
       giftAid: false,
       source: "manual",
+      createdBy: args.createdBy ?? church.userId,
     });
   },
 });
