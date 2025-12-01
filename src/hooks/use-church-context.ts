@@ -49,7 +49,6 @@ export interface ChurchContextValue {
 }
 
 /**
-<<<<<<< HEAD
  * Normalize legacy role values to canonical names
  * Matches backend normalizeRole in convex/roles.ts
  */
@@ -69,8 +68,6 @@ function normalizeRole(role: string | undefined): string {
 }
 
 /**
-=======
->>>>>>> c2efc366c7d52a9bf64b1ac13ef316bfc4a26774
  * Roles that can write data
  */
 const WRITE_ROLES = ["administrator", "finance"];
@@ -164,13 +161,8 @@ export function useChurchContext(): ChurchContextValue {
   // Find selected church
   const selectedChurch = churches?.find((c) => c._id === churchId) ?? null;
 
-<<<<<<< HEAD
   // Compute permissions (normalize to handle legacy role values)
   const role = normalizeRole(currentUser?.role);
-=======
-  // Compute permissions
-  const role = currentUser?.role ?? "";
->>>>>>> c2efc366c7d52a9bf64b1ac13ef316bfc4a26774
   const canWrite = WRITE_ROLES.includes(role);
   const canAdmin = ADMIN_ROLES.includes(role);
 
