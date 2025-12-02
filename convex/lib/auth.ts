@@ -89,12 +89,19 @@ export async function getCurrentUser(
 
 /**
  * Get the current authenticated user
- * @throws AuthenticationError if not authenticated or user not found
+ * @throws UNAUTHORIZED if not authenticated or user not found
  */
 export async function requireUser(ctx: AuthContext): Promise<Doc<"users">> {
+  // First check if user is authenticated at all
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) {
+    return Errors.unauthorized("Authentication required");
+  }
+
+  // Then get the user record
   const user = await getCurrentUser(ctx);
   if (!user) {
-    throw new Error("User not found");
+    return Errors.unauthorized("User account not found. Please complete registration.");
   }
   return user;
 }
@@ -104,23 +111,23 @@ export async function requireUser(ctx: AuthContext): Promise<Doc<"users">> {
  *
  * This is the primary auth middleware. Use this in most functions.
  *
- * @throws AuthenticationError if not authenticated
- * @throws AuthenticationError if user not found
- * @throws AuthorizationError if user not assigned to a church
+ * @throws UNAUTHORIZED if not authenticated or user not found
+ * @throws FORBIDDEN if user not assigned to a church
+ * @throws NOT_FOUND if church doesn't exist
  */
 export async function getChurchContext(ctx: AuthContext): Promise<ChurchContext> {
-  // 1. Get authenticated user
+  // 1. Get authenticated user (throws UNAUTHORIZED if not authenticated)
   const user = await requireUser(ctx);
 
   // 2. Verify user has church assignment
   if (!user.churchId) {
-    throw new Error("User not assigned to a church");
+    return Errors.forbidden("access this resource. You are not assigned to a church.");
   }
 
   // 3. Get church document
   const church = await ctx.db.get(user.churchId);
   if (!church) {
-    throw new Error("Church not found");
+    return Errors.notFound("Church");
   }
 
   // 4. Normalize role and compute permissions
@@ -207,8 +214,8 @@ export async function requirePermission(
 /**
  * Verify a resource belongs to the user's church
  *
- * @throws NotFoundError if resource doesn't exist
- * @throws AuthorizationError if resource doesn't belong to user's church
+ * @throws NOT_FOUND if resource doesn't exist
+ * @throws FORBIDDEN if resource doesn't belong to user's church
  */
 export async function verifyChurchOwnership<
   T extends { churchId: Id<"churches"> }
@@ -218,14 +225,14 @@ export async function verifyChurchOwnership<
   resourceType: string = "Resource"
 ): Promise<T> {
   if (!resource) {
-    throw new Error(`${resourceType} not found`);
+    return Errors.notFound(resourceType);
   }
 
   const churchContext = await getChurchContext(ctx);
 
   if (resource.churchId !== churchContext.churchId) {
-    throw new Error(
-      `Cannot access this ${resourceType}. It belongs to a different church.`
+    return Errors.forbidden(
+      `access this ${resourceType}. It belongs to a different church.`
     );
   }
 
