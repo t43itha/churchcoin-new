@@ -1,19 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useConvex, useMutation, useQuery } from "convex/react";
 import { PlusCircle } from "lucide-react";
 
 import {
   BulkTransactionDialog,
-  type TransactionCreateValues,
 } from "@/components/transactions/bulk-transaction-dialog";
 import { EditTransactionDialog } from "@/components/transactions/edit-transaction-dialog";
 import {
   TransactionLedger,
   type TransactionLedgerRow,
 } from "@/components/transactions/transaction-ledger";
-import { PeriodSelector, type PeriodViewMode } from "@/components/transactions/period-selector";
+import { PeriodSelector } from "@/components/transactions/period-selector";
 import { MultiPeriodOverview } from "@/components/transactions/multi-period-overview";
 import { PeriodCard } from "@/components/transactions/period-card";
 import { SearchFilterBar, type FilterOption } from "@/components/common/search-filter-bar";
@@ -26,10 +23,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { api, type Doc, type Id } from "@/lib/convexGenerated";
-import { useSession } from "@/components/auth/session-provider";
-import { getRolePermissions } from "@/lib/rbac";
-import { getLastNMonths, getCurrentPeriod, periodToKey } from "@/lib/periods";
+import type { Doc, Id } from "@/lib/convexGenerated";
+import { formatCurrency } from "@/lib/formats";
+import { useTransactionsPage } from "@/hooks/pages";
 
 const TRANSACTION_FILTER_OPTIONS: FilterOption<"all" | "income" | "expense" | "reconciled" | "unreconciled">[] = [
   { value: "all", label: "All" },
@@ -39,377 +35,52 @@ const TRANSACTION_FILTER_OPTIONS: FilterOption<"all" | "income" | "expense" | "r
   { value: "unreconciled", label: "Unreconciled" },
 ];
 
-const currency = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "GBP",
-});
-
 export default function TransactionsPage() {
-  const convex = useConvex();
-  const churches = useQuery(api.churches.listChurches, {});
-  const [churchId, setChurchId] = useState<Id<"churches"> | null>(null);
-  const [viewMode, setViewMode] = useState<PeriodViewMode>("last-6");
-  const [expandedPeriods, setExpandedPeriods] = useState<Set<string>>(new Set());
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingTransaction, setEditingTransaction] = useState<Doc<"transactions"> | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [transactionFilter, setTransactionFilter] = useState<"all" | "income" | "expense" | "reconciled" | "unreconciled">("all");
-  const { user } = useSession();
-  const permissions = useMemo(
-    () => getRolePermissions(user?.role),
-    [user?.role]
-  );
-  const canManageTransactions = permissions.canManageFinancialData;
-  const canRecordManualTransactions = permissions.canRecordManualTransactions;
-  const canViewFinancialData = permissions.canViewFinancialData;
-  const showLedger = canViewFinancialData && !permissions.restrictedToManualEntry;
+  const {
+    // State
+    churchId,
+    setChurchId,
+    viewMode,
+    setViewMode,
+    expandedPeriods,
+    feedback,
+    isDialogOpen,
+    setIsDialogOpen,
+    editingTransaction,
+    isEditDialogOpen,
+    setIsEditDialogOpen,
+    searchQuery,
+    setSearchQuery,
+    transactionFilter,
+    setTransactionFilter,
 
-  // Calculate periods based on view mode
-  const periods = useMemo(() => {
-    switch (viewMode) {
-      case "current":
-        return [getCurrentPeriod()];
-      case "last-3":
-        return getLastNMonths(3);
-      case "last-6":
-        return getLastNMonths(6);
-      case "all":
-        return null; // Will use old query
-      default:
-        return getLastNMonths(6);
-    }
-  }, [viewMode]);
+    // Data
+    churches,
+    funds,
+    categories,
+    donors,
+    periods,
+    multiPeriodSummary,
+    trendData,
+    filteredAllTransactions,
+    allTransactionsTotals,
 
-  const funds = useQuery(
-    api.funds.getFunds,
-    churchId ? { churchId } : "skip"
-  );
-  const categories = useQuery(
-    api.categories.getCategories,
-    churchId ? { churchId } : "skip"
-  );
-  const donors = useQuery(
-    api.donors.getDonors,
-    churchId ? { churchId } : "skip"
-  );
+    // Permissions
+    canManageTransactions,
+    canRecordManualTransactions,
+    canViewFinancialData,
+    showLedger,
 
-  // Load multi-period summary
-  const multiPeriodSummary = useQuery(
-    api.transactions.getMultiPeriodSummary,
-    churchId && periods ? { churchId, periods } : "skip"
-  );
-
-  // Load trend data for overview
-  const trendData = useQuery(
-    api.transactions.getPeriodTrends,
-    churchId && periods && periods.length > 1 ? { churchId, periods } : "skip"
-  );
-
-  // Fallback for "All" mode - use old query
-  const allTransactions = useQuery(
-    api.transactions.getLedger,
-    churchId && viewMode === "all" ? { churchId, limit: 1000 } : "skip"
-  );
-
-  // Filter transactions based on search and filter
-  const filteredAllTransactions = useMemo(() => {
-    if (!allTransactions) return allTransactions;
-
-    let filtered = allTransactions;
-
-    // Apply type filter
-    if (transactionFilter === "income") {
-      filtered = filtered.filter((tx) => tx.transaction.type === "income");
-    } else if (transactionFilter === "expense") {
-      filtered = filtered.filter((tx) => tx.transaction.type === "expense");
-    } else if (transactionFilter === "reconciled") {
-      filtered = filtered.filter((tx) => tx.transaction.reconciled === true);
-    } else if (transactionFilter === "unreconciled") {
-      filtered = filtered.filter((tx) => tx.transaction.reconciled !== true);
-    }
-
-    // Apply search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter((tx) =>
-        tx.transaction.description.toLowerCase().includes(query) ||
-        tx.transaction.reference?.toLowerCase().includes(query) ||
-        tx.fund?.name?.toLowerCase().includes(query)
-      );
-    }
-
-    return filtered;
-  }, [allTransactions, transactionFilter, searchQuery]);
-
-  // Calculate totals for filtered transactions
-  const allTransactionsTotals = useMemo(() => {
-    if (!filteredAllTransactions) return { income: 0, expense: 0 };
-
-    return filteredAllTransactions.reduce(
-      (acc, row) => {
-        if (row.transaction.type === "income") {
-          acc.income += row.transaction.amount;
-        } else {
-          acc.expense += row.transaction.amount;
-        }
-        return acc;
-      },
-      { income: 0, expense: 0 }
-    );
-  }, [filteredAllTransactions]);
-
-  const createTransaction = useMutation(api.transactions.createTransaction);
-  const updateTransaction = useMutation(api.transactions.updateTransaction);
-  const deleteTransactionMutation = useMutation(api.transactions.deleteTransaction);
-  const reconcileTransaction = useMutation(api.transactions.reconcileTransaction);
-
-  useEffect(() => {
-    if (!churchId && churches && churches.length > 0) {
-      setChurchId(churches[0]._id);
-    }
-  }, [churches, churchId]);
-
-  // Auto-expand current period
-  useEffect(() => {
-    if (periods && periods.length > 0) {
-      const currentKey = periodToKey(periods[0]);
-      setExpandedPeriods(new Set([currentKey]));
-    }
-  }, [periods]);
-
-  const togglePeriod = (year: number, month: number) => {
-    const key = `${year}-${month}`;
-    setExpandedPeriods(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  };
-
-  const handleCreateTransactions = async (transactions: TransactionCreateValues[]) => {
-    if (!canRecordManualTransactions) {
-      setFeedback({
-        type: "error",
-        message: "You do not have permission to record transactions.",
-      });
-      setTimeout(() => setFeedback(null), 5000);
-      return;
-    }
-    for (const transaction of transactions) {
-      await createTransaction(transaction);
-    }
-    setFeedback({
-      type: "success",
-      message: `Successfully recorded ${transactions.length} transaction${transactions.length > 1 ? "s" : ""}.`,
-    });
-    setTimeout(() => setFeedback(null), 5000);
-  };
-
-  const handleUpdateTransaction = async (transactionId: Id<"transactions">, updates: {
-    date?: string;
-    description?: string;
-    amount?: number;
-    type?: "income" | "expense";
-    fundId?: Id<"funds">;
-    categoryId?: Id<"categories">;
-    donorId?: Id<"donors">;
-    method?: string;
-    reference?: string;
-    giftAid?: boolean;
-    notes?: string;
-  }) => {
-    if (!canManageTransactions) {
-      setFeedback({
-        type: "error",
-        message: "You do not have permission to update transactions.",
-      });
-      setTimeout(() => setFeedback(null), 5000);
-      return;
-    }
-
-    const previousCategory = editingTransaction?.categoryId;
-    const nextCategory = updates.categoryId;
-
-    await updateTransaction({
-      transactionId,
-      ...updates,
-    });
-
-    if (churchId && nextCategory && nextCategory !== previousCategory && editingTransaction) {
-      await convex.mutation(api.ai.recordFeedback, {
-        churchId,
-        description: editingTransaction.description,
-        amount: editingTransaction.amount,
-        categoryId: nextCategory,
-        confidence: 0.9,
-        userId: user?._id,
-      });
-    }
-
-    setFeedback({
-      type: "success",
-      message: "Transaction updated successfully.",
-    });
-    setTimeout(() => setFeedback(null), 5000);
-    setIsEditDialogOpen(false);
-    setEditingTransaction(null);
-  };
-
-  const handleQuickUpdateTransaction = async (updates: {
-    date: string;
-    description: string;
-    amount: number;
-    type: "income" | "expense";
-    fundId: Id<"funds">;
-    categoryId?: Id<"categories">;
-    donorId?: Id<"donors">;
-    method?: string;
-    reference?: string;
-    giftAid?: boolean;
-    notes?: string;
-  }) => {
-    if (!editingTransaction) return;
-    await handleUpdateTransaction(editingTransaction._id, updates);
-  };
-
-  const handleDelete = async (transactionId: Id<"transactions">) => {
-    if (!canManageTransactions) {
-      setFeedback({
-        type: "error",
-        message: "You do not have permission to delete transactions.",
-      });
-      setTimeout(() => setFeedback(null), 5000);
-      return;
-    }
-    await deleteTransactionMutation({ transactionId });
-    if (editingTransaction?._id === transactionId) {
-      setEditingTransaction(null);
-    }
-    setFeedback({ type: "success", message: "Transaction removed from the ledger." });
-  };
-
-  const handleToggleReconciled = async (transactionId: Id<"transactions">, reconciled: boolean) => {
-    if (!canManageTransactions) {
-      setFeedback({
-        type: "error",
-        message: "You do not have permission to reconcile transactions.",
-      });
-      setTimeout(() => setFeedback(null), 5000);
-      return;
-    }
-    await reconcileTransaction({ transactionId, reconciled });
-    setFeedback({
-      type: "success",
-      message: reconciled ? "Marked transaction as reconciled." : "Transaction set back to unreconciled.",
-    });
-  };
-
-  const handleRequestReceipt = async (transaction: Doc<"transactions">) => {
-    if (!canViewFinancialData) {
-      setFeedback({
-        type: "error",
-        message: "You do not have permission to view receipts.",
-      });
-      setTimeout(() => setFeedback(null), 5000);
-      return;
-    }
-
-    if (!transaction.receiptStorageId) {
-      return;
-    }
-
-    try {
-      const params = new URLSearchParams();
-      if (churchId) {
-        params.set("churchId", churchId);
-      }
-
-      const query = params.toString();
-      const response = await fetch(
-        query.length > 0
-          ? `/api/files/receipts/${transaction.receiptStorageId}?${query}`
-          : `/api/files/receipts/${transaction.receiptStorageId}`
-      );
-      const payload = (await response.json().catch(() => null)) as
-        | { url?: string; error?: string }
-        | null;
-
-      if (response.ok && payload?.url) {
-        window.open(payload.url, "_blank", "noopener,noreferrer");
-      } else {
-        const message = payload?.error ?? "Receipt could not be found.";
-        setFeedback({ type: "error", message });
-      }
-    } catch (error) {
-      console.error("Failed to fetch receipt URL", error);
-      setFeedback({ type: "error", message: "Receipt could not be found." });
-    }
-  };
-
-  const handleSuggestCategory = async (transaction: Doc<"transactions">) => {
-    if (!canManageTransactions) {
-      setFeedback({
-        type: "error",
-        message: "You do not have permission to categorise transactions.",
-      });
-      setTimeout(() => setFeedback(null), 5000);
-      return;
-    }
-
-    if (!categories || !churchId) {
-      return;
-    }
-
-    const suggestion = await convex.mutation(api.ai.suggestCategory, {
-      churchId,
-      description: transaction.description,
-      amount: transaction.amount,
-      categories: (categories as Doc<"categories">[]).map((category) => ({
-        id: category._id,
-        name: category.name,
-        type: category.type,
-      })),
-    });
-
-    if (suggestion?.categoryId) {
-      const suggestedCategoryId = suggestion.categoryId as Id<"categories">;
-      const suggestedCategory = (categories as Doc<"categories">[]).find(
-        (category) => category._id === suggestedCategoryId
-      );
-
-      await updateTransaction({
-        transactionId: transaction._id,
-        categoryId: suggestedCategoryId,
-      });
-      await convex.mutation(api.ai.recordFeedback, {
-        churchId,
-        description: transaction.description,
-        amount: transaction.amount,
-        categoryId: suggestedCategoryId,
-        confidence: suggestion.confidence,
-        userId: user?._id,
-      });
-
-      const suggestionLabel = suggestedCategory
-        ? ` (${suggestedCategory.name})`
-        : "";
-      const confidencePercentage = Math.round(suggestion.confidence * 100);
-
-      setFeedback({
-        type: "success",
-        message: `Categorised using AI suggestion${suggestionLabel} at ${confidencePercentage}% confidence.`,
-      });
-    } else {
-      setFeedback({ type: "error", message: "No confident suggestion available yet." });
-    }
-  };
-
+    // Actions
+    togglePeriod,
+    handleCreateTransactions,
+    handleQuickUpdateTransaction,
+    handleDelete,
+    handleToggleReconciled,
+    handleRequestReceipt,
+    handleSuggestCategory,
+    openEditDialog,
+  } = useTransactionsPage();
 
   // Render loading state
   if (!churches) {
@@ -531,10 +202,7 @@ export default function TransactionsPage() {
                     summary={summary}
                     isExpanded={expandedPeriods.has(key)}
                     onToggle={() => togglePeriod(period.year, period.month)}
-                    onEdit={canManageTransactions ? (tx) => {
-                      setEditingTransaction(tx);
-                      setIsEditDialogOpen(true);
-                    } : undefined}
+                    onEdit={canManageTransactions ? openEditDialog : undefined}
                     onDelete={canManageTransactions ? handleDelete : undefined}
                     onToggleReconciled={canManageTransactions ? handleToggleReconciled : undefined}
                     onRequestReceipt={canViewFinancialData ? handleRequestReceipt : undefined}
@@ -555,16 +223,16 @@ export default function TransactionsPage() {
             {/* KPI Badges */}
             <div className="flex flex-wrap items-center gap-2 text-xs text-grey-mid">
               <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
-                {filteredAllTransactions.length} {allTransactions?.length ? `of ${allTransactions.length}` : ""} entries
+                {filteredAllTransactions.length} entries
               </Badge>
               <Badge variant="secondary" className="border-ledger bg-highlight text-success">
-                Income {currency.format(allTransactionsTotals.income)}
+                Income {formatCurrency(allTransactionsTotals.income)}
               </Badge>
               <Badge variant="secondary" className="border-ledger bg-highlight text-error">
-                Expenses {currency.format(allTransactionsTotals.expense)}
+                Expenses {formatCurrency(allTransactionsTotals.expense)}
               </Badge>
               <span className="text-xs text-grey-mid">
-                Net {currency.format(allTransactionsTotals.income - allTransactionsTotals.expense)}
+                Net {formatCurrency(allTransactionsTotals.income - allTransactionsTotals.expense)}
               </span>
             </div>
 
@@ -580,11 +248,8 @@ export default function TransactionsPage() {
 
             <TransactionLedger
               rows={filteredAllTransactions as TransactionLedgerRow[]}
-              totalRows={allTransactions?.length}
-              onEdit={canManageTransactions ? (tx) => {
-                setEditingTransaction(tx);
-                setIsEditDialogOpen(true);
-              } : undefined}
+              totalRows={filteredAllTransactions?.length}
+              onEdit={canManageTransactions ? openEditDialog : undefined}
               onDelete={canManageTransactions ? handleDelete : undefined}
               onToggleReconciled={canManageTransactions ? handleToggleReconciled : undefined}
               onRequestReceipt={canViewFinancialData ? handleRequestReceipt : undefined}

@@ -4,3 +4,4 @@
  */
 
 export { useTransactionForm, type UseTransactionFormOptions, type UseTransactionFormReturn } from "./use-transaction-form";
+export { useTransactionsPage, type UseTransactionsPageReturn } from "./use-transactions-page";
