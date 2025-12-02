@@ -1,0 +1,261 @@
+{
+  "meta": {
+    "project_name": "ChurchCoin - Modern Sanctuary",
+    "version": "1.0.0",
+    "target_audience": "Church Treasurers & Administrators",
+    "design_philosophy": "Cathedral Architecture meets Modern Fintech. Trust, Warmth, Future-Forward.",
+    "mood": "Excited, Modern, Safe, Sacred"
+  },
+  "color_system": {
+    "primary": {
+      "base": "#1a2744",
+      "name": "Cathedral Navy",
+      "shades": {
+        "100": "#e8eaf0",
+        "200": "#c5cad9",
+        "300": "#9ea6bf",
+        "400": "#7d88a8",
+        "500": "#5f6d91",
+        "600": "#43537a",
+        "700": "#2b3b61",
+        "800": "#1a2744",
+        "900": "#0f172b"
+      },
+      "usage": "Primary backgrounds, header text, trust indicators, footer."
+    },
+    "accent": {
+      "base": "#c9a227",
+      "name": "Liturgical Gold",
+      "shades": {
+        "100": "#fdf8e6",
+        "200": "#faecc2",
+        "300": "#f5df99",
+        "400": "#efd070",
+        "500": "#e5bf4b",
+        "600": "#c9a227",
+        "700": "#a1801a",
+        "800": "#7a6010",
+        "900": "#544108"
+      },
+      "usage": "Primary CTAs, highlights, illustrations, icons, borders."
+    },
+    "neutral": {
+      "base": "#faf8f5",
+      "name": "Sanctuary Cream",
+      "shades": {
+        "white": "#ffffff",
+        "50": "#faf8f5",
+        "100": "#f0ede8",
+        "200": "#e6e2db",
+        "300": "#d6d1c9",
+        "800": "#4a4a4a",
+        "900": "#2d2d2d"
+      },
+      "usage": "Page backgrounds (50/100), Cards (White), Text (900)."
+    },
+    "semantic": {
+      "success": "#2e7d32",
+      "success_bg": "#e8f5e9",
+      "error": "#c62828",
+      "error_bg": "#ffebee",
+      "info": "#1565c0",
+      "warning": "#ef6c00"
+    },
+    "gradients": {
+      "stained_glass": "linear-gradient(135deg, #1a2744 0%, #2b3b61 100%)",
+      "morning_light": "linear-gradient(180deg, #faf8f5 0%, #ffffff 100%)",
+      "gold_sheen": "linear-gradient(45deg, #c9a227 0%, #e5bf4b 50%, #c9a227 100%)"
+    }
+  },
+  "typography": {
+    "font_family": {
+      "display": "\"Fraunces\", serif",
+      "body": "\"Source Sans 3\", sans-serif"
+    },
+    "weights": {
+      "regular": 400,
+      "medium": 500,
+      "semibold": 600,
+      "bold": 700
+    },
+    "scale": {
+      "h1": {
+        "size": "3.5rem",
+        "line_height": "1.1",
+        "letter_spacing": "-0.02em",
+        "font_family": "display",
+        "usage": "Hero Headlines"
+      },
+      "h2": {
+        "size": "2.75rem",
+        "line_height": "1.2",
+        "letter_spacing": "-0.01em",
+        "font_family": "display",
+        "usage": "Section Headers"
+      },
+      "h3": {
+        "size": "2rem",
+        "line_height": "1.25",
+        "letter_spacing": "0",
+        "font_family": "display",
+        "usage": "Feature Titles"
+      },
+      "h4": {
+        "size": "1.5rem",
+        "line_height": "1.3",
+        "font_family": "display",
+        "usage": "Card Titles"
+      },
+      "subtitle": {
+        "size": "1.25rem",
+        "line_height": "1.5",
+        "font_family": "body",
+        "weight": "400",
+        "usage": "Hero Subtext"
+      },
+      "body_lg": {
+        "size": "1.125rem",
+        "line_height": "1.6",
+        "font_family": "body",
+        "usage": "Lead Paragraphs"
+      },
+      "body": {
+        "size": "1rem",
+        "line_height": "1.6",
+        "font_family": "body",
+        "usage": "Standard Text"
+      },
+      "caption": {
+        "size": "0.875rem",
+        "line_height": "1.4",
+        "font_family": "body",
+        "usage": "Labels, Meta Data"
+      },
+      "button": {
+        "size": "1rem",
+        "line_height": "1",
+        "weight": "600",
+        "font_family": "body",
+        "text_transform": "none"
+      }
+    }
+  },
+  "spacing_system": {
+    "base_unit": "4px",
+    "scale": {
+      "xs": "4px",
+      "sm": "8px",
+      "md": "16px",
+      "lg": "24px",
+      "xl": "32px",
+      "2xl": "48px",
+      "3xl": "64px",
+      "section": "96px",
+      "gutter": "24px"
+    }
+  },
+  "shadows_and_borders": {
+    "radius": {
+      "sm": "4px",
+      "md": "8px",
+      "lg": "16px",
+      "full": "9999px",
+      "arch": "100px 100px 0 0"
+    },
+    "shadows": {
+      "sm": "0 1px 2px rgba(26, 39, 68, 0.05)",
+      "md": "0 4px 6px -1px rgba(26, 39, 68, 0.1), 0 2px 4px -1px rgba(26, 39, 68, 0.06)",
+      "lg": "0 10px 15px -3px rgba(26, 39, 68, 0.1), 0 4px 6px -2px rgba(26, 39, 68, 0.05)",
+      "gold_glow": "0 0 15px rgba(201, 162, 39, 0.3)"
+    },
+    "borders": {
+      "subtle": "1px solid #e6e2db",
+      "accent": "2px solid #c9a227"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": {
+        "bg": "#c9a227",
+        "text": "#1a2744",
+        "hover_bg": "#dcb63d",
+        "radius": "4px",
+        "shadow": "sm",
+        "style": "Solid, high contrast"
+      },
+      "secondary": {
+        "bg": "transparent",
+        "border": "2px solid #1a2744",
+        "text": "#1a2744",
+        "hover_bg": "#f0ede8",
+        "radius": "4px"
+      },
+      "text": {
+        "bg": "transparent",
+        "text": "#1a2744",
+        "hover_text": "#c9a227",
+        "decoration": "underline decoration-2 decoration-gold/30"
+      }
+    },
+    "cards": {
+      "bg": "#ffffff",
+      "border": "1px solid #f0ede8",
+      "radius": "8px",
+      "shadow": "md",
+      "hover_effect": "translate-y-[-4px] shadow-lg"
+    },
+    "badges": {
+      "bg": "#e8f5e9",
+      "text": "#2e7d32",
+      "radius": "999px",
+      "font": "Source Sans 3, 0.75rem, Bold"
+    }
+  },
+  "visual_elements": {
+    "hero_section": {
+      "layout": "Split screen or Center focused",
+      "background": "Soft Cream (#faf8f5) with subtle 'Sacred Geometry' line art overlay (opacity 5%).",
+      "image_treatment": "Dashboard screenshots placed inside 'Arch' shaped masks or frames.",
+      "headline_style": "Fraunces Navy (#1a2744), stylized italics for emphasis words.",
+      "visual_metaphor": "A beam of warm light (gradient) illuminating the dashboard UI."
+    },
+    "shapes": {
+      "arch": "Used for image masking, modal tops, or section dividers.",
+      "circle": "Used for icon backgrounds or floating decorative elements (halos).",
+      "line": "Thin, gold lines (1px) used to separate content, mimicking ledger lines."
+    },
+    "textures": {
+      "paper": "Subtle grain noise (2%) overlay on backgrounds to give a tactile, stationery feel."
+    },
+    "icons": {
+      "style": "Stroke/Outline icons.",
+      "weight": "1.5px",
+      "color": "Navy (#1a2744)",
+      "accent": "Gold (#c9a227) fill on 20% opacity for specific elements within the icon.",
+      "library_recommendation": "Lucide React or Phosphor Icons"
+    }
+  },
+  "animation": {
+    "timing": {
+      "fast": "150ms",
+      "normal": "300ms",
+      "slow": "500ms",
+      "majestic": "800ms"
+    },
+    "easing": {
+      "standard": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "entrance": "cubic-bezier(0.2, 0.8, 0.2, 1)"
+    },
+    "effects": {
+      "scroll_reveal": "Fade up + 20px y-axis translation.",
+      "hover_lift": "Transform translateY(-4px).",
+      "glow_pulse": "Keyframe animation of box-shadow opacity."
+    }
+  },
+  "breakpoints": {
+    "mobile": "320px",
+    "tablet": "768px",
+    "desktop": "1024px",
+    "wide": "1280px"
+  }
+}

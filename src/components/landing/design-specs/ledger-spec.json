@@ -1,0 +1,244 @@
+{
+  "meta": {
+    "project": "Clean Ledger for ChurchCoin",
+    "version": "1.0.0",
+    "design_philosophy": "Swiss Minimalism meets Digital Ledger",
+    "target_mood": "Excited, Modern, Trustworthy, Precise",
+    "target_audience_considerations": {
+      "accessibility": "High contrast, large touch targets, clear hierarchy for 55+ demographic",
+      "tone": "Professional but inviting, removing the fear of finance"
+    }
+  },
+  "color_system": {
+    "palette": {
+      "ink": {
+        "900": "#000000",
+        "800": "#1a1a1a",
+        "700": "#333333",
+        "100": "#e5e5e5"
+      },
+      "sage": {
+        "main": "#6b8e6b",
+        "light": "#e8f0e8",
+        "dark": "#4a634a"
+      },
+      "paper": {
+        "main": "#fafaf9",
+        "white": "#ffffff",
+        "darker": "#f0f0ed"
+      },
+      "amber": {
+        "main": "#d4a574",
+        "light": "#faefe6",
+        "vibrant": "#eebb86"
+      }
+    },
+    "semantic_usage": {
+      "background": {
+        "default": "#fafaf9",
+        "surface": "#ffffff",
+        "subtle": "#f0f0ed"
+      },
+      "text": {
+        "primary": "#000000",
+        "secondary": "#1a1a1a",
+        "muted": "#666666",
+        "on_dark": "#ffffff"
+      },
+      "border": {
+        "default": "#e5e5e5",
+        "strong": "#000000",
+        "focus": "#6b8e6b"
+      },
+      "action": {
+        "primary_bg": "#000000",
+        "primary_text": "#ffffff",
+        "secondary_bg": "#ffffff",
+        "secondary_border": "#000000",
+        "highlight": "#d4a574"
+      },
+      "status": {
+        "success": "#6b8e6b",
+        "warning": "#d4a574",
+        "error": "#cc3333"
+      }
+    }
+  },
+  "typography": {
+    "font_families": {
+      "primary": "'DM Sans', sans-serif",
+      "mono": "'JetBrains Mono', monospace"
+    },
+    "scale": {
+      "h1": {
+        "size": "4.5rem",
+        "line_height": "1.1",
+        "weight": "700",
+        "letter_spacing": "-0.02em",
+        "mobile_size": "3rem"
+      },
+      "h2": {
+        "size": "3rem",
+        "line_height": "1.2",
+        "weight": "700",
+        "letter_spacing": "-0.01em",
+        "mobile_size": "2.25rem"
+      },
+      "h3": {
+        "size": "2rem",
+        "line_height": "1.3",
+        "weight": "500",
+        "letter_spacing": "-0.01em"
+      },
+      "h4": {
+        "size": "1.5rem",
+        "line_height": "1.4",
+        "weight": "500"
+      },
+      "body_large": {
+        "size": "1.25rem",
+        "line_height": "1.6",
+        "weight": "400"
+      },
+      "body_default": {
+        "size": "1rem",
+        "line_height": "1.6",
+        "weight": "400"
+      },
+      "caption": {
+        "size": "0.875rem",
+        "line_height": "1.5",
+        "weight": "500",
+        "text_transform": "uppercase",
+        "letter_spacing": "0.05em"
+      },
+      "data_display": {
+        "family": "JetBrains Mono",
+        "size": "1rem",
+        "weight": "500"
+      }
+    }
+  },
+  "spacing_system": {
+    "base_unit": "4px",
+    "scale": {
+      "xs": "4px",
+      "sm": "8px",
+      "md": "16px",
+      "lg": "24px",
+      "xl": "32px",
+      "2xl": "48px",
+      "3xl": "64px",
+      "section": "120px"
+    },
+    "grid": {
+      "columns": 12,
+      "gap": "24px",
+      "max_width": "1400px"
+    }
+  },
+  "component_styles": {
+    "buttons": {
+      "primary": {
+        "background": "#000000",
+        "text": "#ffffff",
+        "border": "1px solid #000000",
+        "radius": "2px",
+        "padding": "16px 32px",
+        "font_weight": "500",
+        "hover": {
+          "transform": "translate(-2px, -2px)",
+          "shadow": "4px 4px 0px #d4a574"
+        }
+      },
+      "secondary": {
+        "background": "transparent",
+        "text": "#000000",
+        "border": "1px solid #000000",
+        "radius": "2px",
+        "padding": "16px 32px",
+        "hover": {
+          "background": "#f0f0ed"
+        }
+      }
+    },
+    "cards": {
+      "background": "#ffffff",
+      "border": "1px solid #000000",
+      "radius": "0px",
+      "padding": "32px",
+      "shadow": "8px 8px 0px rgba(0,0,0,0.1)"
+    },
+    "badges": {
+      "font": "JetBrains Mono",
+      "text_transform": "uppercase",
+      "padding": "4px 8px",
+      "radius": "2px",
+      "border": "1px solid #000000",
+      "background": "#e8f0e8"
+    }
+  },
+  "hero_section": {
+    "layout": "Split screen asymmetrical grid (7 col text / 5 col visual)",
+    "visual_treatment": {
+      "background": "Detailed ledger grid pattern (opacity 0.05)",
+      "main_element": "Typography-led 'Financial Clarity'",
+      "graphic": "Abstract geometric visualization of data flow using thin lines and amber dots"
+    }
+  },
+  "animation_specs": {
+    "timing": {
+      "fast": "200ms",
+      "normal": "400ms",
+      "slow": "800ms"
+    },
+    "easing": "cubic-bezier(0.16, 1, 0.3, 1)",
+    "effects": {
+      "reveal": "TranslateY(20px) -> 0px + Opacity 0 -> 1",
+      "hover": "Sharp movement (no blur)",
+      "scroll": "Parallax effect on grid lines",
+      "typewriter": "Used for dynamic headings (simulating AI typing)"
+    }
+  },
+  "responsive_breakpoints": {
+    "mobile": "320px",
+    "tablet": "768px",
+    "desktop": "1024px",
+    "wide": "1440px"
+  },
+  "shadow_and_border": {
+    "borders": {
+      "hairline": "1px solid #e5e5e5",
+      "thin": "1px solid #000000",
+      "thick": "2px solid #000000"
+    },
+    "shadows": {
+      "hard_sm": "2px 2px 0px #000000",
+      "hard_md": "4px 4px 0px #000000",
+      "hard_lg": "8px 8px 0px #000000",
+      "soft": "none"
+    }
+  },
+  "icon_style": {
+    "set": "Custom or Phosphor Icons (Regular weight)",
+    "style": "Stroked, no fill",
+    "stroke_width": "1.5px",
+    "color": "#000000",
+    "corners": "Sharp or minimal rounding (2px)"
+  },
+  "key_visual_elements": {
+    "grid_lines": {
+      "description": "Visible background grid representing order",
+      "color": "rgba(0, 0, 0, 0.05)",
+      "spacing": "40px"
+    },
+    "paper_texture": {
+      "enabled": true,
+      "opacity": "0.4",
+      "blend_mode": "multiply"
+    },
+    "accents": {
+      "description": "Swiss style geometric shapes (circles, squares) in Sage and Amber floating behind content to add depth"
+    }
+  }
+}
