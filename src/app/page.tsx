@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { InteractiveDemo } from "@/components/InteractiveDemo";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Sheet,
   SheetClose,
@@ -23,16 +22,13 @@ import {
   Calculator,
   PoundSterling,
   Shield,
-  TrendingUp,
   Clock,
   CheckCircle,
   Star,
   ArrowRight,
   Menu,
-  ChevronRight,
   Users,
   FileText,
-  BarChart3,
   Wallet,
   Check,
   FileCheck

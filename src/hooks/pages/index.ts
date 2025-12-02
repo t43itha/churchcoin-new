@@ -1,0 +1,6 @@
+/**
+ * Page-level hooks for orchestrating complex page state and logic.
+ * These hooks encapsulate business logic to keep page components focused on layout.
+ */
+
+export { useTransactionForm, type UseTransactionFormOptions, type UseTransactionFormReturn } from "./use-transaction-form";

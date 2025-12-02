@@ -3,17 +3,12 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    PieChart,
     Wallet,
     FileCheck,
     TrendingUp,
     ArrowUpRight,
     ArrowDownRight,
-    Check,
-    Search
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const features = [

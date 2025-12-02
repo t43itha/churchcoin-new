@@ -138,7 +138,10 @@ export default defineSchema({
   })
     .index("by_church_date", ["churchId", "date"])
     .index("by_fund", ["fundId"])
+    .index("by_fund_date", ["fundId", "date"]) // For fund transaction history with date range
     .index("by_donor", ["donorId"])
+    .index("by_donor_date", ["donorId", "date"]) // For donor giving history with date range
+    .index("by_category", ["categoryId"]) // For category-based reports
     .index("by_reconciled", ["churchId", "reconciled"])
     .index("by_period", ["churchId", "periodYear", "periodMonth"])
     .index("by_review_status", ["churchId", "needsReview"])
