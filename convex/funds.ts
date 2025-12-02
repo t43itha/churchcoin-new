@@ -13,6 +13,17 @@ import {
   verifyFundOwnership,
 } from "./lib/auth";
 
+// Import fund overview helpers
+import {
+  getFundsByChurch,
+  initializeFundSummaries,
+  processTransactions,
+  groupPledgesByFund,
+  collectDonorIds,
+  loadDonorsById,
+  buildFundOverviewResult,
+} from "./lib/fundOverview";
+
 // Get all funds for a church (with optional limit for performance)
 export const getFunds = query({
   args: {
@@ -235,273 +246,46 @@ export const getTotalBalance = query({
   },
 });
 
+/**
+ * Get comprehensive fund overview with transactions, balances, and fundraising stats.
+ * Refactored to use helper functions for maintainability.
+ *
+ * @see convex/lib/fundOverview.ts for helper implementations
+ */
 export const getFundsOverview = query({
   args: { churchId: v.id("churches") },
   handler: async (ctx, args) => {
-    const funds = await ctx.db
-      .query("funds")
-      .withIndex("by_church", (q) => q.eq("churchId", args.churchId))
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+    // 1. Get all active funds
+    const funds = await getFundsByChurch(ctx, args.churchId);
 
-    const summaries = new Map<Doc<"funds">["_id"], {
-      fund: Doc<"funds">;
-      incomeTotal: number;
-      expenseTotal: number;
-      lastTransactionDate: string | null;
-      transactions: { transaction: Doc<"transactions">; delta: number }[];
-      deltaSum: number;
-    }>();
+    // 2. Initialize fund summaries
+    const summaries = initializeFundSummaries(funds);
 
-    for (const fund of funds) {
-      summaries.set(fund._id, {
-        fund,
-        incomeTotal: 0,
-        expenseTotal: 0,
-        lastTransactionDate: null,
-        transactions: [],
-        deltaSum: 0,
-      });
-    }
-
-    const donationsByFund = new Map<
-      Doc<"funds">["_id"],
-      Map<Id<"donors">, { total: number; lastDate: string }>
-    >();
-
+    // 3. Fetch and process transactions
     const transactions = await ctx.db
       .query("transactions")
       .withIndex("by_church_date", (q) => q.eq("churchId", args.churchId))
       .order("asc")
       .collect();
 
-    for (const transaction of transactions) {
-      const summary = summaries.get(transaction.fundId);
-      if (!summary) {
-        continue;
-      }
+    const donationsByFund = processTransactions(transactions, summaries);
 
-      const delta =
-        transaction.type === "income"
-          ? transaction.amount
-          : -transaction.amount;
-      summary.transactions.push({ transaction, delta });
-      summary.deltaSum += delta;
-
-      if (transaction.type === "income") {
-        summary.incomeTotal += transaction.amount;
-      } else {
-        summary.expenseTotal += transaction.amount;
-      }
-
-      if (transaction.type === "income" && transaction.donorId) {
-        let donorsForFund = donationsByFund.get(transaction.fundId);
-        if (!donorsForFund) {
-          donorsForFund = new Map();
-          donationsByFund.set(transaction.fundId, donorsForFund);
-        }
-
-        const existing =
-          donorsForFund.get(transaction.donorId) ?? {
-            total: 0,
-            lastDate: transaction.date,
-          };
-        const updatedTotal = existing.total + transaction.amount;
-        const updatedLastDate =
-          existing.lastDate > transaction.date
-            ? existing.lastDate
-            : transaction.date;
-
-        donorsForFund.set(transaction.donorId, {
-          total: updatedTotal,
-          lastDate: updatedLastDate,
-        });
-      }
-
-      summary.lastTransactionDate = transaction.date;
-    }
-
+    // 4. Fetch and group pledges
     const pledges = await ctx.db
       .query("fundPledges")
       .withIndex("by_church", (q) => q.eq("churchId", args.churchId))
       .collect();
 
-    const pledgesByFund = new Map<
-      Doc<"funds">["_id"],
-      Doc<"fundPledges">[]
-    >();
-    for (const pledge of pledges) {
-      const existing = pledgesByFund.get(pledge.fundId);
-      if (existing) {
-        existing.push(pledge);
-      } else {
-        pledgesByFund.set(pledge.fundId, [pledge]);
-      }
-    }
+    const pledgesByFund = groupPledgesByFund(pledges);
 
-    const donorIds = new Set<Id<"donors">>();
-    for (const pledge of pledges) {
-      donorIds.add(pledge.donorId);
-    }
-    for (const donorMap of donationsByFund.values()) {
-      for (const donorId of donorMap.keys()) {
-        donorIds.add(donorId);
-      }
-    }
+    // 5. Load all relevant donors in batch
+    const donorIds = collectDonorIds(pledges, donationsByFund);
+    const donorsById = await loadDonorsById(ctx, donorIds);
 
-    const donorsById = new Map<Id<"donors">, Doc<"donors">>();
-    await Promise.all(
-      Array.from(donorIds).map(async (donorId) => {
-        const donor = await ctx.db.get(donorId);
-        if (donor) {
-          donorsById.set(donorId, donor);
-        }
-      })
+    // 6. Build final results
+    return Array.from(summaries.values()).map((summary) =>
+      buildFundOverviewResult(summary, pledgesByFund, donationsByFund, donorsById)
     );
-
-    return Array.from(summaries.values()).map((summary) => {
-      let running = summary.fund.balance - summary.deltaSum;
-      const runningBalance = summary.transactions.map(
-        ({ transaction, delta }) => {
-          running += delta;
-          return {
-            transactionId: transaction._id,
-            date: transaction.date,
-            description: transaction.description,
-            type: transaction.type,
-            amount: transaction.amount,
-            balance: running,
-          };
-        }
-      );
-
-      const fundPledges = pledgesByFund.get(summary.fund._id) ?? [];
-      const fundDonations =
-        donationsByFund.get(summary.fund._id) ??
-        new Map<Id<"donors">, { total: number; lastDate: string }>();
-      const pledgedDonorIds = new Set<Id<"donors">>(
-        fundPledges.map((pledge) => pledge.donorId)
-      );
-
-      const pledgeSupporters = fundPledges.map((pledge) => {
-        let donatedAmount = 0;
-        let lastDonationAfterPledge: string | null = null;
-
-        // Convert pledge date to comparable format (YYYY-MM-DD)
-        const pledgeDate = pledge.pledgedAt; // Already in YYYY-MM-DD format
-
-        for (const entry of summary.transactions) {
-          const transaction = entry.transaction;
-          
-          // Convert transaction date from DD/MM/YYYY to YYYY-MM-DD for comparison
-          let transactionDateISO = transaction.date;
-          if (transaction.date.includes('/')) {
-            const [day, month, year] = transaction.date.split('/');
-            transactionDateISO = `${year}-${month}-${day}`;
-          }
-
-          if (
-            transaction.type === "income" &&
-            transaction.donorId &&
-            transaction.donorId === pledge.donorId &&
-            transactionDateISO >= pledgeDate
-          ) {
-            donatedAmount += transaction.amount;
-            if (
-              !lastDonationAfterPledge ||
-              transaction.date > lastDonationAfterPledge // Keep original format for display
-            ) {
-              lastDonationAfterPledge = transaction.date;
-            }
-          }
-        }
-
-        const donor = donorsById.get(pledge.donorId);
-        const computedStatus: "open" | "fulfilled" | "cancelled" =
-          pledge.status === "cancelled"
-            ? "cancelled"
-            : donatedAmount >= pledge.amount
-            ? "fulfilled"
-            : pledge.status;
-
-        const baseStats = fundDonations.get(pledge.donorId);
-
-        return {
-          pledgeId: pledge._id,
-          donorId: pledge.donorId,
-          donorName: donor?.name ?? "Unknown donor",
-          amountPledged: pledge.amount,
-          amountDonated: donatedAmount,
-          outstandingAmount: Math.max(pledge.amount - donatedAmount, 0),
-          pledgedAt: pledge.pledgedAt,
-          dueDate: pledge.dueDate ?? null,
-          status: pledge.status,
-          computedStatus,
-          completion:
-            pledge.amount > 0
-              ? Math.min(donatedAmount / pledge.amount, 1)
-              : 0,
-          notes: pledge.notes ?? null,
-          lastDonationDate:
-            lastDonationAfterPledge ?? baseStats?.lastDate ?? null,
-        };
-      });
-
-      const donorsWithoutPledge: {
-        donorId: Id<"donors">;
-        donorName: string;
-        total: number;
-        lastDonationDate: string | null;
-      }[] = [];
-
-      for (const [donorId, stats] of fundDonations.entries()) {
-        if (pledgedDonorIds.has(donorId)) {
-          continue;
-        }
-
-        donorsWithoutPledge.push({
-          donorId,
-          donorName: donorsById.get(donorId)?.name ?? "Unknown donor",
-          total: stats.total,
-          lastDonationDate: stats.lastDate,
-        });
-      }
-
-      const pledgedTotal = fundPledges
-        .filter((pledge) => pledge.status !== "cancelled")
-        .reduce((sum, pledge) => sum + pledge.amount, 0);
-
-      const supporterCount =
-        pledgedDonorIds.size + donorsWithoutPledge.length;
-
-      const fundraising = summary.fund.isFundraising
-        ? {
-            target: summary.fund.fundraisingTarget ?? null,
-            pledgedTotal,
-            donationTotal: summary.incomeTotal,
-            outstandingToTarget:
-              summary.fund.fundraisingTarget !== undefined
-                ? Math.max(
-                    summary.fund.fundraisingTarget - summary.incomeTotal,
-                    0
-                  )
-                : null,
-            pledgeCount: fundPledges.length,
-            supporterCount,
-            supporters: pledgeSupporters,
-            donorsWithoutPledge,
-          }
-        : null;
-
-      return {
-        fund: summary.fund,
-        incomeTotal: summary.incomeTotal,
-        expenseTotal: summary.expenseTotal,
-        lastTransactionDate: summary.lastTransactionDate,
-        runningBalance,
-        fundraising,
-      };
-    });
   },
 });
 
