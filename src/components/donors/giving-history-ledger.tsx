@@ -48,46 +48,53 @@ export const GivingHistoryLedger = memo(function GivingHistoryLedger({ history, 
 
   if (!history.length) {
     return (
-      <div className={cn("rounded-lg border border-ledger bg-paper px-4 py-6 text-sm text-grey-mid", className)}>
+      <div className={cn("swiss-card rounded-lg border border-ink bg-white px-4 py-8 text-sm", className)}>
         <p className="text-center text-grey-mid">No giving history yet</p>
       </div>
     );
   }
 
   return (
-    <div className={cn("overflow-hidden rounded-lg border border-ledger bg-paper", className)}>
-      <table className="min-w-full divide-y divide-ledger">
-        <thead className="bg-ledger/60">
-          <tr className="text-left text-xs uppercase tracking-wide text-grey-mid">
-            <th className="px-4 py-3">Date</th>
-            <th className="px-4 py-3">Fund</th>
-            <th className="px-4 py-3 text-right">Amount</th>
-            <th className="px-4 py-3 text-center">Gift Aid</th>
+    <div className={cn("swiss-card overflow-hidden rounded-lg border border-ink bg-white", className)}>
+      <div className="border-b border-ink/10 bg-ink/5 px-4 py-3">
+        <h3 className="swiss-label text-xs font-semibold uppercase tracking-widest text-grey-mid">Giving History</h3>
+      </div>
+      <table className="min-w-full divide-y divide-ink/10">
+        <thead className="bg-ink/5">
+          <tr className="text-left text-[10px] uppercase tracking-widest text-grey-mid">
+            <th className="px-4 py-3 font-semibold">Date</th>
+            <th className="px-4 py-3 font-semibold">Fund</th>
+            <th className="px-4 py-3 text-right font-semibold">Amount</th>
+            <th className="px-4 py-3 text-center font-semibold">Gift Aid</th>
           </tr>
         </thead>
         <tbody>
           {history.map((entry) => (
-            <tr key={entry.transactionId} className="border-t border-ledger/70 text-sm text-ink hover:bg-highlight/40">
-              <td className="px-4 py-3 font-mono text-xs text-grey-mid">
+            <tr key={entry.transactionId} className="border-t border-ink/10 text-sm text-ink hover:bg-sage-light/30 transition-colors">
+              <td className="px-4 py-3 font-[family-name:var(--font-mono)] text-xs text-grey-mid">
                 {formatDateSafe(entry.date)}
               </td>
               <td className="px-4 py-3 text-sm">{entry.fundName ?? "—"}</td>
-              <td className="px-4 py-3 text-right font-medium text-success">
+              <td className="px-4 py-3 text-right font-medium text-sage font-[family-name:var(--font-mono)]">
                 {formatCurrency(entry.amount)}
               </td>
               <td className="px-4 py-3 text-center text-sm">
-                {entry.giftAidEligible ? "✓" : "—"}
+                {entry.giftAidEligible ? (
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-sage-light text-sage-dark text-xs font-semibold">✓</span>
+                ) : (
+                  <span className="text-grey-mid">—</span>
+                )}
               </td>
             </tr>
           ))}
         </tbody>
-        <tfoot className="bg-ledger/40 text-sm font-medium text-ink">
+        <tfoot className="bg-ink text-sm font-medium text-white">
           <tr>
-            <td className="px-4 py-3" colSpan={2}>
+            <td className="px-4 py-3 font-semibold" colSpan={2}>
               Totals
             </td>
-            <td className="px-4 py-3 text-right">{formatCurrency(totals.amount)}</td>
-            <td className="px-4 py-3 text-center">{formatCurrency(totals.giftAid)}</td>
+            <td className="px-4 py-3 text-right font-[family-name:var(--font-mono)]">{formatCurrency(totals.amount)}</td>
+            <td className="px-4 py-3 text-center font-[family-name:var(--font-mono)]">{formatCurrency(totals.giftAid)}</td>
           </tr>
         </tfoot>
       </table>

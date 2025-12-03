@@ -17,11 +17,19 @@ const baseTabs: { key: FundTabKey; label: string }[] = [
   { key: "settings", label: "Settings" },
 ];
 
+/**
+ * FundTabs - Swiss Ledger styled tab navigation
+ *
+ * Features:
+ * - Sage underline for active tab
+ * - Uppercase labels with wide tracking
+ * - Smooth hover transitions
+ */
 export function FundTabs({ activeTab, onChange, showFundraising }: FundTabsProps) {
   const tabs = baseTabs.filter((tab) => tab.key !== "fundraising" || showFundraising);
 
   return (
-    <div className="sticky top-[11.5rem] z-20 border-b border-ledger bg-paper/95 backdrop-blur">
+    <div className="sticky top-[7.5rem] z-20 border-b border-ink/10 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl gap-8 px-6">
         {tabs.map((tab) => (
           <button
@@ -30,8 +38,8 @@ export function FundTabs({ activeTab, onChange, showFundraising }: FundTabsProps
             onClick={() => onChange(tab.key)}
             data-active={tab.key === activeTab}
             className={cn(
-              "relative border-b-2 border-transparent pb-3 pt-4 text-xs font-medium uppercase tracking-[0.2em] text-grey-mid transition-colors hover:border-ledger hover:text-ink",
-              tab.key === activeTab ? "border-ink text-ink" : undefined
+              "relative border-b-2 border-transparent pb-3 pt-4 text-xs font-semibold uppercase tracking-widest text-grey-mid transition-colors hover:text-ink",
+              tab.key === activeTab ? "border-sage text-ink" : undefined
             )}
           >
             {tab.label}

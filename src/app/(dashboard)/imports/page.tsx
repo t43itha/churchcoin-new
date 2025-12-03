@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { Layers, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 import { CsvUploadCard } from "@/components/imports/csv-upload-card";
 import {
@@ -10,18 +10,11 @@ import {
   type MappingConfig,
 } from "@/components/imports/mapping-drawer";
 import { DuplicateReview } from "@/components/imports/duplicate-review";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { WorkflowStepper, type StepStatus, type WorkflowStep } from "@/components/imports/workflow-stepper";
 import { StatusBanner } from "@/components/imports/status-banner";
 import { RecentImportsDrawer } from "@/components/imports/recent-imports-drawer";
 import { deriveMapping, normalizeCsvDate, type ParsedCsvRow } from "@/lib/csv";
+import { useChurch } from "@/contexts/church-context";
 import { api, type Doc, type Id } from "@/lib/convexGenerated";
 
 type ParsedFileState = {
@@ -43,8 +36,7 @@ type StatusMessage = {
 };
 
 export default function ImportsPage() {
-  const churches = useQuery(api.churches.listChurches, {});
-  const [churchId, setChurchId] = useState<Id<"churches"> | null>(null);
+  const { churchId } = useChurch();
   const [parsedFile, setParsedFile] = useState<ParsedFileState | null>(null);
   const [mapping, setMapping] = useState<MappingConfig | null>(null);
   const [activeImportId, setActiveImportId] = useState<Id<"csvImports"> | null>(null);
@@ -62,12 +54,6 @@ export default function ImportsPage() {
   const approveRows = useMutation(api.imports.approveRows);
   const autoApproveRows = useMutation(api.imports.autoApproveRows);
   const deleteImport = useMutation(api.imports.deleteImport);
-
-  useEffect(() => {
-    if (!churchId && churches && churches.length > 0) {
-      setChurchId(churches[0]._id);
-    }
-  }, [churches, churchId]);
 
   const showStatus = (message: StatusMessage) => {
     setStatusMessage(message);
@@ -297,53 +283,32 @@ export default function ImportsPage() {
 
   return (
     <div className="min-h-screen bg-paper pb-16">
-      <div className="border-b border-ledger bg-paper">
+      <div className="border-b border-ink/10 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-10">
           <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-grey-mid">
-                <Layers className="h-5 w-5 text-grey-mid" />
-                <span className="text-sm uppercase tracking-wide">Bank imports</span>
-              </div>
               <div className="space-y-2">
                 <h1 className="text-3xl font-semibold text-ink">CSV import workspace</h1>
-                <p className="text-sm text-grey-mid">
+                <p className="text-sm text-grey-mid leading-relaxed">
                   Upload CSV exports, map the required columns, and review AI-assisted recommendations before approving
                   transactions into the ledger.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-grey-mid">
-                <Badge variant="secondary" className="border-success/40 bg-success/10 text-success">
+              <div className="flex flex-wrap items-center gap-3 text-xs">
+                <span className="swiss-badge bg-sage-light text-sage-dark border border-sage">
                   <Sparkles className="mr-1 h-3 w-3" /> AI auto-detection active
-                </Badge>
-                <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
+                </span>
+                <span className="swiss-badge bg-ink text-white">
                   Import history stored for audit
-                </Badge>
+                </span>
               </div>
             </div>
-            <div className="flex flex-col items-start gap-4 md:items-end">
-              <div className="space-y-2">
-                <span className="text-xs uppercase tracking-wide text-grey-mid">Active church</span>
-                <Select value={churchId ?? undefined} onValueChange={(value) => setChurchId(value as Id<"churches">)}>
-                  <SelectTrigger className="w-[240px] font-primary">
-                    <SelectValue placeholder="Select church" />
-                  </SelectTrigger>
-                  <SelectContent className="font-primary">
-                    {churches?.map((church) => (
-                      <SelectItem key={church._id} value={church._id}>
-                        {church.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <RecentImportsDrawer
-                imports={imports ?? []}
-                activeImportId={activeImportId}
-                onSelect={(importId) => setActiveImportId(importId)}
-                onDelete={handleDeleteImport}
-              />
-            </div>
+            <RecentImportsDrawer
+              imports={imports ?? []}
+              activeImportId={activeImportId}
+              onSelect={(importId) => setActiveImportId(importId)}
+              onDelete={handleDeleteImport}
+            />
           </div>
           <WorkflowStepper steps={stepperSteps} />
         </div>
@@ -361,18 +326,24 @@ export default function ImportsPage() {
         ) : null}
 
         <section className="space-y-6">
-          <div className="space-y-3">
-            <h2 className="text-xl font-semibold text-ink">Step 1 · Upload CSV</h2>
-            <p className="text-sm text-grey-mid">Drop your bank export to detect the format automatically.</p>
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <span className="swiss-step-number-active flex items-center justify-center w-7 h-7 text-xs font-semibold">01</span>
+              <h2 className="text-xl font-semibold text-ink">Upload CSV</h2>
+            </div>
+            <p className="text-sm text-grey-mid ml-10">Drop your bank export to detect the format automatically.</p>
           </div>
           <CsvUploadCard onFileParsed={handleFileParsed} />
         </section>
 
         {currentStep === 2 && parsedFile && mapping ? (
           <section className="space-y-6">
-            <div className="space-y-3">
-              <h2 className="text-xl font-semibold text-ink">Step 2 · Map columns</h2>
-              <p className="text-sm text-grey-mid">Confirm the required fields and optional enrichments.</p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <span className="swiss-step-number-active flex items-center justify-center w-7 h-7 text-xs font-semibold">02</span>
+                <h2 className="text-xl font-semibold text-ink">Map columns</h2>
+              </div>
+              <p className="text-sm text-grey-mid ml-10">Confirm the required fields and optional enrichments.</p>
             </div>
             <MappingDrawer
               headers={parsedFile.headers}
@@ -387,9 +358,12 @@ export default function ImportsPage() {
 
         {currentStep === 3 && (
           <section className="space-y-6">
-            <div className="space-y-3">
-              <h2 className="text-xl font-semibold text-ink">Step 3 · Review &amp; Approve</h2>
-              <p className="text-sm text-grey-mid">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <span className="swiss-step-number-active flex items-center justify-center w-7 h-7 text-xs font-semibold">03</span>
+                <h2 className="text-xl font-semibold text-ink">Review &amp; Approve</h2>
+              </div>
+              <p className="text-sm text-grey-mid ml-10">
                 Assign funds to each transaction and approve them into the ledger.
               </p>
             </div>
@@ -405,7 +379,7 @@ export default function ImportsPage() {
                 onAutoApprove={handleAutoApprove}
               />
             ) : (
-              <div className="rounded-lg border border-ledger bg-paper px-6 py-10 text-center">
+              <div className="swiss-card rounded-lg border-2 border-dashed border-ink/20 bg-white px-6 py-12 text-center">
                 <p className="text-grey-mid">
                   All rows have been processed. Upload a new CSV to start another import.
                 </p>

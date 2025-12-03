@@ -5,7 +5,6 @@ import { useQuery } from "convex/react";
 import { FileDown, HandHeart, Upload, Users, UserPlus } from "lucide-react";
 import Link from "next/link";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,7 +41,6 @@ export default function DonorDirectoryPage() {
   const {
     // State
     churchId,
-    setChurchId,
     setSelectedDonorId,
     searchQuery,
     setSearchQuery,
@@ -60,7 +58,6 @@ export default function DonorDirectoryPage() {
     setStatementDialog,
 
     // Data
-    churches,
     donors,
     selectedDonor,
     filteredDonors,
@@ -82,73 +79,47 @@ export default function DonorDirectoryPage() {
     clearFilters,
   } = useDonorsPage();
 
-  const selectedChurchId = churchId ?? "";
-
   return (
     <div className="min-h-screen bg-paper pb-12">
-      <header className="border-b border-ledger bg-paper">
+      <header className="border-b border-ink/10 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-10">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-grey-mid">
-                <Users className="h-5 w-5" />
-                <span className="text-sm uppercase tracking-wide">Donor management</span>
-              </div>
               <h1 className="text-3xl font-semibold text-ink">Donor directory</h1>
-              <p className="text-sm text-grey-mid">
+              <p className="text-sm text-grey-mid leading-relaxed">
                 Manage Gift Aid declarations, track giving history, and prepare donor statements.
               </p>
-            </div>
-            <div className="flex flex-col gap-2 lg:items-end">
-              <span className="text-xs uppercase tracking-wide text-grey-mid">Active church</span>
-              <Select
-                value={selectedChurchId}
-                onValueChange={(value) =>
-                  setChurchId(value ? (value as Id<"churches">) : null)
-                }
-              >
-                <SelectTrigger className="w-[240px] font-primary">
-                  <SelectValue placeholder="Select church" />
-                </SelectTrigger>
-                <SelectContent className="font-primary">
-                  {churches?.map((church) => (
-                    <SelectItem key={church._id} value={church._id}>
-                      {church.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3 text-xs text-grey-mid">
-              <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <span className="swiss-badge bg-sage-light text-sage-dark border border-sage">
                 <HandHeart className="mr-1 h-3.5 w-3.5" /> Anonymous giving supported
-              </Badge>
-              <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
+              </span>
+              <span className="swiss-badge bg-ink text-white">
                 {totalGifts} gifts · {formatCurrency(totalGiving)} total
-              </Badge>
-              <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
+              </span>
+              <span className="swiss-badge bg-amber-light text-amber-dark border border-amber">
                 {giftAidCount} Gift Aid declarations
-              </Badge>
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <Link href="/donors/import">
-                <Button variant="outline" className="border-ledger font-primary">
+                <Button variant="outline" className="border-ink text-ink hover:bg-ink hover:text-white transition-colors font-medium">
                   <Upload className="mr-2 h-4 w-4" /> Import
                 </Button>
               </Link>
               <Button
                 variant="outline"
-                className="border-ledger font-primary"
+                className="border-ink text-ink hover:bg-ink hover:text-white transition-colors font-medium"
                 onClick={() => handleOpenStatements(null)}
                 disabled={!churchId || !donors || donors.length === 0}
               >
                 <FileDown className="mr-2 h-4 w-4" /> Statements
               </Button>
               <Button
-                className="border-ledger bg-ink text-paper hover:bg-ink/90"
+                className="bg-ink text-white hover:bg-ink/90 font-medium shadow-[2px_2px_0px_rgba(0,0,0,0.1)] hover:shadow-[4px_4px_0px_#d4a574] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all"
                 onClick={openCreateForm}
                 disabled={!churchId}
               >
@@ -157,7 +128,7 @@ export default function DonorDirectoryPage() {
             </div>
           </div>
           {pageNotice ? (
-            <div className="rounded-lg border border-ledger bg-highlight/50 px-4 py-3 text-sm text-ink">
+            <div className="swiss-card rounded-lg border border-sage bg-sage-light/50 px-4 py-3 text-sm text-ink">
               {pageNotice}
             </div>
           ) : null}
@@ -445,22 +416,22 @@ function GenerateStatementsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="font-primary sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg border-2 border-ink bg-white shadow-[8px_8px_0px_rgba(0,0,0,0.1)]">
         <DialogHeader>
-          <DialogTitle>Generate donor statements</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-xl font-semibold text-ink">Generate donor statements</DialogTitle>
+          <DialogDescription className="text-grey-mid">
             Download a PDF for {scopeLabel} using the selected schedule.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="grid gap-2">
-            <Label>Period</Label>
+            <Label className="swiss-label text-xs font-semibold uppercase tracking-widest text-grey-mid">Period</Label>
             <Select value={rangePreset} onValueChange={(value) => handlePresetChange(value as RangePreset)}>
-              <SelectTrigger className="font-primary">
+              <SelectTrigger className="border-ink">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="font-primary text-sm">
+              <SelectContent>
                 <SelectItem value="thisYear">This year</SelectItem>
                 <SelectItem value="lastYear">Last year</SelectItem>
                 <SelectItem value="custom">Custom period</SelectItem>
@@ -468,7 +439,7 @@ function GenerateStatementsDialog({
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="statement-from">From date</Label>
+            <Label htmlFor="statement-from" className="swiss-label text-xs font-semibold uppercase tracking-widest text-grey-mid">From date</Label>
             <Input
               id="statement-from"
               type="date"
@@ -476,10 +447,11 @@ function GenerateStatementsDialog({
               disabled={rangePreset !== "custom"}
               max={toDate}
               onChange={(event) => setFromDate(event.target.value)}
+              className="border-ink"
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="statement-to">To date</Label>
+            <Label htmlFor="statement-to" className="swiss-label text-xs font-semibold uppercase tracking-widest text-grey-mid">To date</Label>
             <Input
               id="statement-to"
               type="date"
@@ -487,15 +459,16 @@ function GenerateStatementsDialog({
               disabled={rangePreset !== "custom"}
               min={fromDate}
               onChange={(event) => setToDate(event.target.value)}
+              className="border-ink"
             />
           </div>
           <div className="grid gap-2">
-            <Label>Statement type</Label>
+            <Label className="swiss-label text-xs font-semibold uppercase tracking-widest text-grey-mid">Statement type</Label>
             <Select value={fundType} onValueChange={(value) => setFundType(value as "general" | "restricted") }>
-              <SelectTrigger className="font-primary">
+              <SelectTrigger className="border-ink">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="font-primary text-sm">
+              <SelectContent>
                 <SelectItem value="general">Tithe schedule</SelectItem>
                 <SelectItem value="restricted">Building Fund schedule</SelectItem>
               </SelectContent>
@@ -504,21 +477,26 @@ function GenerateStatementsDialog({
           <p className="text-xs text-grey-mid">
             Building Fund statements reuse the dedicated PDF design already configured for legacy projects.
           </p>
-          <p className="text-xs text-grey-mid">
+          <div className={`swiss-badge inline-flex text-xs ${eligibleCount > 0 ? "bg-sage-light text-sage-dark border border-sage" : "bg-amber-light text-amber-dark border border-amber"}`}>
             {eligible
               ? eligibleCount > 0
-                ? `${eligibleCount} statement${eligibleCount === 1 ? "" : "s"} will be generated.`
-                : "No eligible transactions in this period/scope."
-              : null}
-          </p>
+                ? `${eligibleCount} statement${eligibleCount === 1 ? "" : "s"} will be generated`
+                : "No eligible transactions in this period/scope"
+              : "Checking eligibility..."}
+          </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" className="border-ledger" onClick={() => onOpenChange(false)} disabled={isGenerating}>
+        <DialogFooter className="gap-2">
+          <Button
+            variant="outline"
+            className="border-ink text-ink hover:bg-ink hover:text-white transition-colors"
+            onClick={() => onOpenChange(false)}
+            disabled={isGenerating}
+          >
             Cancel
           </Button>
           <Button
-            className="border-ledger bg-ink text-paper hover:bg-ink/90"
+            className="bg-ink text-white hover:bg-ink/90 font-medium shadow-[2px_2px_0px_rgba(0,0,0,0.1)] hover:shadow-[4px_4px_0px_#d4a574] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all"
             onClick={handleGenerate}
             disabled={isGenerating || !churchId || eligibleCount === 0}
           >
@@ -539,14 +517,17 @@ type EmptyStateProps = {
 
 function EmptyState({ title, description, actionLabel, onAction }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-lg border border-ledger bg-paper px-6 py-12 text-center text-sm text-grey-mid">
+    <div className="swiss-card flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-ink/20 bg-white px-6 py-12 text-center">
+      <div className="w-12 h-12 rounded-full bg-ink/5 flex items-center justify-center mb-4">
+        <Users className="h-6 w-6 text-grey-mid" />
+      </div>
       <p className="text-lg font-semibold text-ink">{title}</p>
-      <p className="mt-2 max-w-sm text-sm text-grey-mid">{description}</p>
+      <p className="mt-2 max-w-sm text-sm text-grey-mid leading-relaxed">{description}</p>
       {actionLabel && onAction ? (
         <Button
           variant="outline"
           size="sm"
-          className="mt-4 border-ledger font-primary"
+          className="mt-4 border-ink text-ink hover:bg-ink hover:text-white transition-colors font-medium"
           onClick={onAction}
         >
           {actionLabel}

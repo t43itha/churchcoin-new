@@ -3,7 +3,6 @@
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import { Mail, Phone, MapPin, Banknote, CheckCircle2, FileText, Archive, Pencil } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Doc } from "@/lib/convexGenerated";
@@ -55,38 +54,45 @@ export function DonorDetailsSummary({
 
   return (
     <div className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-ledger bg-paper px-4 py-3">
+      <header className="swiss-card flex flex-wrap items-center justify-between gap-3 rounded-lg border border-ink bg-white px-5 py-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-grey-mid">
+          <div className="flex items-center gap-3">
             <h2 className="text-2xl font-semibold text-ink">{donor.name}</h2>
             {donor.giftAidDeclaration?.signed ? (
-              <Badge
-                variant="secondary"
-                className="flex items-center gap-1 border-success/40 bg-success/10 text-success"
-              >
-                <CheckCircle2 className="h-4 w-4" /> Gift Aid
-              </Badge>
+              <span className="swiss-badge flex items-center gap-1.5 bg-sage-light text-sage-dark border border-sage text-[10px]">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Gift Aid
+              </span>
             ) : null}
           </div>
           {formattedLastGiftDate ? (
             <p className="text-xs text-grey-mid">
-              Last gift on {formattedLastGiftDate}
+              Last gift on <span className="font-[family-name:var(--font-mono)]">{formattedLastGiftDate}</span>
             </p>
           ) : (
             <p className="text-xs text-grey-mid">No gifts recorded yet</p>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" className="border-ledger" onClick={onEdit}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-ink text-ink hover:bg-ink hover:text-white transition-colors font-medium"
+            onClick={onEdit}
+          >
             <Pencil className="mr-2 h-4 w-4" /> Edit
           </Button>
-          <Button variant="outline" size="sm" className="border-ledger" onClick={onGenerateStatement}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-ink text-ink hover:bg-ink hover:text-white transition-colors font-medium"
+            onClick={onGenerateStatement}
+          >
             <FileText className="mr-2 h-4 w-4" /> Statement
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            className="text-error hover:text-error"
+            className="text-error hover:text-error hover:bg-error-light"
             onClick={onArchive}
           >
             <Archive className="mr-2 h-4 w-4" /> Archive
@@ -95,9 +101,9 @@ export function DonorDetailsSummary({
       </header>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="border-ledger bg-paper shadow-none">
+        <Card className="swiss-card border border-ink bg-white shadow-none">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <CardTitle className="swiss-label flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-grey-mid">
               Contact details
             </CardTitle>
           </CardHeader>
@@ -113,37 +119,34 @@ export function DonorDetailsSummary({
           </CardContent>
         </Card>
 
-        <Card className="border-ledger bg-paper shadow-none">
+        <Card className="swiss-card border border-ink bg-white shadow-none">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <CardTitle className="swiss-label flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-grey-mid">
               Gift Aid status
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-grey-mid">
             <div className="flex items-center justify-between">
               <span>Status</span>
-              <Badge
-                variant="secondary"
-                className={donor.giftAidDeclaration?.signed ? "bg-success/10 text-success" : "bg-ledger text-grey-mid"}
-              >
+              <span className={`swiss-badge text-[10px] ${donor.giftAidDeclaration?.signed ? "bg-sage-light text-sage-dark border border-sage" : "bg-ink/5 text-grey-mid border border-ink/20"}`}>
                 {donor.giftAidDeclaration?.signed ? "Signed" : "Not signed"}
-              </Badge>
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span>Declaration date</span>
-              <span className="font-medium text-ink">
+              <span className="font-medium text-ink font-[family-name:var(--font-mono)]">
                 {formattedGiftAidDate ?? "—"}
               </span>
             </div>
             <p className="text-xs text-grey-mid">
-              Gift Aid eligible total: {currency.format(givingTotals.giftAidEligible || 0)}
+              Gift Aid eligible total: <span className="font-medium text-sage font-[family-name:var(--font-mono)]">{currency.format(givingTotals.giftAidEligible || 0)}</span>
             </p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <SummaryTile label="Total giving" value={currency.format(givingTotals.totalGiving || 0)} />
+        <SummaryTile label="Total giving" value={currency.format(givingTotals.totalGiving || 0)} highlight />
         <SummaryTile label="Gift count" value={givingTotals.transactionCount.toString()} />
         <SummaryTile
           label="Gift Aid eligible"
@@ -156,9 +159,9 @@ export function DonorDetailsSummary({
       </div>
 
       {donor.notes ? (
-        <div className="rounded-lg border border-ledger bg-highlight/40 px-4 py-3 text-sm text-grey-mid">
-          <p className="font-medium text-ink">Notes</p>
-          <p className="whitespace-pre-line text-sm">{donor.notes}</p>
+        <div className="swiss-card rounded-lg border border-amber bg-amber-light/50 px-4 py-3 text-sm">
+          <p className="swiss-label text-xs font-semibold uppercase tracking-widest text-amber-dark mb-1">Notes</p>
+          <p className="whitespace-pre-line text-sm text-ink">{donor.notes}</p>
         </div>
       ) : null}
     </div>
@@ -203,13 +206,14 @@ function ContactRow({ icon: Icon, label, value, linkPrefix, multiline }: Contact
 type SummaryTileProps = {
   label: string;
   value: string;
+  highlight?: boolean;
 };
 
-function SummaryTile({ label, value }: SummaryTileProps) {
+function SummaryTile({ label, value, highlight }: SummaryTileProps) {
   return (
-    <div className="rounded-lg border border-ledger bg-paper px-4 py-3">
-      <p className="text-xs uppercase tracking-wide text-grey-light">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-ink">{value}</p>
+    <div className={`swiss-card rounded-lg border px-4 py-3 ${highlight ? "border-ink bg-ink" : "border-ink bg-white"}`}>
+      <p className={`swiss-label text-[10px] uppercase tracking-widest ${highlight ? "text-white/70" : "text-grey-mid"}`}>{label}</p>
+      <p className={`mt-1 text-lg font-bold font-[family-name:var(--font-mono)] ${highlight ? "text-white" : "text-ink"}`}>{value}</p>
     </div>
   );
 }

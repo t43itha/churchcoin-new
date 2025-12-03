@@ -68,7 +68,7 @@ export function DonorFilterChips({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 rounded-md border border-ledger bg-paper px-4 py-3 sm:flex-row sm:items-center sm:justify-between",
+        "swiss-card flex flex-col gap-3 rounded-lg border border-ink bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between",
         className,
       )}
     >
@@ -179,10 +179,10 @@ function ChipButton({ label, active, onClick }: ChipButtonProps) {
       onClick={onClick}
       variant={active ? "default" : "outline"}
       className={cn(
-        "h-8 rounded-full border-ledger px-3 text-xs",
+        "h-8 rounded-full px-3 text-xs font-medium transition-all",
         active
-          ? "bg-ink text-paper hover:bg-ink/90"
-          : "bg-paper text-grey-mid hover:bg-highlight",
+          ? "bg-ink text-white hover:bg-ink/90 border-ink shadow-[2px_2px_0px_rgba(0,0,0,0.1)]"
+          : "bg-white text-grey-mid border-ink/30 hover:border-ink hover:text-ink",
       )}
     >
       {label}

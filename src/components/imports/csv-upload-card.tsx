@@ -6,7 +6,6 @@ import { Clock, UploadCloud } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { detectBankFormat, parseCsv, type ParsedCsvRow } from "@/lib/csv";
 
 type CsvUploadCardProps = {
@@ -60,9 +59,9 @@ export function CsvUploadCard({ onFileParsed }: CsvUploadCardProps) {
   };
 
   return (
-    <Card className="border-ledger bg-paper shadow-none">
+    <Card className="swiss-card border border-ink bg-white shadow-none">
       <CardHeader>
-        <CardTitle className="text-ink">Upload bank export</CardTitle>
+        <CardTitle className="text-lg font-semibold text-ink">Upload bank export</CardTitle>
         <CardDescription className="text-grey-mid">
           Follow the three-step flow to review and approve transactions. We support Barclays, HSBC, and Metro Bank templates
           out of the box.
@@ -70,8 +69,8 @@ export function CsvUploadCard({ onFileParsed }: CsvUploadCardProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         <label
-          className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-ledger p-10 text-center transition ${
-            isDragging ? "border-ink bg-highlight/70" : "bg-highlight/40 hover:border-ink"
+          className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-10 text-center transition-all duration-200 ${
+            isDragging ? "border-ink bg-sage-light/50 shadow-[4px_4px_0px_rgba(0,0,0,0.1)]" : "border-ink/30 bg-ink/5 hover:border-ink hover:bg-ink/10"
           }`}
           onDragEnter={(event) => {
             event.preventDefault();
@@ -124,7 +123,7 @@ export function CsvUploadCard({ onFileParsed }: CsvUploadCardProps) {
           <div className="flex flex-col gap-2 md:flex-row">
             <Button
               variant="outline"
-              className="w-full border-ledger font-primary md:w-auto"
+              className="w-full border-ink text-ink hover:bg-ink hover:text-white transition-colors font-medium md:w-auto"
               onClick={() => {
                 const input = document.createElement("input");
                 input.type = "file";
@@ -141,18 +140,18 @@ export function CsvUploadCard({ onFileParsed }: CsvUploadCardProps) {
             >
               Choose file
             </Button>
-            <Button variant="outline" className="w-full border-ledger font-primary md:w-auto" disabled>
+            <Button variant="outline" className="w-full border-ink/30 text-grey-mid md:w-auto" disabled>
               Use saved template
             </Button>
           </div>
         </div>
         {fileDetails ? (
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-ledger bg-highlight/50 px-4 py-3 text-xs text-grey-mid">
-            <Badge variant="secondary" className="border-ledger bg-paper text-ink">
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-sage bg-sage-light/50 px-4 py-3 text-xs">
+            <span className="swiss-badge bg-ink text-white">
               Format: {formatLabel(fileDetails.bankFormat)}
-            </Badge>
-            <span>{fileDetails.rowCount} rows detected</span>
-            <span>{fileDetails.columnCount} columns</span>
+            </span>
+            <span className="text-grey-mid">{fileDetails.rowCount} rows detected</span>
+            <span className="text-grey-mid">{fileDetails.columnCount} columns</span>
           </div>
         ) : null}
         {error ? (

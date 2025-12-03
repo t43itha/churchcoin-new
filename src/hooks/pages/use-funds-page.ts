@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 
+import { useChurch } from "@/contexts/church-context";
 import { api, type Id } from "@/lib/convexGenerated";
 import type { FundCardSummary } from "@/components/funds/fund-card";
 import type { FundOverview } from "@/components/funds/types";
@@ -20,7 +21,6 @@ export interface FundsTotals {
 export interface UseFundsPageReturn {
   // State
   churchId: Id<"churches"> | null;
-  setChurchId: (id: Id<"churches">) => void;
   isCreateOpen: boolean;
   setIsCreateOpen: (open: boolean) => void;
   isCreateSubmitting: boolean;
@@ -31,7 +31,6 @@ export interface UseFundsPageReturn {
   updateError: string | null;
 
   // Data
-  churches: ReturnType<typeof useQuery<typeof api.churches.listChurches>>;
   fundsOverview: ReturnType<typeof useQuery<typeof api.funds.getFundsOverview>>;
   fundCards: FundCardSummary[];
   totals: FundsTotals;
@@ -52,12 +51,12 @@ export interface UseFundsPageReturn {
  */
 export function useFundsPage(): UseFundsPageReturn {
   const router = useRouter();
+  const { churchId } = useChurch();
 
   // =========================================================================
   // STATE
   // =========================================================================
 
-  const [churchId, setChurchId] = useState<Id<"churches"> | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreateSubmitting, setIsCreateSubmitting] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -69,7 +68,6 @@ export function useFundsPage(): UseFundsPageReturn {
   // QUERIES
   // =========================================================================
 
-  const churches = useQuery(api.churches.listChurches, {});
   const fundsOverview = useQuery(
     api.funds.getFundsOverview,
     churchId ? { churchId } : "skip"
@@ -81,17 +79,6 @@ export function useFundsPage(): UseFundsPageReturn {
 
   const createFund = useMutation(api.funds.createFund);
   const updateFund = useMutation(api.funds.updateFund);
-
-  // =========================================================================
-  // EFFECTS
-  // =========================================================================
-
-  // Auto-select first church
-  useEffect(() => {
-    if (!churchId && churches && churches.length > 0) {
-      setChurchId(churches[0]._id);
-    }
-  }, [churchId, churches]);
 
   // =========================================================================
   // DERIVED DATA
@@ -237,7 +224,6 @@ export function useFundsPage(): UseFundsPageReturn {
   return {
     // State
     churchId,
-    setChurchId,
     isCreateOpen,
     setIsCreateOpen,
     isCreateSubmitting,
@@ -248,7 +234,6 @@ export function useFundsPage(): UseFundsPageReturn {
     updateError,
 
     // Data
-    churches,
     fundsOverview,
     fundCards,
     totals,
