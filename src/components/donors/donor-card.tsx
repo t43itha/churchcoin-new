@@ -4,7 +4,6 @@ import { useCallback } from "react";
 import type { KeyboardEvent } from "react";
 import { CheckCircle2 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Doc } from "@/lib/convexGenerated";
 
@@ -68,9 +67,9 @@ export function DonorCard({
       onClick={onSelect}
       onKeyDown={handleKeyDown}
       className={cn(
-        "group flex flex-col gap-2 rounded-lg border bg-paper px-4 py-3 text-left shadow-sm transition",
-        "border-ledger hover:border-ink hover:shadow",
-        isSelected && "border-ink bg-highlight/60",
+        "swiss-card group flex flex-col gap-3 rounded-lg border bg-white px-4 py-4 text-left transition-all duration-200",
+        "border-ink/20 hover:border-ink hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_rgba(0,0,0,0.1)]",
+        isSelected && "border-ink bg-sage-light/30 shadow-[4px_4px_0px_rgba(0,0,0,0.1)]",
         className,
       )}
     >
@@ -83,25 +82,22 @@ export function DonorCard({
           </p>
         </div>
         {showGiftAidBadge && donor.giftAidDeclaration?.signed ? (
-          <Badge
-            variant="secondary"
-            className="flex items-center gap-1 border-success/40 bg-success/10 text-success"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" />
+          <span className="swiss-badge flex items-center gap-1.5 bg-sage-light text-sage-dark border border-sage text-[10px]">
+            <CheckCircle2 className="h-3 w-3" />
             Gift Aid
-          </Badge>
+          </span>
         ) : null}
       </div>
-      <div className="flex flex-wrap items-center gap-3 text-xs text-grey-mid">
+      <div className="flex flex-wrap items-center gap-3 text-xs">
         <span className="font-medium text-ink">
-          Last gift: <span className="text-grey-mid font-normal">{lastGiftLabel}</span>
+          Last gift: <span className="text-grey-mid font-normal font-[family-name:var(--font-mono)]">{lastGiftLabel}</span>
         </span>
-        <span className="hidden h-1 w-1 rounded-full bg-ledger sm:inline-flex" />
-        <span>
+        <span className="hidden h-1 w-1 rounded-full bg-ink/20 sm:inline-flex" />
+        <span className="text-grey-mid">
           {metrics?.transactionCount ? `${metrics.transactionCount} gifts` : "No gifts recorded"}
         </span>
-        <span className="hidden h-1 w-1 rounded-full bg-ledger sm:inline-flex" />
-        <span>Total: {totalGivingLabel}</span>
+        <span className="hidden h-1 w-1 rounded-full bg-ink/20 sm:inline-flex" />
+        <span className="font-medium text-sage font-[family-name:var(--font-mono)]">{totalGivingLabel}</span>
       </div>
     </div>
   );

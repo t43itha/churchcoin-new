@@ -2,46 +2,51 @@
 
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { Menu, ChevronRight } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./sidebar";
-
-// Navigation breadcrumb mapping
-const breadcrumbMap: Record<string, string[]> = {
-  "/dashboard": ["Dashboard"],
-  "/funds": ["Dashboard", "Funds"],
-  "/transactions": ["Dashboard", "Transactions"],
-  "/reconciliation": ["Dashboard", "Reconciliation"],
-  "/donors": ["Dashboard", "Donors"],
-  "/imports": ["Dashboard", "Import"],
-  "/reports": ["Dashboard", "Reports"],
-};
 
 interface HeaderProps {
   children?: React.ReactNode;
 }
 
+// Map path segments to page titles
+const pageTitles: Record<string, string> = {
+  dashboard: "Dashboard",
+  funds: "Funds",
+  transactions: "Transactions",
+  reconciliation: "Reconciliation",
+  donors: "Donors",
+  imports: "Import",
+  reports: "Reports",
+  settings: "Settings",
+};
+
 export function Header({ children }: HeaderProps) {
   const pathname = usePathname();
-  const breadcrumbs = breadcrumbMap[pathname] || ["Dashboard"];
   const [sheetOpen, setSheetOpen] = useState(false);
 
+  // Get current page title for mobile
+  const segment = pathname.split("/")[1] || "dashboard";
+  const currentPage = pageTitles[segment] || "Dashboard";
+
   return (
-    <header className="border-b border-ledger bg-paper">
-      <div className="flex h-16 items-center gap-4 px-6">
-        {/* Mobile menu trigger */}
+    <header className="border-b border-ink/10 bg-white">
+      <div className="flex h-14 items-center gap-4 px-4 md:px-6">
+        {/* Mobile menu trigger - Swiss Ledger style */}
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
             <Button
               variant="outline"
               size="sm"
-              className="md:hidden border-ledger"
+              className="md:hidden h-10 w-10 p-0 border-ink/20 hover:border-ink hover:bg-paper transition-colors"
             >
-              <Menu className="h-4 w-4" />
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">Open menu</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64">
+          <SheetContent side="left" className="p-0 w-72 border-r border-ink/10">
             <SheetHeader className="sr-only">
               <SheetTitle>Navigation Menu</SheetTitle>
             </SheetHeader>
@@ -49,24 +54,9 @@ export function Header({ children }: HeaderProps) {
           </SheetContent>
         </Sheet>
 
-        {/* Breadcrumbs */}
-        <div className="flex items-center gap-2 text-sm font-primary">
-          {breadcrumbs.map((crumb, index) => (
-            <div key={crumb} className="flex items-center gap-2">
-              {index > 0 && (
-                <ChevronRight className="h-3 w-3 text-grey-mid" />
-              )}
-              <span
-                className={
-                  index === breadcrumbs.length - 1
-                    ? "text-ink font-medium"
-                    : "text-grey-mid"
-                }
-              >
-                {crumb}
-              </span>
-            </div>
-          ))}
+        {/* Mobile: Page title */}
+        <div className="md:hidden">
+          <h1 className="text-lg font-semibold text-ink">{currentPage}</h1>
         </div>
 
         {/* Spacer */}
@@ -75,7 +65,6 @@ export function Header({ children }: HeaderProps) {
         {/* Header actions */}
         {children}
       </div>
-
     </header>
   );
 }

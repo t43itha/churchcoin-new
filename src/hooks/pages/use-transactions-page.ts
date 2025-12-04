@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConvex, useMutation, useQuery } from "convex/react";
 
+import { useChurch } from "@/contexts/church-context";
 import { api, type Doc, type Id } from "@/lib/convexGenerated";
 import { useSession } from "@/components/auth/session-provider";
 import { getRolePermissions } from "@/lib/rbac";
@@ -16,7 +17,6 @@ type FeedbackState = { type: "success" | "error"; message: string } | null;
 export interface UseTransactionsPageReturn {
   // State
   churchId: Id<"churches"> | null;
-  setChurchId: (id: Id<"churches">) => void;
   viewMode: PeriodViewMode;
   setViewMode: (mode: PeriodViewMode) => void;
   expandedPeriods: Set<string>;
@@ -32,7 +32,6 @@ export interface UseTransactionsPageReturn {
   setTransactionFilter: (filter: TransactionFilter) => void;
 
   // Data
-  churches: Doc<"churches">[] | undefined;
   funds: Doc<"funds">[] | undefined;
   categories: Doc<"categories">[] | undefined;
   donors: Doc<"donors">[] | undefined;
@@ -84,12 +83,12 @@ interface TransactionUpdateValues {
 export function useTransactionsPage(): UseTransactionsPageReturn {
   const convex = useConvex();
   const { user } = useSession();
+  const { churchId } = useChurch();
 
   // =========================================================================
   // STATE
   // =========================================================================
 
-  const [churchId, setChurchId] = useState<Id<"churches"> | null>(null);
   const [viewMode, setViewMode] = useState<PeriodViewMode>("last-6");
   const [expandedPeriods, setExpandedPeriods] = useState<Set<string>>(new Set());
   const [feedback, setFeedback] = useState<FeedbackState>(null);
@@ -132,7 +131,6 @@ export function useTransactionsPage(): UseTransactionsPageReturn {
   // QUERIES
   // =========================================================================
 
-  const churches = useQuery(api.churches.listChurches, {});
   const funds = useQuery(api.funds.getFunds, churchId ? { churchId } : "skip");
   const categories = useQuery(api.categories.getCategories, churchId ? { churchId } : "skip");
   const donors = useQuery(api.donors.getDonors, churchId ? { churchId } : "skip");
@@ -214,13 +212,6 @@ export function useTransactionsPage(): UseTransactionsPageReturn {
   // =========================================================================
   // EFFECTS
   // =========================================================================
-
-  // Auto-select first church
-  useEffect(() => {
-    if (!churchId && churches && churches.length > 0) {
-      setChurchId(churches[0]._id);
-    }
-  }, [churches, churchId]);
 
   // Auto-expand current period
   useEffect(() => {
@@ -447,7 +438,6 @@ export function useTransactionsPage(): UseTransactionsPageReturn {
   return {
     // State
     churchId,
-    setChurchId,
     viewMode,
     setViewMode,
     expandedPeriods,
@@ -463,7 +453,6 @@ export function useTransactionsPage(): UseTransactionsPageReturn {
     setTransactionFilter,
 
     // Data
-    churches,
     funds,
     categories,
     donors,

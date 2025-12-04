@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { useQuery } from "convex/react";
 import {
   Calculator,
   PiggyBank,
@@ -19,55 +18,35 @@ import {
 import { cn } from "@/lib/utils";
 import { getRoleDisplayName, getRolePermissions } from "@/lib/rbac";
 import { useSession } from "@/components/auth/session-provider";
+import { useChurch } from "@/contexts/church-context";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ChatDialog } from "@/components/ai/chat-dialog";
-import { api } from "@/lib/convexGenerated";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 const baseNavigation = [
-  {
-    name: "Dashboard",
-    href: "/dashboard",
-    icon: Calculator,
-  },
-  {
-    name: "Funds",
-    href: "/funds",
-    icon: PiggyBank,
-  },
-  {
-    name: "Transactions",
-    href: "/transactions",
-    icon: Receipt,
-  },
-  {
-    name: "Reconciliation",
-    href: "/reconciliation",
-    icon: GitMerge,
-  },
-  {
-    name: "Donors",
-    href: "/donors",
-    icon: Users,
-  },
-  {
-    name: "Import",
-    href: "/imports",
-    icon: Upload,
-  },
-  {
-    name: "Reports",
-    href: "/reports",
-    icon: FileText,
-  },
+  { name: "Dashboard", href: "/dashboard", icon: Calculator },
+  { name: "Funds", href: "/funds", icon: PiggyBank },
+  { name: "Transactions", href: "/transactions", icon: Receipt },
+  { name: "Reconciliation", href: "/reconciliation", icon: GitMerge },
+  { name: "Donors", href: "/donors", icon: Users },
+  { name: "Import", href: "/imports", icon: Upload },
+  { name: "Reports", href: "/reports", icon: FileText },
 ];
 
 const adminNavigation = [
-  {
-    name: "Settings",
-    href: "/settings",
-    icon: Settings,
-  },
+  { name: "Settings", href: "/settings", icon: Settings },
 ];
 
 interface SidebarProps {
@@ -79,8 +58,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const { user, signOut } = useSession();
   const [chatOpen, setChatOpen] = useState(false);
-  const churches = useQuery(api.churches.listChurches, {});
-  const churchId = churches?.[0]?._id;
+  const { churchId, setChurchId, churches } = useChurch();
 
   const permissions = useMemo(
     () => getRolePermissions(user?.role),
@@ -106,29 +84,45 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
 
   return (
     <div className={cn("flex h-full flex-col bg-paper border-r border-ledger", className)}>
-      {/* Header */}
-      <div className="flex items-center gap-2 px-6 py-4 border-b border-ledger">
-        <Calculator className="h-8 w-8 text-grey-dark" />
+      {/* Header - Swiss Ledger Style */}
+      <div className="shrink-0 flex items-center gap-3 px-6 py-5 border-b border-ink/10">
+        <div className="flex items-center justify-center w-10 h-10 bg-ink rounded-lg">
+          <Calculator className="h-5 w-5 text-white" />
+        </div>
         <div className="flex flex-col">
-          <h1 className="text-lg font-semibold text-ink font-primary">ChurchCoin</h1>
-          <p className="text-xs text-grey-mid font-primary">Church Finance</p>
+          <h1 className="text-lg font-bold text-ink tracking-tight">ChurchCoin</h1>
+          <p className="text-xs text-grey-mid uppercase tracking-widest">Church Finance</p>
         </div>
       </div>
 
-      {/* AI Assistant Button */}
-      <div className="px-4 pt-6 pb-3">
+      {/* AI Assistant Button - Amber accent on hover */}
+      <div className="shrink-0 px-4 pt-6 pb-4">
         <Button
           onClick={() => setChatOpen(true)}
-          className="w-full gap-2 bg-ink text-paper hover:bg-grey-dark font-primary"
+          className="w-full h-12 gap-3 bg-ink text-white hover:bg-charcoal font-medium text-base
+                     border border-ink shadow-hard-sm hover:shadow-hard-amber hover:-translate-x-0.5 hover:-translate-y-0.5
+                     transition-all duration-200"
         >
-          <Sparkles className="h-4 w-4" />
+          <Sparkles className="h-5 w-5" />
           AI Assistant
         </Button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-4 pb-6">
-        <ul className="space-y-2">
+      {/* Section Divider */}
+      <div className="shrink-0 px-4">
+        <div className="h-px bg-ledger" />
+      </div>
+
+      {/* Navigation Label */}
+      <div className="shrink-0 px-6 pt-4 pb-2">
+        <span className="swiss-label text-xs font-semibold uppercase tracking-widest text-grey-mid">
+          Navigation
+        </span>
+      </div>
+
+      {/* Navigation - scrollable */}
+      <nav className="flex-1 min-h-0 px-4 pb-4 overflow-y-auto">
+        <ul className="space-y-1">
           {visibleNavigation.map((item) => {
             const isActive = pathname === item.href ||
               (item.href !== "/" && pathname.startsWith(item.href));
@@ -139,19 +133,19 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
                   href={item.href}
                   onClick={onNavigate}
                   className={cn(
-                    "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium font-primary transition-colors",
+                    "group flex items-center gap-3 rounded-md px-3 py-3 text-base font-medium transition-all duration-200",
                     isActive
-                      ? "bg-highlight text-ink border border-ledger"
-                      : "text-grey-mid hover:bg-ledger hover:text-ink"
+                      ? "bg-sage-light text-ink"
+                      : "text-grey-mid hover:bg-paper hover:text-ink"
                   )}
                 >
                   <item.icon
                     className={cn(
-                      "h-4 w-4 shrink-0",
-                      isActive ? "text-ink" : "text-grey-mid group-hover:text-ink"
+                      "h-5 w-5 shrink-0 transition-colors",
+                      isActive ? "text-sage" : "text-grey-mid group-hover:text-ink"
                     )}
                   />
-                  {item.name}
+                  <span className="flex-1">{item.name}</span>
                 </Link>
               </li>
             );
@@ -162,40 +156,67 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
       <ChatDialog
         open={chatOpen}
         onOpenChange={setChatOpen}
-        churchId={churchId}
+        churchId={churchId ?? undefined}
         context={{ page: currentPage }}
       />
 
-      {/* User Profile Section */}
-      <div className="border-t border-ledger p-4">
-        {user && (
-          <div className="flex items-center gap-3 mb-3">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-ledger text-ink font-primary text-xs">
-                {user.name.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-ink font-primary truncate">
-                {user.name}
-              </p>
-              <p className="text-xs text-grey-mid font-primary">
-                {getRoleDisplayName(user.role)}
-              </p>
-            </div>
-          </div>
-        )}
+      {/* Compact Footer - User + Church selector */}
+      <div className="shrink-0 border-t border-ledger p-3">
+        <div className="flex items-center gap-2">
+          {/* User avatar with popover */}
+          {user && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-ink focus:ring-offset-2">
+                  <Avatar className="h-9 w-9 border border-ink cursor-pointer hover:opacity-80 transition-opacity">
+                    <AvatarFallback className="bg-ink text-white font-semibold text-sm">
+                      {user.name.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-3" align="start" side="top">
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-ink truncate">{user.name}</p>
+                    <p className="text-xs text-grey-mid uppercase tracking-wide">
+                      {getRoleDisplayName(user.role)}
+                    </p>
+                  </div>
+                  <div className="h-px bg-ledger" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSignOut}
+                    className="w-full h-9 gap-2 text-sm font-medium border-ink/20 text-grey-mid
+                               hover:border-ink hover:text-ink hover:bg-paper transition-colors"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign out
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
 
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSignOut}
-            className="flex-1 font-primary border-ledger text-grey-mid hover:text-ink"
-          >
-            <LogOut className="h-3 w-3" />
-            Sign Out
-          </Button>
+          {/* Church selector - compact */}
+          {churches && churches.length > 0 && (
+            <Select
+              value={churchId ?? undefined}
+              onValueChange={(value) => setChurchId(value as typeof churchId)}
+            >
+              <SelectTrigger className="flex-1 h-9 text-sm bg-white border-ink/20 hover:border-ink focus:border-ink transition-colors">
+                <SelectValue placeholder="Church" />
+              </SelectTrigger>
+              <SelectContent>
+                {churches.map((church) => (
+                  <SelectItem key={church._id} value={church._id}>
+                    {church.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </div>
     </div>

@@ -18,8 +18,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { api, type Id } from "@/lib/convexGenerated";
 
 const loadingState = (
-  <div className="flex min-h-screen items-center justify-center bg-paper text-sm text-grey-mid">
-    Loading fund…
+  <div className="flex min-h-screen items-center justify-center bg-paper">
+    <div className="text-sm text-grey-mid">Loading fund…</div>
   </div>
 );
 
@@ -230,9 +230,9 @@ export default function FundPage() {
       </main>
 
       <Dialog open={isPledgeDialogOpen} onOpenChange={setIsPledgeDialogOpen}>
-        <DialogContent className="max-w-2xl border-ledger bg-paper font-primary">
+        <DialogContent className="max-w-2xl border-2 border-ink bg-white shadow-[8px_8px_0px_rgba(0,0,0,0.1)]">
           <DialogHeader>
-            <DialogTitle className="text-xl text-ink">Add pledge</DialogTitle>
+            <DialogTitle className="text-xl font-semibold text-ink">Add pledge</DialogTitle>
           </DialogHeader>
           <FundPledgeForm
             donors={donorOptions}

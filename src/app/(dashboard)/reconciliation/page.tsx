@@ -2,20 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { Banknote, CheckCheck, Download, FileWarning } from "lucide-react";
+import { CheckCheck, Download, FileWarning } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useChurch } from "@/contexts/church-context";
 import { api, type Doc, type Id } from "@/lib/convexGenerated";
 import { formatUkDateNumeric } from "@/lib/dates";
 
@@ -37,8 +30,7 @@ const currency = new Intl.NumberFormat("en-GB", {
 });
 
 export default function ReconciliationPage() {
-  const churches = useQuery(api.churches.listChurches, {});
-  const [churchId, setChurchId] = useState<Id<"churches"> | null>(null);
+  const { churchId } = useChurch();
   const sessions = useQuery(api.reconciliation.listSessions, churchId ? { churchId } : "skip");
   const [activeSession, setActiveSession] = useState<Doc<"reconciliationSessions"> | null>(null);
   const [bankBalance, setBankBalance] = useState(0);
@@ -74,12 +66,6 @@ export default function ReconciliationPage() {
   const [isClosing, setIsClosing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!churchId && churches && churches.length > 0) {
-      setChurchId(churches[0]._id);
-    }
-  }, [churches, churchId]);
 
   useEffect(() => {
     if (sessions && sessions.length > 0) {
@@ -208,53 +194,31 @@ export default function ReconciliationPage() {
   };
 
   return (
-    
-      <div className="min-h-screen bg-paper pb-12">
-      <div className="border-b border-ledger bg-paper">
+    <div className="min-h-screen bg-paper pb-12">
+      {/* Header */}
+      <div className="border-b border-ink/10 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-grey-mid">
-                <Banknote className="h-5 w-5 text-grey-mid" />
-                <span className="text-sm uppercase tracking-wide">Match Transactions</span>
-              </div>
               <h1 className="text-3xl font-semibold text-ink">Bank reconciliation</h1>
-              <p className="text-sm text-grey-mid">
+              <p className="text-sm text-grey-mid leading-relaxed">
                 Match bank transactions to the ledger, manage variances, and close each month with confidence.
               </p>
             </div>
-            <div className="flex flex-col gap-2 md:items-end">
-              <span className="text-xs uppercase tracking-wide text-grey-mid">Active church</span>
-              <Select
-                value={churchId ?? undefined}
-                onValueChange={(value) => setChurchId(value as Id<"churches">)}
-              >
-                <SelectTrigger className="w-[240px] font-primary">
-                  <SelectValue placeholder="Select church" />
-                </SelectTrigger>
-                <SelectContent className="font-primary">
-                  {churches?.map((church) => (
-                    <SelectItem key={church._id} value={church._id}>
-                      {church.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-grey-mid">
-            <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
-              <CheckCheck className="mr-1 h-3 w-3" /> AI-powered matching hooked up to CSV imports
-            </Badge>
-            <Badge variant="secondary" className="border-ledger bg-highlight text-ink">
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <span className="swiss-badge bg-sage-light text-sage-dark border border-sage">
+              <CheckCheck className="mr-1 h-3.5 w-3.5" /> AI-powered matching
+            </span>
+            <span className="swiss-badge bg-ink text-white">
               {matches ? `${matches.length} suggested matches` : "No matches yet"}
-            </Badge>
+            </span>
           </div>
         </div>
       </div>
       <div className="mx-auto grid max-w-6xl gap-6 px-6 py-10 lg:grid-cols-[1.2fr,1fr]">
         <div className="space-y-6">
-          <Card className="border-ledger bg-paper shadow-none">
+          <Card className="swiss-card border border-ink bg-white">
             <CardHeader>
               <CardTitle className="text-ink">Start new reconciliation</CardTitle>
               <CardDescription className="text-grey-mid">
@@ -289,7 +253,7 @@ export default function ReconciliationPage() {
           </Card>
 
           {activeSession ? (
-            <Card className="border-ledger bg-paper shadow-none">
+            <Card className="swiss-card border border-ink bg-white">
               <CardHeader>
                 <CardTitle className="text-ink">Month-end summary</CardTitle>
                 <CardDescription className="text-grey-mid">
@@ -394,7 +358,7 @@ export default function ReconciliationPage() {
             </Card>
           ) : null}
 
-          <Card className="border-ledger bg-paper shadow-none">
+          <Card className="swiss-card border border-ink bg-white">
             <CardHeader>
               <CardTitle className="text-ink">Suggested matches</CardTitle>
               <CardDescription className="text-grey-mid">
@@ -442,7 +406,7 @@ export default function ReconciliationPage() {
         </div>
 
         <div className="space-y-6">
-          <Card className="border-ledger bg-paper shadow-none">
+          <Card className="swiss-card border border-ink bg-white">
             <CardHeader>
               <CardTitle className="text-ink">Sessions</CardTitle>
               <CardDescription className="text-grey-mid">
@@ -474,7 +438,7 @@ export default function ReconciliationPage() {
           </Card>
 
           {activeSession ? (
-            <Card className="border-ledger bg-paper shadow-none">
+            <Card className="swiss-card border border-ink bg-white">
               <CardHeader>
                 <CardTitle className="text-ink">Outstanding items</CardTitle>
                 <CardDescription className="text-grey-mid">
@@ -542,7 +506,6 @@ export default function ReconciliationPage() {
           ) : null}
         </div>
       </div>
-      </div>
-    
+    </div>
   );
 }

@@ -863,20 +863,20 @@ export default function DashboardPage() {
               onCustomRange={() => window.alert("Custom range coming soon")}
             />
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" className="border-ledger font-primary" asChild>
+              <Button variant="outline" className="border-ink text-ink hover:bg-ink hover:text-white transition-colors font-medium" asChild>
                 <Link href="/reports">
                   <BarChart3 className="mr-2 h-4 w-4" />
                   Run Report
                 </Link>
               </Button>
-              <Button variant="outline" className="border-ledger font-primary" asChild>
+              <Button variant="outline" className="border-ink text-ink hover:bg-ink hover:text-white transition-colors font-medium" asChild>
                 <Link href="/funds">
                   <Layers className="mr-2 h-4 w-4" />
                   Manage Funds
                 </Link>
               </Button>
               <Button
-                className="font-primary"
+                className="bg-ink text-white hover:bg-ink/90 font-medium shadow-[2px_2px_0px_rgba(0,0,0,0.1)] hover:shadow-[4px_4px_0px_#d4a574] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all"
                 onClick={() => setIsTransactionDialogOpen(true)}
                 disabled={!churchId}
               >
@@ -903,10 +903,10 @@ export default function DashboardPage() {
           defaultOpen
         >
           <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-            <Card className="border-ledger bg-white">
+            <Card className="swiss-card border border-ink bg-white">
               <CardHeader className="pb-4">
                 <CardTitle className="text-ink">Income vs Expense (12 months)</CardTitle>
-                <CardDescription className="font-primary text-grey-mid">
+                <CardDescription className="text-grey-mid">
                   Bars highlight the balance between income and expenditure each month.
                 </CardDescription>
               </CardHeader>
@@ -914,25 +914,33 @@ export default function DashboardPage() {
                 {monthlyIncomeExpense.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={monthlyIncomeExpense}>
-                      <CartesianGrid stroke="#E5E7EB" strokeDasharray="3 3" />
+                      <CartesianGrid stroke="#E8E8E6" strokeDasharray="3 3" />
                       <XAxis
                         dataKey="month"
-                        stroke="#6B7280"
+                        stroke="#6B6B6B"
                         fontSize={12}
                         tickLine={false}
+                        fontFamily="var(--font-mono)"
                       />
                       <YAxis
-                        stroke="#6B7280"
+                        stroke="#6B6B6B"
                         fontSize={12}
                         tickFormatter={(value) => `£${(value / 1000).toFixed(0)}k`}
                         width={60}
+                        fontFamily="var(--font-mono)"
                       />
                       <Tooltip
-                        cursor={{ fill: "rgba(16, 185, 129, 0.1)" }}
+                        cursor={{ fill: "rgba(107, 142, 107, 0.1)" }}
                         formatter={(value: number) => formatCurrency(value)}
+                        contentStyle={{
+                          backgroundColor: "#fafaf9",
+                          border: "1px solid #000",
+                          borderRadius: "8px",
+                          fontFamily: "var(--font-mono)",
+                        }}
                       />
-                      <Bar dataKey="income" fill="#10B981" radius={4} name="Income" />
-                      <Bar dataKey="expense" fill="#F59E0B" radius={4} name="Expenses" />
+                      <Bar dataKey="income" fill="#6b8e6b" radius={4} name="Income" />
+                      <Bar dataKey="expense" fill="#d4a574" radius={4} name="Expenses" />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
@@ -943,12 +951,12 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-ledger bg-white">
+            <Card className="swiss-card border border-ink bg-white">
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2 text-ink">
                   <Church className="h-5 w-5" /> Fund Balances
                 </CardTitle>
-                <CardDescription className="font-primary text-grey-mid">
+                <CardDescription className="text-grey-mid">
                   Important funds (≥£5,000) appear first and display a ⭐ marker.
                 </CardDescription>
               </CardHeader>
@@ -960,7 +968,7 @@ export default function DashboardPage() {
                       : 0;
                     return (
                       <div key={fund._id} className="space-y-2">
-                        <div className="flex items-center justify-between font-primary text-sm">
+                        <div className="flex items-center justify-between text-sm">
                           <span
                             className={
                               fund.isImportant
@@ -970,13 +978,13 @@ export default function DashboardPage() {
                           >
                             {fund.name} {fund.isImportant && <span aria-label="Important fund">⭐</span>}
                           </span>
-                          <span className="text-grey-mid">{formatCurrency(fund.balance)}</span>
+                          <span className="text-ink font-[family-name:var(--font-mono)] font-medium">{formatCurrency(fund.balance)}</span>
                         </div>
-                        <div className="h-2 rounded-full bg-grey-light">
+                        <div className="h-2 rounded-full bg-ink/10">
                           <div
                             className={
                               fund.isImportant
-                                ? "h-full rounded-full bg-success"
+                                ? "h-full rounded-full bg-sage"
                                 : "h-full rounded-full bg-grey-mid"
                             }
                             style={{ width: `${Math.max(percent, 4)}%` }}
@@ -986,55 +994,55 @@ export default function DashboardPage() {
                     );
                   })}
                 </div>
-                <p className="text-xs font-primary text-grey-mid">
-                  ⭐ Important funds monitored for alerts. Total balance {formatCurrency(totalFundBalance)}.
+                <p className="text-xs text-grey-mid pt-2 border-t border-ink/5">
+                  ⭐ Important funds monitored for alerts. Total balance <span className="font-[family-name:var(--font-mono)] font-medium text-ink">{formatCurrency(totalFundBalance)}</span>.
                 </p>
               </CardContent>
             </Card>
           </div>
 
-          <Card className="border-ledger bg-white">
+          <Card className="swiss-card border border-ink bg-white">
             <CardHeader className="pb-4">
               <CardTitle className="text-ink">Budget Variance</CardTitle>
-              <CardDescription className="font-primary text-grey-mid">
+              <CardDescription className="text-grey-mid">
                 Important funds appear first and highlight variances greater than 20%.
               </CardDescription>
             </CardHeader>
             <CardContent className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-sm font-primary">
-                <thead className="text-left text-xs uppercase tracking-[0.2em] text-grey-mid">
+              <table className="w-full min-w-[640px] text-sm">
+                <thead className="text-left text-xs uppercase tracking-widest text-grey-mid border-b border-ink/10">
                   <tr>
-                    <th className="py-2">Fund</th>
-                    <th className="py-2">Budget</th>
-                    <th className="py-2">Actual</th>
-                    <th className="py-2">Variance</th>
-                    <th className="py-2">% of Budget</th>
+                    <th className="py-3 font-semibold">Fund</th>
+                    <th className="py-3 font-semibold">Budget</th>
+                    <th className="py-3 font-semibold">Actual</th>
+                    <th className="py-3 font-semibold">Variance</th>
+                    <th className="py-3 font-semibold">% of Budget</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-ledger/60">
+                <tbody className="divide-y divide-ink/5">
                   {budgetRows.map((row) => {
                     const varianceTone =
-                      row.variance > 0 ? "text-success" : row.variance < 0 ? "text-error" : "text-grey-mid";
+                      row.variance > 0 ? "text-sage" : row.variance < 0 ? "text-error" : "text-grey-mid";
                     return (
                       <tr
                         key={row.id}
-                        className={row.varianceAlert ? "bg-amber-50/60" : undefined}
+                        className={row.varianceAlert ? "bg-amber-light/50" : undefined}
                       >
                         <td className="py-3 font-medium text-ink">
                           {row.name} {row.isImportant && <span aria-label="Important fund">⭐</span>}
                         </td>
-                        <td className="py-3 text-grey-mid">{formatCurrency(row.budget ?? 0)}</td>
-                        <td className="py-3 text-grey-mid">{formatCurrency(row.actual)}</td>
-                        <td className={`py-3 ${varianceTone}`}>{formatCurrency(row.variance)}</td>
+                        <td className="py-3 text-grey-mid font-[family-name:var(--font-mono)]">{formatCurrency(row.budget ?? 0)}</td>
+                        <td className="py-3 text-ink font-[family-name:var(--font-mono)] font-medium">{formatCurrency(row.actual)}</td>
+                        <td className={`py-3 font-[family-name:var(--font-mono)] font-medium ${varianceTone}`}>{formatCurrency(row.variance)}</td>
                         <td className="py-3">
                           <div className="flex items-center gap-3">
-                            <div className="h-2 flex-1 rounded-full bg-grey-light">
+                            <div className="h-2 flex-1 rounded-full bg-ink/10">
                               <div
-                                className={`h-full rounded-full ${row.progress >= 100 ? "bg-error" : "bg-success"}`}
-                                style={{ width: `${Math.min(Math.max(row.progress, 4), 120)}%` }}
+                                className={`h-full rounded-full ${row.progress >= 100 ? "bg-amber" : "bg-sage"}`}
+                                style={{ width: `${Math.min(Math.max(row.progress, 4), 100)}%` }}
                               />
                             </div>
-                            <span className="w-12 text-right text-sm text-grey-mid">
+                            <span className="w-12 text-right text-sm font-[family-name:var(--font-mono)] text-grey-mid">
                               {row.progress.toFixed(0)}%
                             </span>
                           </div>
@@ -1062,7 +1070,7 @@ export default function DashboardPage() {
                   value: donorActivity.activeDonors,
                   change: donorActivity.newDonors,
                   icon: UserCheck,
-                  tone: "text-success",
+                  tone: "text-sage",
                 }, {
                   title: "Lapsed Donors",
                   value: donorActivity.lapsedDonors,
@@ -1074,20 +1082,20 @@ export default function DashboardPage() {
                   value: donorActivity.newDonors,
                   change: donorActivity.newDonors,
                   icon: UserPlus,
-                  tone: donorActivity.newDonors > 0 ? "text-success" : "text-grey-mid",
+                  tone: donorActivity.newDonors > 0 ? "text-sage" : "text-grey-mid",
                 }].map((card) => {
                   const Icon = card.icon;
                   return (
-                    <Card key={card.title} className="border-ledger bg-white">
+                    <Card key={card.title} className="swiss-card border border-ink bg-white">
                       <CardHeader className="flex flex-row items-start justify-between pb-2">
-                        <CardTitle className="font-primary text-xs uppercase tracking-[0.2em] text-grey-mid">
+                        <CardTitle className="swiss-label text-xs font-semibold uppercase tracking-widest text-grey-mid">
                           {card.title}
                         </CardTitle>
                         <Icon className={`h-4 w-4 ${card.tone}`} />
                       </CardHeader>
                       <CardContent className="space-y-2">
-                        <div className="text-2xl font-semibold text-ink">{card.value}</div>
-                        <p className="text-xs font-primary text-grey-mid">
+                        <div className="text-2xl font-bold text-ink font-[family-name:var(--font-mono)]">{card.value}</div>
+                        <p className="text-xs text-grey-mid">
                           {card.title === "Lapsed Donors"
                             ? lapsedRate.toFixed(1) + "% of base"
                             : card.change >= 0
@@ -1099,10 +1107,10 @@ export default function DashboardPage() {
                   );
                 })}
               </div>
-              <Card className="border-ledger bg-white">
+              <Card className="swiss-card border border-ink bg-white">
                 <CardHeader className="pb-4">
                   <CardTitle className="text-ink">Donor Retention Trend</CardTitle>
-                  <CardDescription className="font-primary text-grey-mid">
+                  <CardDescription className="text-grey-mid">
                     Measures returning donors month over month.
                   </CardDescription>
                 </CardHeader>
@@ -1110,11 +1118,31 @@ export default function DashboardPage() {
                   {donorRetentionSeries.length > 1 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={donorRetentionSeries}>
-                        <CartesianGrid stroke="#E5E7EB" strokeDasharray="3 3" />
-                        <XAxis dataKey="month" stroke="#6B7280" fontSize={12} tickLine={false} />
-                        <YAxis domain={[0, 100]} stroke="#6B7280" fontSize={12} tickFormatter={(value) => `${value}%`} />
-                        <Tooltip formatter={(value: number) => `${value.toFixed(1)}%`} />
-                        <Line type="monotone" dataKey="retention" stroke="#6366F1" strokeWidth={2} dot={{ r: 3 }} />
+                        <CartesianGrid stroke="#E8E8E6" strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="month"
+                          stroke="#6B6B6B"
+                          fontSize={12}
+                          tickLine={false}
+                          fontFamily="var(--font-mono)"
+                        />
+                        <YAxis
+                          domain={[0, 100]}
+                          stroke="#6B6B6B"
+                          fontSize={12}
+                          tickFormatter={(value) => `${value}%`}
+                          fontFamily="var(--font-mono)"
+                        />
+                        <Tooltip
+                          formatter={(value: number) => `${value.toFixed(1)}%`}
+                          contentStyle={{
+                            backgroundColor: "#fafaf9",
+                            border: "1px solid #000",
+                            borderRadius: "8px",
+                            fontFamily: "var(--font-mono)",
+                          }}
+                        />
+                        <Line type="monotone" dataKey="retention" stroke="#6b8e6b" strokeWidth={2} dot={{ r: 3, fill: "#6b8e6b" }} />
                       </LineChart>
                     </ResponsiveContainer>
                   ) : (
@@ -1125,21 +1153,21 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </div>
-            <Card className="border-ledger bg-white">
+            <Card className="swiss-card border border-ink bg-white">
               <CardHeader className="pb-4">
                 <CardTitle className="text-ink">Average Gift This Period</CardTitle>
-                <CardDescription className="font-primary text-grey-mid">
+                <CardDescription className="text-grey-mid">
                   Compare to the previous period to spot momentum shifts.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="text-3xl font-semibold text-ink">
+              <CardContent className="space-y-4">
+                <div className="text-3xl font-bold text-ink font-[family-name:var(--font-mono)]">
                   {formatCurrency(donorActivity.averageDonation)}
                 </div>
-                <p className="text-sm font-primary text-grey-mid">
-                  New donors added: {donorActivity.newDonors}. Recurring donors: {donorActivity.recurringDonors}.
+                <p className="text-sm text-grey-mid">
+                  New donors added: <span className="font-medium text-ink">{donorActivity.newDonors}</span>. Recurring donors: <span className="font-medium text-ink">{donorActivity.recurringDonors}</span>.
                 </p>
-                <Button variant="outline" className="w-full border-ledger font-primary" asChild>
+                <Button variant="outline" className="w-full border-ink text-ink hover:bg-ink hover:text-white transition-colors font-medium" asChild>
                   <Link href="/donors">
                     Review donor list
                     <ChevronRight className="ml-2 h-4 w-4" />
@@ -1158,15 +1186,15 @@ export default function DashboardPage() {
         >
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {advancedMetrics.map((metric) => (
-              <Card key={metric.title} className="border-ledger bg-white">
+              <Card key={metric.title} className="swiss-card border border-ink bg-white">
                 <CardHeader className="pb-2">
-                  <CardTitle className="font-primary text-xs uppercase tracking-[0.2em] text-grey-mid">
+                  <CardTitle className="swiss-label text-xs font-semibold uppercase tracking-widest text-grey-mid">
                     {metric.title}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <div className="text-2xl font-semibold text-ink">{metric.value}</div>
-                  <p className="text-xs font-primary text-grey-mid">{metric.hint}</p>
+                  <div className="text-xl font-bold text-ink">{metric.value}</div>
+                  <p className="text-xs text-grey-mid">{metric.hint}</p>
                 </CardContent>
               </Card>
             ))}
@@ -1174,35 +1202,35 @@ export default function DashboardPage() {
         </CollapsibleSection>
       </div>
 
-      <div className="sticky bottom-0 border-t border-ledger bg-white/95 backdrop-blur">
+      <div className="sticky bottom-0 border-t border-ink/10 bg-white/95 backdrop-blur hidden md:block">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-sm font-primary text-grey-mid">
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-grey-mid">
               {currentPeriod ? currentPeriod.periodName : "Current period"}
             </div>
             {periodMetrics && (
-              <div className="flex items-center gap-2 text-sm font-primary text-grey-mid">
+              <div className="flex items-center gap-2 text-sm text-grey-mid">
                 <span>Ledger progress</span>
-                <div className="h-2 w-36 rounded-full bg-grey-light">
+                <div className="h-2 w-36 rounded-full bg-ink/10">
                   <div
-                    className="h-full rounded-full bg-success"
+                    className="h-full rounded-full bg-sage"
                     style={{ width: `${periodMetrics.percentComplete}%` }}
                   />
                 </div>
-                <span className="text-ink font-semibold">
+                <span className="text-ink font-[family-name:var(--font-mono)] font-semibold">
                   {periodMetrics.percentComplete}% ({periodMetrics.categorized} of {periodMetrics.total})
                 </span>
               </div>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" className="border-ledger font-primary" asChild>
+            <Button variant="outline" className="border-ink text-ink hover:bg-ink hover:text-white transition-colors font-medium" asChild>
               <Link href="/reports">
                 <Target className="mr-2 h-4 w-4" />
                 Review Month-End Checklist
               </Link>
             </Button>
-            <Button variant="ghost" className="font-primary text-xs uppercase tracking-[0.2em] text-grey-mid" asChild>
+            <Button variant="ghost" className="text-xs uppercase tracking-widest text-grey-mid hover:text-ink" asChild>
               <Link href="/reconciliation">
                 <Receipt className="mr-2 h-4 w-4" />
                 Reconcile Accounts

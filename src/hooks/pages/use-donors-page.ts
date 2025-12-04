@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 
+import { useChurch } from "@/contexts/church-context";
 import { api, type Doc, type Id } from "@/lib/convexGenerated";
 import type { DonorMetrics } from "@/components/donors/donor-card";
 import type { FilterState } from "@/components/donors/donor-filter-chips";
@@ -19,7 +20,6 @@ const statementRange = {
 export interface UseDonorsPageReturn {
   // State
   churchId: Id<"churches"> | null;
-  setChurchId: (id: Id<"churches"> | null) => void;
   selectedDonorId: Id<"donors"> | null;
   setSelectedDonorId: (id: Id<"donors"> | null) => void;
   searchQuery: string;
@@ -38,7 +38,6 @@ export interface UseDonorsPageReturn {
   setStatementDialog: (state: { open: boolean; donorIds: Id<"donors">[] | null }) => void;
 
   // Data
-  churches: Doc<"churches">[] | undefined;
   donors: Doc<"donors">[] | undefined;
   funds: ReturnType<typeof useQuery<typeof api.funds.getFunds>>;
   selectedDonor: Doc<"donors"> | null;
@@ -94,11 +93,12 @@ function periodToDays(period: NonNullable<FilterState["lastGiftPeriod"]>) {
  * Reduces page component complexity significantly.
  */
 export function useDonorsPage(): UseDonorsPageReturn {
+  const { churchId } = useChurch();
+
   // =========================================================================
   // STATE
   // =========================================================================
 
-  const [churchId, setChurchId] = useState<Id<"churches"> | null>(null);
   const [selectedDonorId, setSelectedDonorId] = useState<Id<"donors"> | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<FilterState>({});
@@ -115,7 +115,6 @@ export function useDonorsPage(): UseDonorsPageReturn {
   // QUERIES
   // =========================================================================
 
-  const churches = useQuery(api.churches.listChurches, {});
   const donors = useQuery(api.donors.getDonors, churchId ? { churchId } : "skip");
   const funds = useQuery(api.funds.getFunds, churchId ? { churchId } : "skip");
 
@@ -155,13 +154,6 @@ export function useDonorsPage(): UseDonorsPageReturn {
   // =========================================================================
   // EFFECTS
   // =========================================================================
-
-  // Auto-select first church
-  useEffect(() => {
-    if (!churchId && churches && churches.length > 0) {
-      setChurchId(churches[0]._id);
-    }
-  }, [churches, churchId]);
 
   // Clear selected donor if it no longer exists
   useEffect(() => {
@@ -362,7 +354,6 @@ export function useDonorsPage(): UseDonorsPageReturn {
   return {
     // State
     churchId,
-    setChurchId,
     selectedDonorId,
     setSelectedDonorId,
     searchQuery,
@@ -381,7 +372,6 @@ export function useDonorsPage(): UseDonorsPageReturn {
     setStatementDialog,
 
     // Data
-    churches,
     donors,
     funds,
     selectedDonor,

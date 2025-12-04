@@ -4,7 +4,6 @@ import { Banknote, LineChart, PiggyBank, PlusCircle } from "lucide-react";
 
 import { FundCard } from "@/components/funds/fund-card";
 import { FundForm } from "@/components/funds/fund-form";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -13,13 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { Id } from "@/lib/convexGenerated";
 import { formatCurrency } from "@/lib/formats";
 import { useFundsPage } from "@/hooks/pages/use-funds-page";
@@ -28,7 +20,6 @@ export default function FundsPage() {
   const {
     // State
     churchId,
-    setChurchId,
     isCreateOpen,
     isCreateSubmitting,
     createError,
@@ -37,7 +28,6 @@ export default function FundsPage() {
     updateError,
 
     // Data
-    churches,
     fundsOverview,
     fundCards,
     totals,
@@ -55,94 +45,72 @@ export default function FundsPage() {
   return (
     <div className="min-h-screen bg-paper pb-12">
       {/* Header */}
-      <div className="border-b border-ledger bg-paper">
+      <div className="border-b border-ink/10 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-grey-mid">
-                <PiggyBank className="h-5 w-5 text-grey-mid" />
-                <span className="text-sm uppercase tracking-wide">Fund Management</span>
-              </div>
               <h1 className="text-3xl font-semibold text-ink">Church funds overview</h1>
-              <p className="text-sm text-grey-mid">
+              <p className="text-sm text-grey-mid leading-relaxed">
                 Monitor balances across every fund, capture restrictions, and drill into the running ledger.
               </p>
             </div>
-            <div className="flex flex-col items-start gap-3 md:items-end">
-              <Select
-                value={churchId ?? undefined}
-                onValueChange={(value) => setChurchId(value as Id<"churches">)}
-                disabled={!churches?.length}
-              >
-                <SelectTrigger className="min-w-[220px] border-ledger font-primary">
-                  <SelectValue placeholder="Select church" />
-                </SelectTrigger>
-                <SelectContent className="font-primary">
-                  {churches?.map((church) => (
-                    <SelectItem key={church._id} value={church._id}>
-                      {church.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                className="font-primary"
-                onClick={openCreateDialog}
-                disabled={!churchId}
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                New fund
-              </Button>
-            </div>
+            <Button
+              className="bg-ink text-white hover:bg-ink/90 font-medium shadow-[2px_2px_0px_rgba(0,0,0,0.1)] hover:shadow-[4px_4px_0px_#d4a574] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all"
+              onClick={openCreateDialog}
+              disabled={!churchId}
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              New fund
+            </Button>
           </div>
 
           {/* Summary Cards */}
           <div className="grid gap-4 md:grid-cols-3">
-            <Card className="border-ledger">
+            <Card className="swiss-card border border-ink bg-white">
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
-                  <Banknote className="h-4 w-4 text-grey-mid" />
+                <CardTitle className="swiss-label flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-grey-mid">
+                  <Banknote className="h-4 w-4" />
                   Total balance
                 </CardTitle>
               </CardHeader>
-              <CardContent className="text-2xl font-semibold text-ink">
+              <CardContent className="text-2xl font-bold text-ink font-[family-name:var(--font-mono)]">
                 {formatCurrency(totals.balance)}
               </CardContent>
             </Card>
-            <Card className="border-ledger">
+            <Card className="swiss-card border border-ink bg-white">
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
-                  <LineChart className="h-4 w-4 text-grey-mid" />
+                <CardTitle className="swiss-label flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-grey-mid">
+                  <LineChart className="h-4 w-4" />
                   Year-to-date movement
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-baseline justify-between">
-                  <span className="text-sm text-success">+{formatCurrency(totals.income)}</span>
-                  <span className="text-sm text-error">-{formatCurrency(totals.expense)}</span>
+                <div className="flex items-baseline justify-between font-[family-name:var(--font-mono)] font-medium">
+                  <span className="text-sage">+{formatCurrency(totals.income)}</span>
+                  <span className="text-error">-{formatCurrency(totals.expense)}</span>
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-ledger">
+            <Card className="swiss-card border border-ink bg-white">
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-sm font-medium text-grey-mid">
-                  <PiggyBank className="h-4 w-4 text-grey-mid" />
+                <CardTitle className="swiss-label flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-grey-mid">
+                  <PiggyBank className="h-4 w-4" />
                   Funds tracked
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-2 text-2xl font-semibold text-ink">
+                <div className="flex items-center gap-3 text-2xl font-bold text-ink font-[family-name:var(--font-mono)]">
                   {totals.count}
-                  <div className="flex gap-2 text-xs text-grey-mid">
-                    <Badge variant="outline" className="border-ledger text-grey-mid">
+                  <div className="flex gap-2 text-xs">
+                    <span className="swiss-badge bg-ink text-white">
                       General {totals.byType.general ?? 0}
-                    </Badge>
-                    <Badge variant="outline" className="border-ledger text-grey-mid">
+                    </span>
+                    <span className="swiss-badge bg-sage-light text-sage-dark border border-sage">
                       Restricted {totals.byType.restricted ?? 0}
-                    </Badge>
-                    <Badge variant="outline" className="border-ledger text-grey-mid">
+                    </span>
+                    <span className="swiss-badge bg-amber-light text-amber-dark border border-amber">
                       Designated {totals.byType.designated ?? 0}
-                    </Badge>
+                    </span>
                   </div>
                 </div>
               </CardContent>
@@ -154,18 +122,18 @@ export default function FundsPage() {
       {/* Main Content */}
       <div className="mx-auto max-w-6xl px-6 py-10">
         {!churchId && (
-          <div className="rounded-lg border border-dashed border-ledger bg-paper px-6 py-10 text-center text-grey-mid">
-            Add a church to Convex and select it to begin tracking funds.
+          <div className="swiss-card rounded-lg border-2 border-dashed border-ink/20 bg-white px-6 py-12 text-center">
+            <p className="text-grey-mid">Add a church to Convex and select it to begin tracking funds.</p>
           </div>
         )}
         {churchId && fundsOverview === undefined && (
-          <div className="rounded-lg border border-ledger bg-paper px-6 py-10 text-center text-grey-mid">
-            Loading fund information…
+          <div className="swiss-card rounded-lg border border-ink bg-white px-6 py-12 text-center">
+            <p className="text-grey-mid">Loading fund information…</p>
           </div>
         )}
         {churchId && fundsOverview?.length === 0 && (
-          <div className="rounded-lg border border-dashed border-ledger bg-paper px-6 py-10 text-center text-grey-mid">
-            No funds created yet. Use the &ldquo;New fund&rdquo; button to get started.
+          <div className="swiss-card rounded-lg border-2 border-dashed border-ink/20 bg-white px-6 py-12 text-center">
+            <p className="text-grey-mid">No funds created yet. Use the &ldquo;New fund&rdquo; button to get started.</p>
           </div>
         )}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -182,9 +150,9 @@ export default function FundsPage() {
 
       {/* Create Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={(open) => !open && closeCreateDialog()}>
-        <DialogContent className="max-w-2xl border-ledger bg-paper font-primary">
+        <DialogContent className="max-w-2xl border-2 border-ink bg-white shadow-[8px_8px_0px_rgba(0,0,0,0.1)]">
           <DialogHeader>
-            <DialogTitle className="text-xl text-ink">Create new fund</DialogTitle>
+            <DialogTitle className="text-xl font-semibold text-ink">Create new fund</DialogTitle>
           </DialogHeader>
           <FundForm
             onSubmit={handleCreateFund}
@@ -198,9 +166,9 @@ export default function FundsPage() {
 
       {/* Edit Dialog */}
       <Dialog open={Boolean(editingFund)} onOpenChange={(open) => !open && closeEditDialog()}>
-        <DialogContent className="max-w-2xl border-ledger bg-paper font-primary">
+        <DialogContent className="max-w-2xl border-2 border-ink bg-white shadow-[8px_8px_0px_rgba(0,0,0,0.1)]">
           <DialogHeader>
-            <DialogTitle className="text-xl text-ink">Edit fund</DialogTitle>
+            <DialogTitle className="text-xl font-semibold text-ink">Edit fund</DialogTitle>
           </DialogHeader>
           {editingFund && (
             <FundForm

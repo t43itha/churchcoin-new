@@ -63,19 +63,44 @@
 }
 
 :root {
-  --radius: 0.5rem; /* Slightly more rounded for modern feel */
+  --radius: 0.5rem;
 
-  /* ChurchCoin Sleek Ledger Palette */
-  --ink: #1A1A1A;          /* Softer Black */
-  --paper: #FAFAF9;        /* Stone-50ish, Warm Paper */
-  --ledger: #E7E5E4;       /* Stone-200, Warm Divider */
-  --grey-dark: #44403C;    /* Stone-700 */
-  --grey-mid: #78716C;     /* Stone-500 */
-  --grey-light: #F5F5F4;   /* Stone-100 */
-  --success: #15803D;      /* Green-700 */
-  --error: #B91C1C;        /* Red-700 */
-  --highlight: #F0FDFA;    /* Teal-50, subtle cool highlight */
-  --gold: #D97706;         /* Amber-600, Coin Gold */
+  /* === SWISS LEDGER DESIGN SYSTEM === */
+
+  /* Core Palette */
+  --ink: #000000;           /* Primary text, borders - true black */
+  --charcoal: #1a1a1a;      /* Dark backgrounds, secondary black */
+  --paper: #fafaf9;         /* Background - warm paper white */
+  --white: #ffffff;         /* Pure white for cards */
+
+  /* Sage (Success/Growth) */
+  --sage: #6b8e6b;          /* Primary sage */
+  --sage-dark: #557555;     /* Darker sage for text on light */
+  --sage-light: #e8f0e8;    /* Light sage background */
+
+  /* Amber (Highlight/Warmth) */
+  --amber: #d4a574;         /* Primary amber - CTA, highlights */
+  --amber-dark: #b5895b;    /* Darker amber */
+  --amber-light: #faefe6;   /* Light amber background */
+
+  /* Error */
+  --error: #c64545;         /* Error red */
+  --error-light: #fce8e8;   /* Light error background */
+
+  /* Neutrals (legacy support) */
+  --ledger: #e5e5e5;        /* Default border color */
+  --grey-dark: #44403C;     /* Stone-700 */
+  --grey-mid: #525252;      /* Muted text */
+  --grey-light: #f5f5f5;    /* Light backgrounds */
+  --success: var(--sage);   /* Map success to sage */
+  --highlight: var(--amber-light);
+  --gold: var(--amber);     /* Legacy gold mapping */
+
+  /* Hard Shadows - Swiss Ledger signature */
+  --shadow-hard-sm: 2px 2px 0px 0px rgba(0, 0, 0, 1);
+  --shadow-hard-md: 4px 4px 0px 0px rgba(0, 0, 0, 1);
+  --shadow-hard-lg: 8px 8px 0px 0px rgba(0, 0, 0, 1);
+  --shadow-hard-amber: 4px 4px 0px 0px #d4a574;
 
   /* Core theme variables mapped to ChurchCoin palette */
   --background: var(--paper);
@@ -247,5 +272,360 @@
 
   .amount-zero {
     color: var(--grey-mid);
+  }
+
+  /* === SWISS LEDGER UTILITIES === */
+
+  /* Swiss Colors */
+  .text-sage {
+    color: var(--sage);
+  }
+
+  .text-sage-dark {
+    color: var(--sage-dark);
+  }
+
+  .text-amber {
+    color: var(--amber);
+  }
+
+  .text-amber-dark {
+    color: var(--amber-dark);
+  }
+
+  .bg-sage {
+    background-color: var(--sage);
+  }
+
+  .bg-sage-light {
+    background-color: var(--sage-light);
+  }
+
+  .bg-amber {
+    background-color: var(--amber);
+  }
+
+  .bg-amber-light {
+    background-color: var(--amber-light);
+  }
+
+  .bg-error-light {
+    background-color: var(--error-light);
+  }
+
+  .border-ink {
+    border-color: var(--ink);
+  }
+
+  .border-sage {
+    border-color: var(--sage);
+  }
+
+  .border-amber {
+    border-color: var(--amber);
+  }
+
+  /* Swiss Card - Hard shadow with lift effect */
+  .swiss-card {
+    background-color: var(--white);
+    border: 1px solid var(--ink);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+  }
+
+  .swiss-card-interactive {
+    cursor: pointer;
+    box-shadow: var(--shadow-hard-sm);
+  }
+
+  .swiss-card-interactive:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: var(--shadow-hard-md);
+  }
+
+  .swiss-card-interactive:active {
+    transform: translate(0, 0);
+    box-shadow: none;
+  }
+
+  /* Swiss Buttons */
+  .swiss-button {
+    height: 48px;
+    padding: 0 24px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 4px;
+    transition: all 0.2s ease-out;
+    min-height: 44px; /* Touch target */
+  }
+
+  .swiss-button-primary {
+    background-color: var(--amber);
+    color: var(--ink);
+    border: 1px solid var(--ink);
+    box-shadow: var(--shadow-hard-sm);
+  }
+
+  .swiss-button-primary:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: var(--shadow-hard-md);
+  }
+
+  .swiss-button-primary:active {
+    transform: translate(0, 0);
+    box-shadow: none;
+  }
+
+  .swiss-button-secondary {
+    background-color: var(--sage-light);
+    color: var(--sage-dark);
+    border: 1px solid var(--sage);
+  }
+
+  .swiss-button-secondary:hover {
+    background-color: #dbe8db;
+  }
+
+  .swiss-button-ghost {
+    background-color: transparent;
+    color: var(--ink);
+    border: 1px solid transparent;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+  }
+
+  .swiss-button-ghost:hover {
+    background-color: var(--paper);
+  }
+
+  /* Swiss Input */
+  .swiss-input {
+    height: 48px;
+    font-size: 16px;
+    background-color: var(--white);
+    border: 1px solid #a3a3a3;
+    border-radius: 4px;
+    padding: 0 16px;
+    color: var(--ink);
+    transition: all 0.2s ease;
+  }
+
+  .swiss-input:focus {
+    border: 2px solid var(--ink);
+    outline: 2px solid var(--amber-light);
+    outline-offset: 2px;
+  }
+
+  .swiss-input:disabled {
+    background-color: #f5f5f5;
+    border: 1px solid #e5e5e5;
+    color: #a3a3a3;
+  }
+
+  /* Swiss Label */
+  .swiss-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--grey-mid);
+    margin-bottom: 8px;
+  }
+
+  /* Swiss Table */
+  .swiss-table {
+    border: 2px solid var(--ink);
+    border-radius: 4px;
+    background-color: var(--white);
+    overflow: hidden;
+  }
+
+  .swiss-table-header {
+    background-color: var(--paper);
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid var(--ink);
+    padding: 16px;
+  }
+
+  .swiss-table-row {
+    border-bottom: 1px solid var(--ledger);
+    min-height: 56px;
+    transition: background-color 0.15s ease;
+  }
+
+  .swiss-table-row:hover {
+    background-color: var(--amber-light);
+  }
+
+  .swiss-table-row:nth-child(even) {
+    background-color: var(--paper);
+  }
+
+  .swiss-table-row:nth-child(even):hover {
+    background-color: var(--amber-light);
+  }
+
+  .swiss-table-cell {
+    padding: 12px 16px;
+    font-size: 16px;
+  }
+
+  .swiss-table-cell-currency {
+    font-family: var(--font-mono);
+    text-align: right;
+  }
+
+  .swiss-table-cell-credit {
+    color: var(--sage);
+  }
+
+  /* Swiss Badge */
+  .swiss-badge {
+    padding: 4px 12px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid transparent;
+  }
+
+  .swiss-badge-success {
+    background-color: var(--sage-light);
+    color: var(--sage-dark);
+    border-color: var(--sage);
+  }
+
+  .swiss-badge-warning {
+    background-color: var(--amber-light);
+    color: var(--amber-dark);
+    border-color: var(--amber);
+  }
+
+  .swiss-badge-error {
+    background-color: var(--error-light);
+    color: var(--error);
+    border-color: var(--error);
+  }
+
+  .swiss-badge-neutral {
+    background-color: #f5f5f5;
+    color: var(--grey-mid);
+    border-color: #d4d4d4;
+  }
+
+  /* Fund Type Badges */
+  .swiss-badge-fund-general {
+    background-color: var(--ink);
+    color: var(--white);
+  }
+
+  .swiss-badge-fund-restricted {
+    background-color: var(--sage-light);
+    color: var(--sage-dark);
+  }
+
+  .swiss-badge-fund-designated {
+    background-color: var(--amber-light);
+    color: var(--amber-dark);
+  }
+
+  /* Step Number (Navigation) */
+  .swiss-step-number {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 4px;
+    background-color: transparent;
+    border: 1px solid var(--ledger);
+    color: var(--grey-mid);
+  }
+
+  .swiss-step-number-active {
+    background-color: var(--ink);
+    border: none;
+    color: var(--white);
+  }
+
+  /* Ledger Grid Background */
+  .ledger-grid-bg {
+    background-image:
+      linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Hard Shadow Utilities */
+  .shadow-hard-sm {
+    box-shadow: var(--shadow-hard-sm);
+  }
+
+  .shadow-hard-md {
+    box-shadow: var(--shadow-hard-md);
+  }
+
+  .shadow-hard-lg {
+    box-shadow: var(--shadow-hard-lg);
+  }
+
+  .shadow-hard-amber {
+    box-shadow: var(--shadow-hard-amber);
+  }
+
+  /* Hover Lift Animation */
+  .hover-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .hover-lift:hover {
+    transform: translate(-2px, -2px);
+  }
+
+  /* Focus Ring (Accessibility) */
+  .swiss-focus:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+  }
+
+  /* Typewriter Cursor Animation */
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
+
+  .typewriter-cursor {
+    animation: blink 1s infinite;
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    background-color: var(--ink);
+    margin-left: 2px;
+    vertical-align: text-bottom;
+  }
+
+  /* Reduced Motion */
+  @media (prefers-reduced-motion: reduce) {
+    .swiss-card-interactive,
+    .swiss-button,
+    .swiss-button-primary,
+    .hover-lift,
+    .typewriter-cursor {
+      transition: none;
+      animation: none;
+    }
+
+    .swiss-card-interactive:hover,
+    .swiss-button-primary:hover,
+    .hover-lift:hover {
+      transform: none;
+    }
   }
 }

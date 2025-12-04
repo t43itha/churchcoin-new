@@ -21,21 +21,27 @@ type GivingByFundCardProps = {
 
 export function GivingByFundCard({ givingByFund, className }: GivingByFundCardProps) {
   return (
-    <Card className={cn("border-ledger bg-paper shadow-none", className)}>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold text-ink">Giving by fund</CardTitle>
+    <Card className={cn("swiss-card border border-ink bg-white shadow-none", className)}>
+      <CardHeader className="pb-3 border-b border-ink/10">
+        <CardTitle className="swiss-label text-xs font-semibold uppercase tracking-widest text-grey-mid">
+          Giving by fund
+        </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-4">
         {givingByFund.length === 0 ? (
           <p className="text-sm text-grey-mid">No giving recorded for this donor yet.</p>
         ) : (
-          <ul className="space-y-2 text-sm">
+          <ul className="space-y-3 text-sm">
             {givingByFund.map((fund) => (
               <li key={fund.fundName} className="flex items-center justify-between text-ink">
-                <span>{fund.fundName}</span>
-                <span className="font-medium">
-                  {currency.format(fund.amount)}
-                  <span className="ml-2 text-xs text-grey-mid">({fund.count})</span>
+                <span className="font-medium">{fund.fundName}</span>
+                <span className="flex items-center gap-2">
+                  <span className="font-bold text-sage font-[family-name:var(--font-mono)]">
+                    {currency.format(fund.amount)}
+                  </span>
+                  <span className="swiss-badge text-[10px] bg-ink/5 text-grey-mid border border-ink/10">
+                    {fund.count} {fund.count === 1 ? "gift" : "gifts"}
+                  </span>
                 </span>
               </li>
             ))}

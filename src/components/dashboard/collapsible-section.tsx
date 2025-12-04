@@ -14,6 +14,14 @@ interface CollapsibleSectionProps {
 
 const STORAGE_PREFIX = "churchcoin-dashboard-section";
 
+/**
+ * CollapsibleSection - Swiss Ledger styled collapsible section
+ *
+ * Features:
+ * - Hard border with Swiss styling
+ * - Sage accent on hover
+ * - Smooth collapse animation
+ */
 export function CollapsibleSection({
   id,
   title,
@@ -43,35 +51,51 @@ export function CollapsibleSection({
   }, [id, isOpen]);
 
   return (
-    <section className="rounded-xl border border-ledger bg-white shadow-sm">
+    <section className="rounded-lg border border-ink/20 bg-white overflow-hidden">
+      {/* Header */}
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+        className={cn(
+          "flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors",
+          "hover:bg-sage-light/50",
+          isOpen && "border-b border-ink/10"
+        )}
         aria-expanded={isOpen}
       >
         <div className="flex items-center gap-3">
-          {isOpen ? (
-            <ChevronDown className="h-4 w-4 text-grey-mid" aria-hidden />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-grey-mid" aria-hidden />
-          )}
+          {/* Chevron with sage accent */}
+          <span className={cn(
+            "flex items-center justify-center w-6 h-6 rounded transition-colors",
+            isOpen ? "bg-sage text-white" : "bg-ledger text-grey-mid"
+          )}>
+            {isOpen ? (
+              <ChevronDown className="h-4 w-4" aria-hidden />
+            ) : (
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            )}
+          </span>
           <div>
-            <h2 className="font-primary text-sm font-semibold uppercase tracking-[0.2em] text-ink">
+            <h2 className="swiss-label text-xs font-semibold uppercase tracking-widest text-ink">
               {title}
             </h2>
             {description && (
-              <p className="mt-1 text-xs font-primary text-grey-mid">{description}</p>
+              <p className="mt-1 text-sm text-grey-mid">{description}</p>
             )}
           </div>
         </div>
-        <span className="text-xs font-primary uppercase text-grey-mid">
+        <span className={cn(
+          "text-xs uppercase tracking-wider font-medium transition-colors",
+          isOpen ? "text-sage" : "text-grey-mid"
+        )}>
           {isOpen ? "Hide" : "Show"}
         </span>
       </button>
+
+      {/* Content */}
       <div
         className={cn(
-          "grid overflow-hidden border-t border-ledger transition-all duration-200",
+          "grid overflow-hidden transition-all duration-300 ease-out",
           isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
         )}
       >
