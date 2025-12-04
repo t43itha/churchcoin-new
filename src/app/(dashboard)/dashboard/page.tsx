@@ -35,6 +35,7 @@ import {
 import { CollapsibleSection } from "@/components/dashboard/collapsible-section";
 import { PeriodSelector, type PeriodOption } from "@/components/dashboard/period-selector";
 import { api, type Id, type Doc } from "@/lib/convexGenerated";
+import { useChurch } from "@/contexts/church-context";
 import {
   Bar,
   BarChart,
@@ -194,8 +195,7 @@ export default function DashboardPage() {
   const [periodOffset] = useState(0);
   const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
 
-  const churches = useQuery(api.churches.listChurches, {});
-  const churchId = churches?.[0]?._id;
+  const { churchId } = useChurch();
 
   const funds = useQuery(
     api.funds.list,

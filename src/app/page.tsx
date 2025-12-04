@@ -1,6 +1,13 @@
 "use client";
 
-import { motion, useInView } from "framer-motion";
+import {
+  motion,
+  useInView,
+  useSpring,
+  useTransform,
+  useReducedMotion,
+  type Variants,
+} from "framer-motion";
 import {
   Wallet,
   Gift,
@@ -16,6 +23,513 @@ import {
 import { useState, useRef, useEffect } from "react";
 import { landingContent } from "@/components/landing/shared";
 import Link from "next/link";
+
+// ============================================================================
+// ANIMATION TIMING SYSTEM - Swiss Ledger Precision
+// ============================================================================
+const TIMING = {
+  eyebrow: 0.1,
+  headline: 0.3,
+  card: 0.4,
+  subheadline: 0.5,
+  shadow: 0.6,
+  balance: 0.7,
+  ctas: 0.7,
+  indicator: 0.9,
+  trustBadge: 0.9,
+  progressBars: 1.0,
+  stats: 1.5,
+};
+
+const EASING = {
+  smooth: [0.16, 1, 0.3, 1] as const,
+  snappy: [0.65, 0, 0.35, 1] as const,
+};
+
+// ============================================================================
+// ANIMATION VARIANTS
+// ============================================================================
+const eyebrowVariants: Variants = {
+  hidden: {
+    opacity: 0,
+    clipPath: "inset(0 100% 0 0)",
+  },
+  visible: {
+    opacity: 1,
+    clipPath: "inset(0 0% 0 0)",
+    transition: {
+      duration: 0.6,
+      ease: EASING.smooth,
+      delay: TIMING.eyebrow,
+    }
+  }
+};
+
+const indicatorPulseVariants: Variants = {
+  hidden: { scale: 0, opacity: 0 },
+  visible: {
+    scale: 1,
+    opacity: 1,
+    transition: {
+      delay: TIMING.eyebrow + 0.3,
+      type: "spring",
+      stiffness: 400,
+      damping: 15,
+    }
+  },
+  pulse: {
+    boxShadow: [
+      "0 0 0 0 rgba(107, 142, 107, 0.6)",
+      "0 0 0 8px rgba(107, 142, 107, 0)",
+    ],
+    transition: {
+      duration: 1.8,
+      repeat: Infinity,
+      ease: "easeOut",
+    }
+  }
+};
+
+const headlineContainerVariants: Variants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.06,
+      delayChildren: TIMING.headline,
+    }
+  }
+};
+
+const wordVariants: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 40,
+    filter: "blur(8px)",
+    rotateX: -15,
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    filter: "blur(0px)",
+    rotateX: 0,
+    transition: {
+      duration: 0.5,
+      ease: EASING.smooth,
+    }
+  }
+};
+
+const ctaContainerVariants: Variants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: TIMING.ctas,
+    }
+  }
+};
+
+const ctaVariants: Variants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: EASING.smooth }
+  }
+};
+
+const cardVariants: Variants = {
+  hidden: {
+    opacity: 0,
+    x: 80,
+    rotateY: -12,
+    scale: 0.92,
+  },
+  visible: {
+    opacity: 1,
+    x: 0,
+    rotateY: 0,
+    scale: 1,
+    transition: {
+      duration: 0.9,
+      ease: EASING.smooth,
+      delay: TIMING.card,
+    }
+  }
+};
+
+const shadowVariants: Variants = {
+  hidden: {
+    x: 0,
+    y: 0,
+    opacity: 0,
+  },
+  visible: {
+    x: 8,
+    y: 8,
+    opacity: 1,
+    transition: {
+      delay: TIMING.shadow,
+      duration: 0.7,
+      ease: EASING.smooth,
+    }
+  }
+};
+
+const progressBarContainerVariants: Variants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.18,
+      delayChildren: TIMING.progressBars,
+    }
+  }
+};
+
+const statsContainerVariants: Variants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.15,
+      delayChildren: TIMING.stats,
+    }
+  }
+};
+
+const statItemVariants: Variants = {
+  hidden: { opacity: 0, y: 25 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: EASING.smooth,
+    }
+  }
+};
+
+const decorativeShapeVariants: Variants = {
+  hidden: { scale: 0.8, opacity: 0 },
+  visible: (delay: number) => ({
+    scale: 1,
+    opacity: 0.6,
+    transition: {
+      delay,
+      duration: 1.2,
+      ease: EASING.smooth,
+    }
+  }),
+  breathing: (duration: number) => ({
+    scale: [1, 1.08, 1],
+    opacity: [0.5, 0.7, 0.5],
+    transition: {
+      duration,
+      repeat: Infinity,
+      ease: "easeInOut",
+    }
+  })
+};
+
+// ============================================================================
+// ANIMATED BALANCE COMPONENT - Spring-based counting
+// ============================================================================
+function AnimatedBalance({
+  value,
+  prefix = "£",
+  delay = 0,
+}: {
+  value: number;
+  prefix?: string;
+  delay?: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true });
+  const shouldReduceMotion = useReducedMotion();
+
+  const springValue = useSpring(0, {
+    stiffness: 30,
+    damping: 25,
+    mass: 1,
+  });
+
+  const displayValue = useTransform(springValue, (latest) =>
+    Math.floor(latest).toLocaleString()
+  );
+
+  const [display, setDisplay] = useState("0");
+
+  useEffect(() => {
+    if (isInView) {
+      const timer = setTimeout(() => {
+        if (shouldReduceMotion) {
+          setDisplay(value.toLocaleString());
+        } else {
+          springValue.set(value);
+        }
+      }, delay * 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isInView, value, delay, springValue, shouldReduceMotion]);
+
+  useEffect(() => {
+    if (!shouldReduceMotion) {
+      return displayValue.on("change", (v) => setDisplay(v));
+    }
+  }, [displayValue, shouldReduceMotion]);
+
+  return (
+    <div ref={ref} className="text-4xl font-bold font-mono tabular-nums">
+      <motion.span
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={isInView ? { opacity: 1, scale: 1 } : {}}
+        transition={{ delay: delay, duration: 0.4, ease: EASING.smooth }}
+      >
+        {prefix}{display}
+      </motion.span>
+    </div>
+  );
+}
+
+// ============================================================================
+// ANIMATED STAT VALUE - For income/expenses/gift aid
+// ============================================================================
+function AnimatedStatValue({
+  value,
+  prefix = "",
+  color = "inherit",
+  delay = 0,
+}: {
+  value: number;
+  prefix?: string;
+  color?: string;
+  delay?: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true });
+  const shouldReduceMotion = useReducedMotion();
+
+  const springValue = useSpring(0, {
+    stiffness: 50,
+    damping: 20,
+  });
+
+  const [display, setDisplay] = useState("0");
+
+  useEffect(() => {
+    if (isInView) {
+      const timer = setTimeout(() => {
+        if (shouldReduceMotion) {
+          setDisplay(value.toLocaleString());
+        } else {
+          springValue.set(value);
+        }
+      }, delay * 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isInView, value, delay, springValue, shouldReduceMotion]);
+
+  useEffect(() => {
+    if (!shouldReduceMotion) {
+      return springValue.on("change", (v) =>
+        setDisplay(Math.floor(v).toLocaleString())
+      );
+    }
+  }, [springValue, shouldReduceMotion]);
+
+  return (
+    <div
+      ref={ref}
+      className="text-lg font-bold font-mono tabular-nums"
+      style={{ color }}
+    >
+      {prefix}£{display}
+    </div>
+  );
+}
+
+// ============================================================================
+// ANIMATED PROGRESS BAR
+// ============================================================================
+function AnimatedProgressBar({
+  targetWidth,
+  color,
+  delay = 0,
+}: {
+  targetWidth: string;
+  color: string;
+  delay?: number;
+}) {
+  const shouldReduceMotion = useReducedMotion();
+
+  return (
+    <motion.div
+      initial={{ width: 0, opacity: 0.5 }}
+      animate={{
+        width: targetWidth,
+        opacity: 1,
+      }}
+      transition={{
+        width: {
+          duration: shouldReduceMotion ? 0.01 : 0.9,
+          ease: EASING.smooth,
+          delay: shouldReduceMotion ? 0 : delay,
+        },
+        opacity: {
+          duration: 0.3,
+          delay: shouldReduceMotion ? 0 : delay,
+        }
+      }}
+      className="h-full"
+      style={{ backgroundColor: color }}
+    />
+  );
+}
+
+// ============================================================================
+// FLOATING CARD WRAPPER - Subtle breathing animation
+// ============================================================================
+function FloatingCard({ children }: { children: React.ReactNode }) {
+  const shouldReduceMotion = useReducedMotion();
+
+  return (
+    <motion.div
+      animate={shouldReduceMotion ? {} : {
+        y: [0, -8, 0],
+      }}
+      transition={{
+        duration: 5,
+        repeat: Infinity,
+        ease: "easeInOut",
+      }}
+      whileHover={{
+        y: -12,
+        transition: { duration: 0.3, ease: EASING.snappy }
+      }}
+      className="relative"
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+// ============================================================================
+// LIVE PROGRESS BAR - Grows/shrinks to mimic live data
+// ============================================================================
+function LiveProgressBar({
+  color,
+  baseWidth,
+  variance,
+  duration,
+  delay,
+}: {
+  color: string;
+  baseWidth: number;
+  variance: number;
+  duration: number;
+  delay: number;
+}) {
+  const shouldReduceMotion = useReducedMotion();
+  const [currentPercent, setCurrentPercent] = useState(baseWidth);
+
+  // Animate the percentage display to follow the bar
+  useEffect(() => {
+    if (shouldReduceMotion) {
+      setCurrentPercent(baseWidth);
+      return;
+    }
+
+    const startDelay = delay * 1000;
+    let startTime: number;
+    let animationId: number;
+
+    const timeout = setTimeout(() => {
+      startTime = Date.now();
+
+      const tick = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = (elapsed % (duration * 1000)) / (duration * 1000);
+
+        // Sine wave oscillation
+        const oscillation = Math.sin(progress * Math.PI * 2);
+        const newPercent = baseWidth + (oscillation * variance);
+        setCurrentPercent(Math.round(newPercent));
+
+        animationId = requestAnimationFrame(tick);
+      };
+
+      animationId = requestAnimationFrame(tick);
+    }, startDelay);
+
+    return () => {
+      clearTimeout(timeout);
+      if (animationId) cancelAnimationFrame(animationId);
+    };
+  }, [baseWidth, variance, duration, delay, shouldReduceMotion]);
+
+  // Generate keyframes for width animation
+  const widthKeyframes = [
+    `${baseWidth}%`,
+    `${baseWidth + variance}%`,
+    `${baseWidth}%`,
+    `${baseWidth - variance}%`,
+    `${baseWidth}%`,
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.5, ease: EASING.smooth }}
+      className="flex items-center gap-4 group cursor-pointer"
+    >
+      {/* Indicator dot */}
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        whileHover={{
+          scale: 1.5,
+          boxShadow: `0 0 8px ${color}`,
+        }}
+        transition={{
+          delay,
+          type: "spring",
+          stiffness: 400,
+        }}
+        className="w-2 h-2"
+        style={{ backgroundColor: color }}
+      />
+
+      {/* Progress bar container */}
+      <div className="flex-1 h-2 bg-[#e5e5e5] overflow-hidden rounded-sm">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{
+            width: widthKeyframes,
+          }}
+          transition={{
+            times: [0, 0.25, 0.5, 0.75, 1],
+            duration: duration,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: delay,
+          }}
+          className="h-full"
+          style={{ backgroundColor: color }}
+        />
+      </div>
+
+      {/* Animated percentage label */}
+      <motion.span
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: delay + 0.3, duration: 0.3 }}
+        className="text-sm font-mono tabular-nums w-12 text-right"
+      >
+        {currentPercent}%
+      </motion.span>
+    </motion.div>
+  );
+}
 
 // Typewriter component for animated numbers
 function TypewriterNumber({ value, suffix = "" }: { value: string; suffix?: string }) {
@@ -172,124 +686,304 @@ export default function Home() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-24 min-h-[90vh] flex items-center">
-        {/* Decorative shapes */}
-        <div className="absolute top-40 right-20 w-32 h-32 rounded-full bg-[#e8f0e8] opacity-60" />
-        <div className="absolute bottom-40 left-10 w-20 h-20 bg-[#faefe6] opacity-60" />
+      <section className="relative pt-32 pb-24 min-h-[90vh] flex items-center overflow-hidden">
+        {/* Decorative shapes with breathing animation */}
+        <motion.div
+          custom={0.2}
+          initial="hidden"
+          animate={["visible", "breathing"]}
+          variants={decorativeShapeVariants}
+          className="absolute top-40 right-20 w-32 h-32 rounded-full bg-[#e8f0e8]"
+          style={{ willChange: "transform, opacity" }}
+        />
+        <motion.div
+          custom={0.4}
+          initial="hidden"
+          animate={["visible", "breathing"]}
+          variants={{
+            ...decorativeShapeVariants,
+            breathing: {
+              scale: [1, 1.06, 1],
+              opacity: [0.5, 0.65, 0.5],
+              rotate: [0, 3, 0],
+              transition: {
+                duration: 7,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }
+            }
+          }}
+          className="absolute bottom-40 left-10 w-20 h-20 bg-[#faefe6]"
+          style={{ willChange: "transform, opacity" }}
+        />
+        {/* Additional subtle decorative element */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.5 }}
+          animate={{
+            opacity: [0.2, 0.35, 0.2],
+            scale: [1, 1.1, 1],
+          }}
+          transition={{
+            delay: 0.8,
+            duration: 9,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="absolute top-1/2 right-1/4 w-16 h-16 rounded-full border border-[#6b8e6b]/30"
+        />
 
         <div className="max-w-7xl mx-auto px-6 relative">
           <div className="grid lg:grid-cols-12 gap-12 items-center">
             {/* Text content - 7 columns */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              className="lg:col-span-7"
-            >
-              {/* Eyebrow */}
-              <div className="mb-6">
+            <div className="lg:col-span-7">
+              {/* Eyebrow with clip-path reveal */}
+              <motion.div
+                initial="hidden"
+                animate="visible"
+                variants={eyebrowVariants}
+                className="mb-6"
+              >
                 <span className="inline-flex items-center gap-2 border border-black px-3 py-1 text-xs uppercase tracking-widest font-medium">
-                  <span className="w-2 h-2 bg-[#6b8e6b]" />
+                  <motion.span
+                    initial="hidden"
+                    animate={["visible", "pulse"]}
+                    variants={indicatorPulseVariants}
+                    className="w-2 h-2 bg-[#6b8e6b]"
+                  />
                   {landingContent.hero.eyebrow}
                 </span>
-              </div>
+              </motion.div>
 
-              {/* Headline */}
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-black leading-[1.05] mb-6 tracking-tight">
-                {landingContent.hero.headline}{" "}
-                <span className="text-[#6b8e6b]">
+              {/* Headline with staggered word reveal */}
+              <motion.h1
+                initial="hidden"
+                animate="visible"
+                variants={headlineContainerVariants}
+                className="text-5xl md:text-6xl lg:text-7xl font-bold text-black leading-[1.05] mb-6 tracking-tight"
+                style={{ perspective: "1000px" }}
+              >
+                {landingContent.hero.headline.split(" ").map((word, i) => (
+                  <motion.span
+                    key={i}
+                    variants={wordVariants}
+                    className="inline-block mr-[0.25em]"
+                    style={{ transformOrigin: "center bottom" }}
+                  >
+                    {word}
+                  </motion.span>
+                ))}
+                <motion.span
+                  variants={{
+                    hidden: {
+                      opacity: 0,
+                      y: 50,
+                      filter: "blur(10px)",
+                      scale: 0.9,
+                    },
+                    visible: {
+                      opacity: 1,
+                      y: 0,
+                      filter: "blur(0px)",
+                      scale: 1,
+                      transition: {
+                        duration: 0.7,
+                        ease: EASING.smooth,
+                      }
+                    }
+                  }}
+                  className="inline-block text-[#6b8e6b]"
+                >
                   {landingContent.hero.highlightedWord}
-                </span>
-              </h1>
+                </motion.span>
+              </motion.h1>
 
               {/* Subheadline */}
-              <p className="text-xl text-[#1a1a1a] mb-8 leading-relaxed max-w-xl">
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: TIMING.subheadline, duration: 0.6, ease: EASING.smooth }}
+                className="text-xl text-[#1a1a1a] mb-8 leading-relaxed max-w-xl"
+              >
                 {landingContent.hero.subheadline}
-              </p>
+              </motion.p>
 
-              {/* CTAs */}
-              <div className="flex flex-wrap gap-4 mb-8">
-                <Link
-                  href="/register"
-                  className="group bg-black text-white px-8 py-4 font-medium text-lg hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_#d4a574] transition-all flex items-center gap-2"
-                >
-                  {landingContent.hero.primaryCta}
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-                <Link
-                  href="/demo"
-                  className="border-2 border-black text-black px-8 py-4 font-medium text-lg hover:bg-[#f0f0ed] transition-colors"
-                >
-                  {landingContent.hero.secondaryCta}
-                </Link>
-              </div>
+              {/* CTAs with stagger and spring hover */}
+              <motion.div
+                initial="hidden"
+                animate="visible"
+                variants={ctaContainerVariants}
+                className="flex flex-wrap gap-4 mb-8"
+              >
+                <motion.div variants={ctaVariants}>
+                  <motion.div
+                    whileHover={{
+                      x: -3,
+                      y: -3,
+                      boxShadow: "6px 6px 0px #d4a574",
+                    }}
+                    whileTap={{
+                      x: 0,
+                      y: 0,
+                      boxShadow: "0px 0px 0px #d4a574",
+                    }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                  >
+                    <Link
+                      href="/register"
+                      className="group bg-black text-white px-8 py-4 font-medium text-lg flex items-center gap-2"
+                    >
+                      {landingContent.hero.primaryCta}
+                      <motion.span
+                        initial={{ x: 0 }}
+                        whileHover={{ x: 4 }}
+                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                      >
+                        <ArrowRight className="w-5 h-5" />
+                      </motion.span>
+                    </Link>
+                  </motion.div>
+                </motion.div>
+                <motion.div variants={ctaVariants}>
+                  <motion.div
+                    whileHover={{ backgroundColor: "#f0f0ed" }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Link
+                      href="/demo"
+                      className="border-2 border-black text-black px-8 py-4 font-medium text-lg block"
+                    >
+                      {landingContent.hero.secondaryCta}
+                    </Link>
+                  </motion.div>
+                </motion.div>
+              </motion.div>
 
               {/* Trust Badge */}
-              <p className="text-sm text-[#666666] font-mono">
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: TIMING.trustBadge, duration: 0.5 }}
+                className="text-sm text-[#666666] font-mono"
+              >
                 {landingContent.hero.trustBadge}
-              </p>
-            </motion.div>
+              </motion.p>
+            </div>
 
-            {/* Visual - 5 columns */}
+            {/* Visual - 5 columns with 3D card entrance */}
             <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              initial="hidden"
+              animate="visible"
+              variants={cardVariants}
               className="lg:col-span-5 relative"
+              style={{ perspective: "1200px", transformStyle: "preserve-3d" }}
             >
-              {/* Abstract data visualization placeholder */}
-              <div className="relative aspect-square">
-                <div className="absolute inset-0 border-2 border-black p-8">
-                  <div className="h-full flex flex-col justify-between">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="text-xs uppercase tracking-widest text-[#666666] mb-1">Total Balance</div>
-                        <div className="text-4xl font-bold font-mono">£127,450</div>
-                      </div>
-                      <div className="w-8 h-8 bg-[#6b8e6b]" />
-                    </div>
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-2 h-2 bg-black" />
-                        <div className="flex-1 h-2 bg-[#e5e5e5]">
-                          <div className="h-full bg-black w-3/4" />
+              <FloatingCard>
+                {/* Balance Card */}
+                <div className="relative aspect-square">
+                  <motion.div
+                    className="absolute inset-0 border-2 border-black p-8 bg-[#fafaf9]"
+                    whileHover={{ scale: 1.02 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                  >
+                    <div className="h-full flex flex-col justify-between">
+                      {/* Header with balance */}
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: TIMING.balance - 0.1, duration: 0.4 }}
+                            className="text-xs uppercase tracking-widest text-[#666666] mb-1"
+                          >
+                            Total Balance
+                          </motion.div>
+                          <AnimatedBalance value={127450} delay={TIMING.balance} />
                         </div>
-                        <span className="text-sm font-mono">75%</span>
+                        {/* Live indicator with pulse */}
+                        <motion.div
+                          initial={{ scale: 0, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{
+                            delay: TIMING.indicator,
+                            type: "spring",
+                            stiffness: 400,
+                            damping: 15,
+                          }}
+                          className="relative"
+                        >
+                          <motion.div
+                            animate={{
+                              boxShadow: [
+                                "0 0 0 0 rgba(107, 142, 107, 0.5)",
+                                "0 0 0 10px rgba(107, 142, 107, 0)",
+                              ],
+                            }}
+                            transition={{
+                              duration: 2,
+                              repeat: Infinity,
+                              ease: "easeOut",
+                              delay: TIMING.indicator + 0.5,
+                            }}
+                            className="w-8 h-8 bg-[#6b8e6b]"
+                          />
+                        </motion.div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="w-2 h-2 bg-[#6b8e6b]" />
-                        <div className="flex-1 h-2 bg-[#e5e5e5]">
-                          <div className="h-full bg-[#6b8e6b] w-1/2" />
-                        </div>
-                        <span className="text-sm font-mono">50%</span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="w-2 h-2 bg-[#d4a574]" />
-                        <div className="flex-1 h-2 bg-[#e5e5e5]">
-                          <div className="h-full bg-[#d4a574] w-1/4" />
-                        </div>
-                        <span className="text-sm font-mono">25%</span>
-                      </div>
+
+                      {/* Progress bars with live data animation */}
+                      <motion.div
+                        initial="hidden"
+                        animate="visible"
+                        variants={progressBarContainerVariants}
+                        className="space-y-4"
+                      >
+                        {[
+                          { color: "#000000", baseWidth: 75, variance: 8, duration: 3 },
+                          { color: "#6b8e6b", baseWidth: 50, variance: 12, duration: 4 },
+                          { color: "#d4a574", baseWidth: 25, variance: 10, duration: 3.5 },
+                        ].map((bar, index) => (
+                          <LiveProgressBar
+                            key={index}
+                            color={bar.color}
+                            baseWidth={bar.baseWidth}
+                            variance={bar.variance}
+                            duration={bar.duration}
+                            delay={TIMING.progressBars + index * 0.18}
+                          />
+                        ))}
+                      </motion.div>
+
+                      {/* Bottom stats with staggered reveal and counting */}
+                      <motion.div
+                        initial="hidden"
+                        animate="visible"
+                        variants={statsContainerVariants}
+                        className="grid grid-cols-3 gap-4 pt-4 border-t border-[#e5e5e5]"
+                      >
+                        <motion.div variants={statItemVariants}>
+                          <div className="text-xs uppercase tracking-widest text-[#666666]">Income</div>
+                          <AnimatedStatValue value={8240} prefix="+" color="#6b8e6b" delay={TIMING.stats} />
+                        </motion.div>
+                        <motion.div variants={statItemVariants}>
+                          <div className="text-xs uppercase tracking-widest text-[#666666]">Expenses</div>
+                          <AnimatedStatValue value={3120} prefix="-" color="#000000" delay={TIMING.stats + 0.15} />
+                        </motion.div>
+                        <motion.div variants={statItemVariants}>
+                          <div className="text-xs uppercase tracking-widest text-[#666666]">Gift Aid</div>
+                          <AnimatedStatValue value={1240} prefix="" color="#d4a574" delay={TIMING.stats + 0.3} />
+                        </motion.div>
+                      </motion.div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4 pt-4 border-t border-[#e5e5e5]">
-                      <div>
-                        <div className="text-xs uppercase tracking-widest text-[#666666]">Income</div>
-                        <div className="text-lg font-bold text-[#6b8e6b] font-mono">+£8,240</div>
-                      </div>
-                      <div>
-                        <div className="text-xs uppercase tracking-widest text-[#666666]">Expenses</div>
-                        <div className="text-lg font-bold font-mono">-£3,120</div>
-                      </div>
-                      <div>
-                        <div className="text-xs uppercase tracking-widest text-[#666666]">Gift Aid</div>
-                        <div className="text-lg font-bold text-[#d4a574] font-mono">£1,240</div>
-                      </div>
-                    </div>
-                  </div>
+                  </motion.div>
+
+                  {/* Animated hard shadow */}
+                  <motion.div
+                    initial="hidden"
+                    animate="visible"
+                    variants={shadowVariants}
+                    className="absolute inset-0 border-2 border-black -z-10 bg-[#fafaf9]"
+                  />
                 </div>
-                {/* Hard shadow */}
-                <div className="absolute inset-0 border-2 border-black translate-x-2 translate-y-2 -z-10 bg-[#fafaf9]" />
-              </div>
+              </FloatingCard>
             </motion.div>
           </div>
         </div>
